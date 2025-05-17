@@ -284,7 +284,7 @@
                 return groupedByGroupKeyFavoriteAvatars;
             },
             isLocalUserVrcplusSupporter() {
-                return this.API.currentUser.$isVRCPlus;
+                return true;
             }
         },
         methods: {
