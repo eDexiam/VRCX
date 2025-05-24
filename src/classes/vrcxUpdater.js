@@ -20,17 +20,7 @@ export default class extends baseClass {
         checkingForVRCXUpdate: false,
         pendingVRCXInstall: '',
         pendingVRCXUpdate: false,
-        branches: {
-            Stable: {
-                name: 'Stable',
-                urlReleases: 'https://api0.vrcx.app/releases/stable',
-                urlLatest: 'https://api0.vrcx.app/releases/stable/latest'
-            },
-            Nightly: {
-                name: 'Nightly',
-                urlReleases: 'https://api0.vrcx.app/releases/nightly',
-                urlLatest: 'https://api0.vrcx.app/releases/nightly/latest'
-            }
+        branches: {}
             // LinuxTest: {
             //     name: 'LinuxTest',
             //     urlReleases: 'https://api.github.com/repos/rs189/VRCX/releases',
