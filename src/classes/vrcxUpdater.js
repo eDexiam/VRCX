@@ -20,14 +20,13 @@ export default class extends baseClass {
         checkingForVRCXUpdate: false,
         pendingVRCXInstall: '',
         pendingVRCXUpdate: false,
-        branches: {}
+        branches: {},
             // LinuxTest: {
             //     name: 'LinuxTest',
             //     urlReleases: 'https://api.github.com/repos/rs189/VRCX/releases',
             //     urlLatest:
             //         'https://api.github.com/repos/rs189/VRCX/releases/latest'
             // }
-        },
         updateProgress: 0,
         updateInProgress: false
     };
