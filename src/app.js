@@ -356,7 +356,9 @@ console.log(`isLinux: ${LINUX}`);
                 languageClass: this.languageClass,
                 showGroupDialog: this.showGroupDialog,
                 showGallerySelectDialog: this.showGallerySelectDialog,
-                showGalleryDialog: this.showGalleryDialog
+                showGalleryDialog: this.showGalleryDialog,
+                getImageUrlFromImageId: this.getImageUrlFromImageId,
+                getAvatarGallery: this.getAvatarGallery
             };
         },
         el: '#root',
@@ -1436,25 +1438,30 @@ console.log(`isLinux: ${LINUX}`);
         var ref = this.cachedAvatars.get(json.id);
         if (typeof ref === 'undefined') {
             ref = {
-                id: '',
-                name: '',
-                description: '',
+                acknowledgements: '',
                 authorId: '',
                 authorName: '',
-                tags: [],
-                assetUrl: '',
-                assetUrlObject: {},
+                created_at: '',
+                description: '',
+                featured: false,
+                highestPrice: null,
+                id: '',
                 imageUrl: '',
-                thumbnailImageUrl: '',
+                lock: false,
+                lowestPrice: null,
+                name: '',
+                productId: null,
+                publishedListings: [],
                 releaseStatus: '',
+                searchable: false,
                 styles: [],
-                version: 0,
-                unityPackages: [],
+                tags: [],
+                thumbnailImageUrl: '',
                 unityPackageUrl: '',
                 unityPackageUrlObject: {},
-                created_at: '',
+                unityPackages: [],
                 updated_at: '',
-                featured: false,
+                version: 0,
                 ...json
             };
             this.cachedAvatars.set(ref.id, ref);
@@ -1468,6 +1475,10 @@ console.log(`isLinux: ${LINUX}`);
             ) {
                 ref.unityPackages = unityPackages;
             }
+        }
+        for (const listing of ref?.publishedListings) {
+            listing.displayName = $utils.replaceBioSymbols(listing.displayName);
+            listing.description = $utils.replaceBioSymbols(listing.description);
         }
         ref.name = $utils.replaceBioSymbols(ref.name);
         ref.description = $utils.replaceBioSymbols(ref.description);
@@ -9523,6 +9534,7 @@ console.log(`isLinux: ${LINUX}`);
         isIos: false,
         bundleSizes: [],
         platformInfo: {},
+        galleryImages: [],
         lastUpdated: '',
         inCache: false,
         cacheSize: 0,
@@ -9565,6 +9577,7 @@ console.log(`isLinux: ${LINUX}`);
         D.lastUpdated = '';
         D.bundleSizes = [];
         D.platformInfo = {};
+        D.galleryImages = [];
         D.isFavorite =
             API.cachedFavoritesByObjectId.has(avatarId) ||
             (API.currentUser.$isVRCPlus &&
@@ -9587,6 +9600,7 @@ console.log(`isLinux: ${LINUX}`);
             .then((args) => {
                 var { ref } = args;
                 D.ref = ref;
+                this.getAvatarGallery(avatarId);
                 this.updateVRChatAvatarCache();
                 if (/quest/.test(ref.tags)) {
                     D.isQuestFallback = true;
@@ -9619,6 +9633,22 @@ console.log(`isLinux: ${LINUX}`);
             .finally(() => {
                 this.$nextTick(() => (D.loading = false));
             });
+    };
+
+    $app.methods.getAvatarGallery = async function (avatarId) {
+        var D = this.avatarDialog;
+        const args = await avatarRequest.getAvatarGallery(avatarId);
+        if (args.params.galleryId !== D.id) {
+            return;
+        }
+        D.galleryImages = [];
+        for (const file of args.json) {
+            const url = file.versions[file.versions.length - 1].file.url;
+            D.galleryImages.push(url);
+        }
+
+        // for JSON tab treeData
+        D.ref.gallery = args.json;
     };
 
     $app.methods.selectAvatarWithConfirmation = function (id) {
@@ -11146,6 +11176,10 @@ console.log(`isLinux: ${LINUX}`);
             return user.profilePicOverride;
         }
         return user.currentAvatarImageUrl;
+    };
+
+    $app.methods.getImageUrlFromImageId = function (imageId) {
+        return `https://api.vrchat.cloud/api/1/file/${imageId}/1/`;
     };
 
     $app.methods.showConsole = function () {
@@ -13841,14 +13875,11 @@ console.log(`isLinux: ${LINUX}`);
         };
     };
 
-    //
-
     $app.methods.languageClass = function (key) {
         return languageClass(key);
     };
 
     // #endregion
-
     // #region | Electron
 
     if (LINUX) {
