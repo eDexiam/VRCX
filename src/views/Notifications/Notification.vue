@@ -1,5 +1,5 @@
 <template>
-    <div v-show="menuActiveIndex === 'notification'" v-loading="API.isNotificationsLoading" class="x-container">
+    <div v-show="menuActiveIndex === 'notification'" v-loading="isNotificationsLoading" class="x-container">
         <data-tables v-bind="notificationTable" ref="notificationTableRef" class="notification-table">
             <template #tool>
                 <div style="margin: 0 0 10px; display: flex; align-items: center">
@@ -20,6 +20,7 @@
                                 'ignoredFriendRequest',
                                 'message',
                                 'boop',
+                                'event.announcement',
                                 'groupChange',
                                 'group.announcement',
                                 'group.informative',
@@ -45,11 +46,11 @@
                         :disabled="hideTooltips">
                         <el-button
                             type="default"
-                            :loading="API.isNotificationsLoading"
+                            :loading="isNotificationsLoading"
                             icon="el-icon-refresh"
                             circle
                             style="flex: none"
-                            @click="API.refreshNotifications()" />
+                            @click="refreshNotifications()" />
                     </el-tooltip>
                 </div>
             </template>
@@ -58,9 +59,9 @@
                 <template #default="scope">
                     <el-tooltip placement="right">
                         <template #content>
-                            <span>{{ scope.row.created_at | formatDate('long') }}</span>
+                            <span>{{ formatDateFilter(scope.row.created_at, 'long') }}</span>
                         </template>
-                        <span>{{ scope.row.created_at | formatDate('short') }}</span>
+                        <span>{{ formatDateFilter(scope.row.created_at, 'short') }}</span>
                     </el-tooltip>
                 </template>
             </el-table-column>
@@ -76,7 +77,7 @@
                         v-else-if="scope.row.type === 'group.queueReady' || scope.row.type === 'instance.closed'"
                         placement="top">
                         <template #content>
-                            <location
+                            <Location
                                 v-if="scope.row.location"
                                 :location="scope.row.location"
                                 :hint="scope.row.worldName"
@@ -169,7 +170,7 @@
             <el-table-column :label="t('table.notification.message')" prop="message">
                 <template #default="scope">
                     <span v-if="scope.row.type === 'invite'" style="display: flex">
-                        <location
+                        <Location
                             v-if="scope.row.details"
                             :location="scope.row.details.worldId"
                             :hint="scope.row.details.worldName"
@@ -213,7 +214,7 @@
 
             <el-table-column :label="t('table.notification.action')" width="100" align="right">
                 <template #default="scope">
-                    <template v-if="scope.row.senderUserId !== API.currentUser.id && !scope.row.$isExpired">
+                    <template v-if="scope.row.senderUserId !== currentUser.id && !scope.row.$isExpired">
                         <template v-if="scope.row.type === 'friendRequest'">
                             <el-tooltip placement="top" content="Accept" :disabled="hideTooltips">
                                 <el-button
@@ -257,7 +258,11 @@
 
                         <template v-if="scope.row.responses">
                             <template v-for="response in scope.row.responses">
-                                <el-tooltip placement="top" :content="response.text" :disabled="hideTooltips">
+                                <el-tooltip
+                                    placement="top"
+                                    :content="response.text"
+                                    :disabled="hideTooltips"
+                                    :key="response.text">
                                     <el-button
                                         v-if="response.icon === 'check'"
                                         type="text"
@@ -399,90 +404,65 @@
             </el-table-column>
         </data-tables>
         <SendInviteResponseDialog
-            :send-invite-response-dialog-visible.sync="sendInviteResponseDialogVisible"
-            :invite-response-message-table="inviteResponseMessageTable"
-            :upload-image="uploadImage"
-            @invite-image-upload="inviteImageUpload" />
+            :send-invite-response-dialog="sendInviteResponseDialog"
+            :send-invite-response-dialog-visible.sync="sendInviteResponseDialogVisible" />
         <SendInviteRequestResponseDialog
-            :send-invite-request-response-dialog-visible.sync="sendInviteRequestResponseDialogVisible"
-            :invite-request-response-message-table="inviteRequestResponseMessageTable"
-            :upload-image="uploadImage"
-            @invite-image-upload="inviteImageUpload" />
+            :send-invite-response-dialog="sendInviteResponseDialog"
+            :send-invite-request-response-dialog-visible.sync="sendInviteRequestResponseDialogVisible" />
     </div>
 </template>
 
-<script>
-    export default {
-        name: 'NotificationTab'
-    };
-</script>
-
 <script setup>
-    import { getCurrentInstance, inject, ref } from 'vue';
+    import { storeToRefs } from 'pinia';
+    import { getCurrentInstance, ref } from 'vue';
     import { useI18n } from 'vue-i18n-bridge';
-    import { friendRequest, inviteMessagesRequest, notificationRequest, worldRequest } from '../../api';
-    import utils from '../../classes/utils';
-    import { parseLocation } from '../../composables/instance/utils';
-    import { convertFileUrlToImageUrl } from '../../composables/shared/utils';
+    import { friendRequest, notificationRequest, worldRequest } from '../../api';
+    import {
+        checkCanInvite,
+        convertFileUrlToImageUrl,
+        escapeTag,
+        formatDateFilter,
+        parseLocation,
+        removeFromArray
+    } from '../../shared/utils';
     import configRepository from '../../service/config';
-    import database from '../../service/database';
+    import { database } from '../../service/database';
+    import {
+        useAppearanceSettingsStore,
+        useGalleryStore,
+        useGameStore,
+        useGroupStore,
+        useInviteStore,
+        useLocationStore,
+        useNotificationStore,
+        useUiStore,
+        useUserStore,
+        useWorldStore
+    } from '../../stores';
     import SendInviteRequestResponseDialog from './dialogs/SendInviteRequestResponseDialog.vue';
     import SendInviteResponseDialog from './dialogs/SendInviteResponseDialog.vue';
-    import Location from '../../components/Location.vue';
+    import Noty from 'noty';
+
+    const { hideTooltips } = storeToRefs(useAppearanceSettingsStore());
+    const { showUserDialog } = useUserStore();
+    const { showWorldDialog } = useWorldStore();
+    const { showGroupDialog } = useGroupStore();
+    const { lastLocation, lastLocationDestination } = storeToRefs(useLocationStore());
+    const { refreshInviteMessageTableData } = useInviteStore();
+    const { clearInviteImageUpload } = useGalleryStore();
+    const { notificationTable, isNotificationsLoading } = storeToRefs(useNotificationStore());
+    const { refreshNotifications, handleNotificationHide } = useNotificationStore();
+    const { menuActiveIndex, shiftHeld } = storeToRefs(useUiStore());
+    const { isGameRunning } = storeToRefs(useGameStore());
+    const { showFullscreenImageDialog } = useGalleryStore();
+    const { currentUser } = storeToRefs(useUserStore());
 
     const { t } = useI18n();
 
     const { $confirm, $message } = getCurrentInstance().proxy;
 
-    const API = inject('API');
-    const showWorldDialog = inject('showWorldDialog');
-    const showGroupDialog = inject('showGroupDialog');
-    const showUserDialog = inject('showUserDialog');
-    const showFullscreenImageDialog = inject('showFullscreenImageDialog');
-
-    const props = defineProps({
-        menuActiveIndex: {
-            type: String,
-            default: ''
-        },
-        notificationTable: {
-            type: Object,
-            default: () => ({})
-        },
-        shiftHeld: { type: Boolean, default: false },
-        hideTooltips: { type: Boolean, default: false },
-        lastLocation: { type: Object, default: () => ({}) },
-        inviteResponseMessageTable: {
-            type: Object,
-            default: () => ({})
-        },
-        uploadImage: {
-            type: String,
-            default: ''
-        },
-        lastLocationDestination: {
-            type: String,
-            default: ''
-        },
-        isGameRunning: {
-            type: Boolean,
-            default: false
-        },
-        checkCanInvite: {
-            type: Function,
-            default: () => true
-        },
-        inviteRequestResponseMessageTable: {
-            type: Object,
-            default: () => ({})
-        }
-    });
-
-    const emit = defineEmits(['inviteImageUpload', 'clearInviteImageUpload']);
-
     const sendInviteResponseDialog = ref({
-        message: '',
-        messageSlot: 0,
+        messageSlot: {},
         invite: {}
     });
 
@@ -490,14 +470,10 @@
 
     const sendInviteRequestResponseDialogVisible = ref(false);
 
-    function inviteImageUpload(event) {
-        emit('inviteImageUpload', event);
-    }
-
     function saveTableFilters() {
         configRepository.setString(
             'VRCX_notificationTableFilters',
-            JSON.stringify(props.notificationTable.filters[0].value)
+            JSON.stringify(notificationTable.value.filters[0].value)
         );
     }
 
@@ -515,6 +491,16 @@
                 break;
             case 'user':
                 showUserDialog(data[1]);
+                break;
+            case 'event':
+                const ids = data[1].split(',');
+                if (ids.length < 2) {
+                    console.error('Invalid event notification link:', data[1]);
+                    return;
+                }
+
+                showGroupDialog(ids[0]);
+                // ids[1] cal_ is the event id
                 break;
         }
     }
@@ -540,16 +526,11 @@
     }
 
     function showSendInviteResponseDialog(invite) {
-        sendInviteResponseDialog.value = {
-            invite
-        };
-        inviteMessagesRequest.refreshInviteMessageTableData('response');
+        sendInviteResponseDialog.value.invite = invite;
+        sendInviteResponseDialog.value.messageSlot = {};
+        refreshInviteMessageTableData('response');
         clearInviteImageUpload();
         sendInviteResponseDialogVisible.value = true;
-    }
-
-    function clearInviteImageUpload() {
-        emit('clearInviteImageUpload');
     }
 
     function acceptRequestInvite(row) {
@@ -559,10 +540,9 @@
             type: 'info',
             callback: (action) => {
                 if (action === 'confirm') {
-                    let currentLocation = props.lastLocation.location;
-                    // todo
-                    if (props.lastLocation.location === 'traveling') {
-                        currentLocation = props.lastLocationDestination;
+                    let currentLocation = lastLocation.value.location;
+                    if (lastLocation.value.location === 'traveling') {
+                        currentLocation = lastLocationDestination.value;
                     }
                     const L = parseLocation(currentLocation);
                     worldRequest
@@ -594,17 +574,16 @@
     }
 
     function showSendInviteRequestResponseDialog(invite) {
-        sendInviteResponseDialog.value = {
-            invite
-        };
-        inviteMessagesRequest.refreshInviteMessageTableData('requestResponse');
+        sendInviteResponseDialog.value.invite = invite;
+        sendInviteResponseDialog.value.messageSlot = {};
+        refreshInviteMessageTableData('requestResponse');
         clearInviteImageUpload();
         sendInviteRequestResponseDialogVisible.value = true;
     }
 
     function sendNotificationResponse(notificationId, responses, responseType) {
         if (!Array.isArray(responses) || responses.length === 0) {
-            return null;
+            return;
         }
         let responseData = '';
         for (let i = 0; i < responses.length; i++) {
@@ -613,21 +592,41 @@
                 break;
             }
         }
-        return notificationRequest.sendNotificationResponse({
+        const params = {
             notificationId,
             responseType,
             responseData
-        });
+        };
+        notificationRequest
+            .sendNotificationResponse(params)
+            .then((json) => {
+                const args = {
+                    json,
+                    params
+                };
+                handleNotificationHide(args);
+                new Noty({
+                    type: 'success',
+                    text: escapeTag(args.json)
+                }).show();
+                console.log('NOTIFICATION:RESPONSE', args);
+            })
+            .catch((err) => {
+                handleNotificationHide({ params });
+                notificationRequest.hideNotificationV2(params.notificationId);
+                throw err;
+            });
     }
 
-    function hideNotification(row) {
+    async function hideNotification(row) {
         if (row.type === 'ignoredFriendRequest') {
-            friendRequest.deleteHiddenFriendRequest(
+            const args = await friendRequest.deleteHiddenFriendRequest(
                 {
                     notificationId: row.id
                 },
                 row.senderUserId
             );
+            useNotificationStore().handleNotificationHide(args);
         } else {
             notificationRequest.hideNotification({
                 notificationId: row.id
@@ -649,7 +648,7 @@
     }
 
     function deleteNotificationLog(row) {
-        utils.removeFromArray(props.notificationTable.data, row);
+        removeFromArray(notificationTable.value.data, row);
         if (row.type !== 'friendRequest' && row.type !== 'ignoredFriendRequest') {
             database.deleteNotification(row.id);
         }

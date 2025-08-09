@@ -1,0 +1,133 @@
+@charset "utf-8";
+
+//
+// Copyright(c) 2019-2025 pypy and individual contributors.
+// All rights reserved.
+//
+// This work is licensed under the terms of the MIT license.
+// For a copy, see <https://opensource.org/licenses/MIT>.
+//
+
+$--theme-hue: 210;
+$--theme-saturation: 15%;
+
+$--theme-bg-1: hsl($--theme-hue, $--theme-saturation, 6%); // #101010
+$--theme-bg-2: hsl($--theme-hue, $--theme-saturation, 9%); // #171717
+$--theme-bg-3: hsl($--theme-hue, $--theme-saturation, 13%); // #222222
+$--theme-bg-4: hsl($--theme-hue, $--theme-saturation, 17%); // #2b2b2b
+$--theme-bg-5: hsl($--theme-hue, $--theme-saturation, 20%); // #333333
+
+$--theme-border-1: hsl($--theme-hue, $--theme-saturation, 23%); // #3a3a3a
+$--theme-border-2: hsl($--theme-hue, $--theme-saturation, 25%); // #404040
+$--theme-border-3: hsl($--theme-hue, $--theme-saturation, 31%); // #505050
+
+$--theme-text-1: hsl($--theme-hue, $--theme-saturation, 100%); // #ffffff
+$--theme-text-2: hsl($--theme-hue, $--theme-saturation, 78%); // #c8c8c8
+$--theme-text-3: hsl($--theme-hue, $--theme-saturation, 70%); // #b3b3b3
+$--theme-text-4: hsl($--theme-hue, $--theme-saturation, 38%); // #606266
+
+$--theme-primary: #66b1ff;
+$--theme-success: #67c23a;
+$--theme-warning: #e6a23c;
+$--theme-danger: #f56c6c;
+$--theme-info: #909399;
+
+// Mapping
+
+$--color-primary: $--theme-primary;
+$--color-success: $--theme-success;
+$--color-warning: $--theme-warning;
+$--color-danger: $--theme-danger;
+$--color-info: $--theme-info;
+
+$--color-white: $--theme-text-1;
+$--color-black: $--theme-bg-1;
+
+$--color-text-primary: $--theme-text-1;
+$--color-text-regular: $--theme-text-2;
+$--color-text-secondary: $--theme-info;
+$--color-text-placeholder: $--theme-text-4;
+
+$--border-color-base: $--theme-border-1;
+$--border-color-light: $--theme-bg-5;
+$--border-color-lighter: hsl($--theme-hue, $--theme-saturation, 16%);
+$--border-color-extra-light: hsl($--theme-hue, $--theme-saturation, 15%);
+
+$--background-color-base: hsl($--theme-hue, $--theme-saturation, 16%);
+
+$--button-default-background-color: $--theme-bg-5;
+$--button-default-border-color: $--theme-border-2;
+$--button-default-font-color: $--theme-text-2;
+
+$--input-background-color: $--theme-bg-5;
+$--input-border-color: $--theme-border-1;
+$--input-font-color: $--theme-text-1;
+$--input-focus-border: hsl($--theme-hue, $--theme-saturation, 33%);
+
+$--select-input-focus-border-color: hsl($--theme-hue, $--theme-saturation, 33%);
+
+$--dialog-background-color: $--theme-bg-4;
+$--popover-background-color: $--theme-bg-4;
+
+$--table-border-color: $--theme-border-2;
+$--table-header-background-color: hsl($--theme-hue, $--theme-saturation, 15%);
+$--table-row-hover-background-color: hsl(
+    $--theme-hue,
+    $--theme-saturation,
+    18%
+);
+
+$--pagination-font-color: $--theme-text-2;
+$--pagination-background-color: $--theme-bg-4;
+
+$--tooltip-fill: $--theme-bg-4;
+$--tooltip-color: $--theme-text-1;
+$--tooltip-border-color: $--theme-bg-4;
+
+$--backtop-background-color: $--theme-bg-5;
+$--backtop-font-color: $--theme-text-2;
+$--backtop-hover-background-color: $--theme-border-2;
+
+$--datepicker-font-color: $--theme-text-1;
+$--datepicker-header-font-color: $--theme-text-1;
+$--datepicker-icon-color: $--theme-text-1;
+
+$--skeleton-color: $--theme-bg-5;
+$--skeleton-to-color: hsl($--theme-hue, $--theme-saturation, 33%);
+
+$--select-dropdown-background: $--theme-bg-4;
+$--select-dropdown-border: 1px solid $--theme-border-1;
+
+$--dropdown-menu-box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+
+$--tree-font-color: $--theme-text-2;
+$--tree-node-hover-background-color: hsl(
+    $--theme-hue,
+    $--theme-saturation,
+    16%
+);
+
+$--menu-item-font-color: $--theme-text-2;
+$--menu-background-color: $--theme-bg-2;
+
+$--collapse-header-background-color: $--theme-bg-5;
+$--collapse-content-background-color: $--theme-bg-4;
+$--collapse-border-color: $--theme-border-2;
+$--collapse-header-font-color: $--theme-text-2;
+$--collapse-content-font-color: hsl($--theme-hue, $--theme-saturation, 66%);
+
+$--message-background-color: $--theme-bg-5;
+$--message-close-icon-color: hsl($--theme-hue, $--theme-saturation, 60%);
+$--message-close-hover-color: $--theme-text-2;
+$--message-success-font-color: #52c41a;
+$--message-info-font-color: #1890ff;
+$--message-warning-font-color: #faad14;
+$--message-danger-font-color: #ff4d4f;
+
+$--pagination-hover-color: $--theme-text-4;
+
+$--font-path: '~element-ui/lib/theme-chalk/fonts';
+
+@import '~element-ui/packages/theme-chalk/src/index';
+
+@import '_theme.dark_styles';

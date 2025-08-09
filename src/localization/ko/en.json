@@ -152,7 +152,7 @@
                 "vrchat_credits": "VRChat 크레딧",
                 "refresh": "새로고침",
                 "logout": "로그아웃",
-                "manage_gallery_icon": "Manage Photos/Icons/Emojis",
+                "manage_gallery_inventory_icon": "Manage Photos/Icons/Emojis",
                 "export_friend_list": "친구 목록 내보내기",
                 "export_own_avatars": "내 아바타 목록 내보내기",
                 "discord_names": "디스코드 아이디",
@@ -428,10 +428,6 @@
                         "header": "VRChat을 종료할 때 캐시 관리",
                         "description": "오래된 버전 캐시 삭제하기"
                     },
-                    "local_world_persistence": {
-                        "header": "Local World Persistence",
-                        "description": "Localhost webserver (requires restart)"
-                    },
                     "remote_database": {
                         "header": "원격 아바타 데이터베이스",
                         "enable": "사용",
@@ -568,7 +564,7 @@
                 "request_invite_with_message": "메시지 초대 요청",
                 "invite_to_group": "그룹에 초대",
                 "send_boop": "Send Boop",
-                "manage_gallery_icon": "갤러리/아이콘/이모지 관리",
+                "manage_gallery_inventory_icon": "갤러리/아이콘/이모지 관리",
                 "accept_friend_request": "친구 요청 수락",
                 "decline_friend_request": "친구 요청 거절",
                 "cancel_friend_request": "친구 요청 취소",

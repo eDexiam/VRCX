@@ -160,7 +160,7 @@
                 "v_bucks": "V-Bucks",
                 "refresh": "Obnovit",
                 "logout": "Odhlásit se",
-                "manage_gallery_icon": "Manage Photos/Icons/Emojis/Stickers",
+                "manage_gallery_inventory_icon": "Manage Photos/Icons/Emojis/Stickers",
                 "export_friend_list": "Exportovat seznam přátel",
                 "export_own_avatars": "Exportovat vlastní avatary",
                 "discord_names": "Discord Jména",
@@ -434,10 +434,6 @@
                         "header": "Automatically Manage Cache When Closing VRChat",
                         "description": "Auto delete old versions from cache"
                     },
-                    "local_world_persistence": {
-                        "header": "Local World Persistence",
-                        "description": "Localhost webserver (requires restart)"
-                    },
                     "save_instance_prints_to_file": {
                         "header": "Save Instance Prints To File",
                         "header_tooltip": "Requires \"--enable-sdk-log-levels\" VRC launch option",
@@ -596,7 +592,7 @@
                 "request_invite_with_message": "Request Invite With Message",
                 "invite_to_group": "Invite To Group",
                 "send_boop": "Send Boop",
-                "manage_gallery_icon": "Manage VRC+ Images",
+                "manage_gallery_inventory_icon": "Manage VRC+ Images",
                 "accept_friend_request": "Accept Friend Request",
                 "decline_friend_request": "Decline Friend Request",
                 "cancel_friend_request": "Cancel Friend Request",

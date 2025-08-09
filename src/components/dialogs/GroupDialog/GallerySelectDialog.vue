@@ -26,7 +26,7 @@
                     type="default"
                     size="small"
                     icon="el-icon-upload2"
-                    :disabled="!API.currentUser.$isVRCPlus"
+                    :disabled="!currentUser.$isVRCPlus"
                     @click="displayGalleryUpload"
                     >{{ t('dialog.gallery_select.upload') }}</el-button
                 >
@@ -34,45 +34,42 @@
             <br />
             <div
                 v-for="image in galleryTable"
-                v-if="image.versions && image.versions.length > 0"
                 :key="image.id"
                 class="x-friend-item"
                 style="display: inline-block; margin-top: 10px; width: unset; cursor: default">
-                <div
-                    v-if="image.versions[image.versions.length - 1].file.url"
-                    class="vrcplus-icon"
-                    @click="selectImageGallerySelect(image.versions[image.versions.length - 1].file.url, image.id)">
-                    <img v-lazy="image.versions[image.versions.length - 1].file.url" class="avatar" />
-                </div>
+                <template v-if="image.versions && image.versions.length > 0">
+                    <div
+                        v-if="image.versions[image.versions.length - 1].file.url"
+                        class="vrcplus-icon"
+                        @click="selectImageGallerySelect(image.versions[image.versions.length - 1].file.url, image.id)">
+                        <img v-lazy="image.versions[image.versions.length - 1].file.url" class="avatar" /></div
+                ></template>
             </div>
         </div>
     </safe-dialog>
 </template>
 
 <script setup>
-    import { inject, getCurrentInstance } from 'vue';
-
+    import { storeToRefs } from 'pinia';
+    import { getCurrentInstance } from 'vue';
     import { useI18n } from 'vue-i18n-bridge';
     import { vrcPlusImageRequest } from '../../../api';
+    import { useGalleryStore, useUserStore } from '../../../stores';
+
     const { t } = useI18n();
 
     const { proxy } = getCurrentInstance();
     const { $message } = proxy;
-
-    const API = inject('API');
+    const { galleryTable } = storeToRefs(useGalleryStore());
+    const { refreshGalleryTable, handleGalleryImageAdd } = useGalleryStore();
+    const { currentUser } = storeToRefs(useUserStore());
 
     const props = defineProps({
         gallerySelectDialog: {
             type: Object,
             required: true
-        },
-        galleryTable: {
-            type: Array,
-            required: true
         }
     });
-
-    const emit = defineEmits(['refreshGalleryTable']);
 
     function selectImageGallerySelect(imageUrl, fileId) {
         const D = props.gallerySelectDialog;
@@ -87,8 +84,9 @@
 
     function onFileChangeGallery(e) {
         const clearFile = function () {
-            if (document.querySelector('#GalleryUploadButton')) {
-                document.querySelector('#GalleryUploadButton').value = '';
+            const fileInput = /** @type{HTMLInputElement} */ (document.querySelector('#GalleryUploadButton'));
+            if (fileInput) {
+                fileInput.value = '';
             }
         };
         const files = e.target.files || e.dataTransfer.files;
@@ -114,23 +112,20 @@
         }
         const r = new FileReader();
         r.onload = function () {
-            const base64Body = btoa(r.result);
+            const base64Body = btoa(r.result.toString());
             vrcPlusImageRequest.uploadGalleryImage(base64Body).then((args) => {
+                handleGalleryImageAdd(args);
                 $message({
                     message: t('message.gallery.uploaded'),
                     type: 'success'
                 });
-                // API.$on('GALLERYIMAGE:ADD')
-                if (Object.keys(props.galleryTable).length !== 0) {
-                    props.galleryTable.unshift(args.json);
+                if (Object.keys(galleryTable.value).length !== 0) {
+                    galleryTable.value.unshift(args.json);
                 }
                 return args;
             });
         };
         r.readAsBinaryString(files[0]);
         clearFile();
-    }
-    function refreshGalleryTable() {
-        emit('refreshGalleryTable');
     }
 </script>

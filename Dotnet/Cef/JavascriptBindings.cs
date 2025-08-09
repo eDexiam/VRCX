@@ -8,7 +8,6 @@ namespace VRCX
         {
             repository.NameConverter = null;
             repository.Register("AppApi", Program.AppApiInstance);
-            repository.Register("SharedVariable", SharedVariable.Instance);
             repository.Register("WebApi", WebApi.Instance);
             repository.Register("VRCXStorage", VRCXStorage.Instance);
             repository.Register("SQLite", SQLiteLegacy.Instance);
@@ -16,7 +15,7 @@ namespace VRCX
             repository.Register("Discord", Discord.Instance);
             repository.Register("AssetBundleManager", AssetBundleManager.Instance);
         }
-        
+
         public static void ApplyVrJavascriptBindings(IJavascriptObjectRepository repository)
         {
             repository.NameConverter = null;

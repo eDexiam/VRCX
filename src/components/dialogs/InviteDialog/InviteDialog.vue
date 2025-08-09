@@ -6,7 +6,7 @@
         width="500px"
         append-to-body>
         <div v-if="inviteDialog.visible" v-loading="inviteDialog.loading">
-            <location :location="inviteDialog.worldId" :link="false"></location>
+            <Location :location="inviteDialog.worldId" :link="false" />
             <br />
             <el-button size="mini" style="margin-top: 10px" @click="addSelfToInvite">{{
                 t('dialog.invite.add_self')
@@ -34,17 +34,17 @@
                 filterable
                 :disabled="inviteDialog.loading"
                 style="width: 100%; margin-top: 15px">
-                <el-option-group v-if="API.currentUser" :label="t('side_panel.me')">
+                <el-option-group v-if="currentUser" :label="t('side_panel.me')">
                     <el-option
                         class="x-friend-item"
-                        :label="API.currentUser.displayName"
-                        :value="API.currentUser.id"
+                        :label="currentUser.displayName"
+                        :value="currentUser.id"
                         style="height: auto">
-                        <div :class="['avatar', userStatusClass(API.currentUser)]">
-                            <img v-lazy="userImage(API.currentUser)" />
+                        <div :class="['avatar', userStatusClass(currentUser)]">
+                            <img v-lazy="userImage(currentUser)" />
                         </div>
                         <div class="detail">
-                            <span class="name">{{ API.currentUser.displayName }}</span>
+                            <span class="name">{{ currentUser.displayName }}</span>
                         </div>
                     </el-option>
                 </el-option-group>
@@ -156,63 +156,46 @@
         </template>
         <SendInviteDialog
             :send-invite-dialog-visible.sync="sendInviteDialogVisible"
-            :invite-message-table="inviteMessageTable"
             :send-invite-dialog="sendInviteDialog"
             :invite-dialog="inviteDialog"
-            :upload-image="uploadImage"
-            @close-invite-dialog="closeInviteDialog" />
+            @closeInviteDialog="closeInviteDialog" />
     </safe-dialog>
 </template>
 
 <script setup>
-    import { getCurrentInstance, inject, ref } from 'vue';
+    import { storeToRefs } from 'pinia';
+    import { getCurrentInstance, ref } from 'vue';
     import { useI18n } from 'vue-i18n-bridge';
-    import { instanceRequest, inviteMessagesRequest, notificationRequest } from '../../../api';
-    import { parseLocation } from '../../../composables/instance/utils';
-    import Location from '../../Location.vue';
+    import { instanceRequest, notificationRequest } from '../../../api';
+    import { parseLocation, userImage, userStatusClass } from '../../../shared/utils';
+    import { useFriendStore, useGalleryStore, useInviteStore, useUserStore } from '../../../stores';
     import SendInviteDialog from './SendInviteDialog.vue';
+
+    const { vipFriends, onlineFriends, activeFriends } = storeToRefs(useFriendStore());
+    const { refreshInviteMessageTableData } = useInviteStore();
+    const { currentUser } = storeToRefs(useUserStore());
+    const { clearInviteImageUpload } = useGalleryStore();
 
     const { t } = useI18n();
     const instance = getCurrentInstance();
     const $message = instance.proxy.$message;
     const $confirm = instance.proxy.$confirm;
 
-    const userStatusClass = inject('userStatusClass');
-    const userImage = inject('userImage');
-    const API = inject('API');
-
     const props = defineProps({
         inviteDialog: {
             type: Object,
             required: true
-        },
-        vipFriends: {
-            type: Array,
-            required: true
-        },
-        onlineFriends: {
-            type: Array,
-            required: true
-        },
-        activeFriends: {
-            type: Array,
-            required: true
-        },
-        // SendInviteDialog
-        inviteMessageTable: {
-            type: Object,
-            default: () => ({})
-        },
-        uploadImage: {
-            type: String,
-            default: ''
         }
     });
 
-    const emit = defineEmits(['clearInviteImageUpload', 'inviteImageUpload', 'closeInviteDialog']);
+    const emit = defineEmits(['closeInviteDialog']);
 
     const sendInviteDialogVisible = ref(false);
-    const sendInviteDialog = ref({ message: '', messageSlot: 0, userId: '', messageType: '', params: {} });
+    const sendInviteDialog = ref({
+        messageSlot: {},
+        userId: '',
+        params: {}
+    });
 
     function closeInviteDialog() {
         emit('closeInviteDialog');
@@ -222,21 +205,17 @@
         sendInviteDialog.value = {
             params,
             userId,
-            messageType: 'invite'
+            messageSlot: {}
         };
-        inviteMessagesRequest.refreshInviteMessageTableData('message');
+        refreshInviteMessageTableData('message');
         clearInviteImageUpload();
         sendInviteDialogVisible.value = true;
     }
 
-    function clearInviteImageUpload() {
-        emit('clearInviteImageUpload');
-    }
-
     function addSelfToInvite() {
         const D = props.inviteDialog;
-        if (!D.userIds.includes(API.currentUser.id)) {
-            D.userIds.push(API.currentUser.id);
+        if (!D.userIds.includes(currentUser.value.id)) {
+            D.userIds.push(currentUser.value.id);
         }
     }
 
@@ -251,7 +230,7 @@
 
     function addFavoriteFriendsToInvite() {
         const D = props.inviteDialog;
-        for (const friend of props.vipFriends) {
+        for (const friend of vipFriends.value) {
             if (!D.userIds.includes(friend.id)) {
                 D.userIds.push(friend.id);
             }
@@ -272,7 +251,7 @@
                 const inviteLoop = () => {
                     if (D.userIds.length > 0) {
                         const receiverUserId = D.userIds.shift();
-                        if (receiverUserId === API.currentUser.id) {
+                        if (receiverUserId === currentUser.value.id) {
                             // can't invite self!?
                             const L = parseLocation(D.worldId);
                             instanceRequest

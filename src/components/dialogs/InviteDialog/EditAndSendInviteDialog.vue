@@ -32,16 +32,20 @@
 </template>
 
 <script setup>
-    import { getCurrentInstance, inject } from 'vue';
+    import { storeToRefs } from 'pinia';
+    import { getCurrentInstance } from 'vue';
     import { useI18n } from 'vue-i18n-bridge';
     import { instanceRequest, inviteMessagesRequest, notificationRequest } from '../../../api';
-    import { parseLocation } from '../../../composables/instance/utils';
+    import { parseLocation } from '../../../shared/utils';
+    import { useGalleryStore, useUserStore } from '../../../stores';
 
     const { t } = useI18n();
     const instance = getCurrentInstance();
     const $message = instance.proxy.$message;
 
-    const API = inject('API');
+    const { uploadImage } = storeToRefs(useGalleryStore());
+    const { clearInviteImageUpload } = useGalleryStore();
+    const { currentUser } = storeToRefs(useUserStore());
 
     const props = defineProps({
         editAndSendInviteDialog: {
@@ -56,9 +60,6 @@
             type: Object,
             required: false,
             default: () => ({})
-        },
-        uploadImage: {
-            type: String
         }
     });
 
@@ -70,10 +71,11 @@
 
     async function saveEditAndSendInvite() {
         const D = props.editAndSendInviteDialog;
+        const I = props.sendInviteDialog;
         D.visible = false;
-        const messageType = D.messageType;
-        const slot = D.inviteMessage.slot;
-        if (D.inviteMessage.message !== D.newMessage) {
+        const messageType = I.messageSlot.messageType;
+        const slot = I.messageSlot.slot;
+        if (I.messageSlot.message !== D.newMessage) {
             const params = {
                 message: D.newMessage
             };
@@ -83,8 +85,7 @@
                     throw err;
                 })
                 .then((args) => {
-                    API.$emit(`INVITE:${messageType.toUpperCase()}`, args);
-                    if (args.json[slot].message === D.inviteMessage.message) {
+                    if (args.json[slot].message === I.messageSlot.message) {
                         $message({
                             message: "VRChat API didn't update message, try again",
                             type: 'error'
@@ -96,13 +97,12 @@
                     return args;
                 });
         }
-        const I = props.sendInviteDialog;
         const J = props.inviteDialog;
         if (J?.visible) {
             const inviteLoop = () => {
                 if (J.userIds.length > 0) {
                     const receiverUserId = J.userIds.shift();
-                    if (receiverUserId === API.currentUser.id) {
+                    if (receiverUserId === currentUser.value.id) {
                         // can't invite self!?
                         const L = parseLocation(J.worldId);
                         instanceRequest
@@ -111,7 +111,7 @@
                                 worldId: L.worldId
                             })
                             .finally(inviteLoop);
-                    } else if (props.uploadImage) {
+                    } else if (uploadImage.value) {
                         notificationRequest
                             .sendInvitePhoto(
                                 {
@@ -146,9 +146,9 @@
                 }
             };
             inviteLoop();
-        } else if (I.messageType === 'invite') {
+        } else if (messageType === 'invite') {
             I.params.messageSlot = slot;
-            if (props.uploadImage) {
+            if (uploadImage.value) {
                 notificationRequest
                     .sendInvitePhoto(I.params, I.userId)
                     .catch((err) => {
@@ -175,13 +175,13 @@
                         return args;
                     });
             }
-        } else if (I.messageType === 'requestInvite') {
+        } else if (messageType === 'request') {
             I.params.requestSlot = slot;
-            if (props.uploadImage) {
+            if (uploadImage.value) {
                 notificationRequest
                     .sendRequestInvitePhoto(I.params, I.userId)
                     .catch((err) => {
-                        this.clearInviteImageUpload();
+                        clearInviteImageUpload();
                         throw err;
                     })
                     .then((args) => {

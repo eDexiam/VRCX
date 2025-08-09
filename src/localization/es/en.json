@@ -254,7 +254,7 @@
                 "vrchat_credits": "Créditos de VRChat",
                 "refresh": "Haz clic para actualizar",
                 "logout": "Cerrar Sesión",
-                "manage_gallery_icon": "Gestionar Imágenes de VRC+",
+                "manage_gallery_inventory_icon": "Gestionar Imágenes de VRC+",
                 "export_friend_list": "Exportar Lista de Amigos",
                 "export_own_avatars": "Exportar Avatares Propios",
                 "discord_names": "Nombres de Discord",
@@ -535,10 +535,6 @@
                         "header": "Gestionar Caché Automáticamente al Cerrar VRChat",
                         "description": "Eliminar automáticamente las versiones antiguas de la caché"
                     },
-                    "local_world_persistence": {
-                        "header": "Persistencia de Mundo Local",
-                        "description": "Servidor web local (requiere reinicio)"
-                    },
                     "save_instance_prints_to_file": {
                         "header": "Guardar Impresiones de Instancia en Archivo",
                         "header_tooltip": "Requiere la opción de lanzamiento de VRC \"--enable-sdk-log-levels\"",
@@ -709,7 +705,7 @@
                 "request_invite_with_message": "Solicitar Invitación con Mensaje",
                 "invite_to_group": "Invitar al Grupo",
                 "send_boop": "Enviar Boop",
-                "manage_gallery_icon": "Gestionar Imágenes de VRC+",
+                "manage_gallery_inventory_icon": "Gestionar Imágenes de VRC+",
                 "accept_friend_request": "Aceptar Solicitud de Amistad",
                 "decline_friend_request": "Rechazar Solicitud de Amistad",
                 "cancel_friend_request": "Cancelar Solicitud de Amistad",

@@ -23,17 +23,19 @@
             style="margin-top: 10px">
         </el-input>
 
-        <div style="font-size: 12px; margin-top: 10px">
-            {{ t('dialog.launch_options.path_override') }}
-        </div>
+        <template v-if="!isLinux">
+            <div style="font-size: 12px; margin-top: 10px">
+                {{ t('dialog.launch_options.path_override') }}
+            </div>
 
-        <el-input
-            v-model="launchOptionsDialog.vrcLaunchPathOverride"
-            type="textarea"
-            placeholder="C:\Program Files (x86)\Steam\steamapps\common\VRChat"
-            :rows="1"
-            style="display: block; margin-top: 10px">
-        </el-input>
+            <el-input
+                v-model="launchOptionsDialog.vrcLaunchPathOverride"
+                type="textarea"
+                placeholder="C:\Program Files (x86)\Steam\steamapps\common\VRChat"
+                :rows="1"
+                style="display: block; margin-top: 10px">
+            </el-input>
+        </template>
 
         <template #footer>
             <div style="display: flex">
@@ -54,31 +56,27 @@
 </template>
 
 <script setup>
-    import { ref, inject, getCurrentInstance } from 'vue';
+    import { storeToRefs } from 'pinia';
+    import { computed, getCurrentInstance, ref } from 'vue';
     import { useI18n } from 'vue-i18n-bridge';
     import configRepository from '../../../service/config';
-
-    const openExternalLink = inject('openExternalLink');
+    import { openExternalLink } from '../../../shared/utils';
+    import { useLaunchStore } from '../../../stores';
 
     const { t } = useI18n();
 
     const instance = getCurrentInstance();
     const $message = instance.proxy.$message;
 
-    defineProps({
-        isLaunchOptionsDialogVisible: {
-            type: Boolean,
-            default: false,
-            required: true
-        }
-    });
-
-    const emit = defineEmits(['update:isLaunchOptionsDialogVisible']);
+    const launchStore = useLaunchStore();
+    const { isLaunchOptionsDialogVisible } = storeToRefs(launchStore);
 
     const launchOptionsDialog = ref({
         launchArguments: '',
         vrcLaunchPathOverride: ''
     });
+
+    const isLinux = computed(() => LINUX);
 
     function init() {
         configRepository
@@ -122,6 +120,6 @@
     }
 
     function closeDialog() {
-        emit('update:isLaunchOptionsDialogVisible');
+        isLaunchOptionsDialogVisible.value = false;
     }
 </script>

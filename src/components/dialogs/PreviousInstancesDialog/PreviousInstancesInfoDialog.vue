@@ -1,14 +1,14 @@
 <template>
     <safe-dialog
-        ref="dialog"
-        :visible="visible"
+        ref="dialogRef"
+        :visible="previousInstancesInfoDialogVisible"
         :title="$t('dialog.previous_instances.info')"
         width="800px"
         :fullscreen="fullscreen"
         destroy-on-close
-        @close="$emit('update:visible', false)">
+        @close="closeDialog">
         <div style="display: flex; align-items: center; justify-content: space-between">
-            <location :location="location.tag" style="font-size: 14px"></location>
+            <Location :location="location.tag" style="font-size: 14px" />
             <el-input
                 v-model="dataTable.filters[0].value"
                 :placeholder="$t('dialog.previous_instances.search_placeholder')"
@@ -17,17 +17,17 @@
         </div>
         <data-tables v-loading="loading" v-bind="dataTable" style="margin-top: 10px">
             <el-table-column :label="$t('table.previous_instances.date')" prop="created_at" sortable width="110">
-                <template slot-scope="scope">
+                <template #default="scope">
                     <el-tooltip placement="left">
-                        <template slot="content">
-                            <span>{{ scope.row.created_at | formatDate('long') }}</span>
+                        <template #content>
+                            <span>{{ formatDateFilter(scope.row.created_at, 'long') }}</span>
                         </template>
-                        <span>{{ scope.row.created_at | formatDate('short') }}</span>
+                        <span>{{ formatDateFilter(scope.row.created_at, 'short') }}</span>
                     </el-tooltip>
                 </template>
             </el-table-column>
             <el-table-column :label="$t('table.gameLog.icon')" prop="isFriend" width="70" align="center">
-                <template slot-scope="scope">
+                <template #default="scope">
                     <template v-if="gameLogIsFriend(scope.row)">
                         <el-tooltip v-if="gameLogIsFavorite(scope.row)" placement="top" content="Favorite">
                             <span>⭐</span>
@@ -39,17 +39,17 @@
                 </template>
             </el-table-column>
             <el-table-column :label="$t('table.previous_instances.display_name')" prop="displayName" sortable>
-                <template slot-scope="scope">
+                <template #default="scope">
                     <span class="x-link" @click="lookupUser(scope.row)">{{ scope.row.displayName }}</span>
                 </template>
             </el-table-column>
             <el-table-column :label="$t('table.previous_instances.time')" prop="time" width="100" sortable>
-                <template slot-scope="scope">
+                <template #default="scope">
                     <span>{{ scope.row.timer }}</span>
                 </template>
             </el-table-column>
             <el-table-column :label="$t('table.previous_instances.count')" prop="count" width="100" sortable>
-                <template slot-scope="scope">
+                <template #default="scope">
                     <span>{{ scope.row.count }}</span>
                 </template>
             </el-table-column>
@@ -57,105 +57,107 @@
     </safe-dialog>
 </template>
 
-<script>
-    import dayjs from 'dayjs';
-    import utils from '../../../classes/utils';
-    import { parseLocation } from '../../../composables/instance/utils';
-    import database from '../../../service/database';
-    import Location from '../../Location.vue';
+<script setup>
+    import { ref, watch, nextTick } from 'vue';
+    import { storeToRefs } from 'pinia';
+    import { database } from '../../../service/database';
+    import {
+        adjustDialogZ,
+        compareByCreatedAt,
+        parseLocation,
+        timeToText,
+        formatDateFilter
+    } from '../../../shared/utils';
+    import { useGameLogStore, useInstanceStore, useUserStore } from '../../../stores';
 
-    export default {
-        name: 'PreviousInstancesInfoDialog',
-        components: {
-            Location
-        },
-        inject: ['adjustDialogZ'],
-        props: {
-            visible: {
-                type: Boolean,
-                default: false
-            },
-            instanceId: { type: String, required: true },
-            gameLogIsFriend: { type: Function, required: true },
-            gameLogIsFavorite: { type: Function, required: true },
-            lookupUser: { type: Function, required: true },
-            isDarkMode: { type: Boolean, required: true }
-        },
-        data() {
-            return {
-                echarts: null,
-                echartsInstance: null,
-                loading: false,
-                location: {},
-                currentTab: 'table',
-                dataTable: {
-                    data: [],
-                    filters: [
-                        {
-                            prop: 'displayName',
-                            value: ''
-                        }
-                    ],
-                    tableProps: {
-                        stripe: true,
-                        size: 'mini',
-                        defaultSort: {
-                            prop: 'created_at',
-                            order: 'descending'
-                        }
-                    },
-                    pageSize: 10,
-                    paginationProps: {
-                        small: true,
-                        layout: 'sizes,prev,pager,next,total',
-                        pageSizes: [10, 25, 50, 100]
-                    }
-                },
-                fullscreen: false
-            };
-        },
-        computed: {
-            activityDetailData() {
-                return this.dataTable.data.map((item) => ({
-                    displayName: item.displayName,
-                    joinTime: dayjs(item.created_at),
-                    leaveTime: dayjs(item.created_at).add(item.time, 'ms'),
-                    time: item.time,
-                    timer: item.timer
-                }));
+    const { lookupUser } = useUserStore();
+    const { previousInstancesInfoDialogVisible, previousInstancesInfoDialogInstanceId } =
+        storeToRefs(useInstanceStore());
+    const { gameLogIsFriend, gameLogIsFavorite } = useGameLogStore();
+
+    const dialogRef = ref(null);
+
+    const loading = ref(false);
+    const location = ref({
+        tag: '',
+        isOffline: false,
+        isPrivate: false,
+        isTraveling: false,
+        isRealInstance: false,
+        worldId: '',
+        instanceId: '',
+        instanceName: '',
+        accessType: '',
+        accessTypeName: '',
+        region: '',
+        shortName: '',
+        userId: null,
+        hiddenId: null,
+        privateId: null,
+        friendsId: null,
+        groupId: null,
+        groupAccessType: null,
+        canRequestInvite: false,
+        strict: false,
+        ageGate: false
+    });
+    const dataTable = ref({
+        data: [],
+        filters: [
+            {
+                prop: 'displayName',
+                value: ''
+            }
+        ],
+        tableProps: {
+            stripe: true,
+            size: 'mini',
+            defaultSort: {
+                prop: 'created_at',
+                order: 'descending'
             }
         },
-        watch: {
-            visible(value) {
-                if (value) {
-                    this.$nextTick(() => {
-                        this.init();
-                        this.refreshPreviousInstancesInfoTable();
-                    });
-                    utils.loadEcharts().then((echarts) => {
-                        this.echarts = echarts;
-                    });
-                }
-            }
-        },
-        methods: {
-            init() {
-                this.adjustDialogZ(this.$refs.dialog.$el);
-                this.loading = true;
-                this.location = parseLocation(this.instanceId);
-            },
-            refreshPreviousInstancesInfoTable() {
-                database.getPlayersFromInstance(this.location.tag).then((data) => {
-                    const array = [];
-                    for (const entry of Array.from(data.values())) {
-                        entry.timer = utils.timeToText(entry.time);
-                        array.push(entry);
-                    }
-                    array.sort(utils.compareByCreatedAt);
-                    this.dataTable.data = array;
-                    this.loading = false;
+        pageSize: 10,
+        paginationProps: {
+            small: true,
+            layout: 'sizes,prev,pager,next,total',
+            pageSizes: [10, 25, 50, 100]
+        }
+    });
+    const fullscreen = ref(false);
+
+    watch(
+        () => previousInstancesInfoDialogVisible.value,
+        (value) => {
+            if (value) {
+                nextTick(() => {
+                    init();
+                    refreshPreviousInstancesInfoTable();
                 });
             }
         }
-    };
+    );
+
+    function init() {
+        adjustDialogZ(dialogRef.value.$el);
+        loading.value = true;
+        location.value = parseLocation(previousInstancesInfoDialogInstanceId.value);
+    }
+
+    function refreshPreviousInstancesInfoTable() {
+        database.getPlayersFromInstance(location.value.tag).then((data) => {
+            const array = [];
+            for (const entry of Array.from(data.values())) {
+                entry.timer = timeToText(entry.time);
+                array.push(entry);
+            }
+            array.sort(compareByCreatedAt);
+            dataTable.value.data = array;
+            loading.value = false;
+        });
+    }
+
+    function closeDialog() {
+        previousInstancesInfoDialogVisible.value = false;
+    }
 </script>

@@ -152,7 +152,7 @@
                 "vrchat_credits": "Créditos do VRChat",
                 "refresh": "Clique para atualizar",
                 "logout": "Encerrar Sessão",
-                "manage_gallery_icon": "Gerenciar Fotos/Icones/Emojis",
+                "manage_gallery_inventory_icon": "Gerenciar Fotos/Icones/Emojis",
                 "export_friend_list": "Exportar Lista de Amigos",
                 "export_own_avatars": "Exportar os Próprios Avatares",
                 "discord_names": "Nomes do Discord",
@@ -428,10 +428,6 @@
                         "header": "Gerenciar automaticamente o cache ao fechar o VRChat",
                         "description": "Excluir automaticamente versões antigas do cache"
                     },
-                    "local_world_persistence": {
-                        "header": "Persistência de Mundos Locais",
-                        "description": "Servidor web localhost (requere reinicialização)"
-                    },
                     "remote_database": {
                         "header": "Banco de Dados de Avatares Remotos",
                         "enable": "Ativado",
@@ -568,7 +564,7 @@
                 "request_invite_with_message": "Solicitar Convite Com Mensagem",
                 "invite_to_group": "Convidar Para Grupo",
                 "send_boop": "Enviar Boop",
-                "manage_gallery_icon": "Gerenciar Fotos/Icones/Emojis",
+                "manage_gallery_inventory_icon": "Gerenciar Fotos/Icones/Emojis",
                 "accept_friend_request": "Aceitar Pedido de Amizade",
                 "decline_friend_request": "Recusar Pedido de Amizade",
                 "cancel_friend_request": "Cancelar Pedido de Amizade",

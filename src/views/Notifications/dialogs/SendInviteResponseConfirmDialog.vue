@@ -22,25 +22,27 @@
 </template>
 
 <script setup>
+    import { storeToRefs } from 'pinia';
     import { getCurrentInstance } from 'vue';
     import { useI18n } from 'vue-i18n-bridge';
     import { notificationRequest } from '../../../api';
+    import { useGalleryStore } from '../../../stores';
+
     const { t } = useI18n();
 
     const instance = getCurrentInstance();
     const $message = instance.proxy.$message;
+    const galleryStore = useGalleryStore();
+    const { uploadImage } = storeToRefs(galleryStore);
 
     const props = defineProps({
-        sendInviteResponseConfirmDialog: {
-            type: Object,
-            required: true
-        },
-        uploadImage: {
-            type: String
-        },
         sendInviteResponseDialog: {
             type: Object,
             default: () => ({})
+        },
+        sendInviteResponseConfirmDialog: {
+            type: Object,
+            required: true
         }
     });
 
@@ -48,17 +50,18 @@
 
     function cancelInviteResponseConfirm() {
         emit('update:sendInviteResponseConfirmDialog', { visible: false });
+        props.sendInviteResponseConfirmDialog.visible = false;
     }
 
     function sendInviteResponseConfirm() {
         const D = props.sendInviteResponseDialog;
         const params = {
-            responseSlot: D.messageSlot,
+            responseSlot: D.messageSlot.slot,
             rsvp: true
         };
-        if (props.uploadImage) {
+        if (uploadImage.value) {
             notificationRequest
-                .sendInviteResponsePhoto(params, D.invite.id, D.messageType)
+                .sendInviteResponsePhoto(params, D.invite.id, D.messageSlot.messageType)
                 .catch((err) => {
                     throw err;
                 })
@@ -71,10 +74,13 @@
                         type: 'success'
                     });
                     return args;
+                })
+                .finally(() => {
+                    emit('closeInviteDialog');
                 });
         } else {
             notificationRequest
-                .sendInviteResponse(params, D.invite.id, D.messageType)
+                .sendInviteResponse(params, D.invite.id, D.messageSlot.messageType)
                 .catch((err) => {
                     throw err;
                 })
@@ -87,9 +93,11 @@
                         type: 'success'
                     });
                     return args;
+                })
+                .finally(() => {
+                    emit('closeInviteDialog');
                 });
         }
         cancelInviteResponseConfirm();
-        emit('closeInviteDialog');
     }
 </script>

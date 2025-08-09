@@ -7,12 +7,13 @@
         append-to-body
         @close="closeDialog">
         <div>
-            <div
-                v-for="image in previousImagesTable"
-                v-if="image.file"
-                :key="image.version"
-                style="display: inline-block">
-                <el-popover class="x-change-image-item" placement="right" width="500px" trigger="click">
+            <div v-for="image in previousImagesTable" :key="image.version" style="display: inline-block">
+                <el-popover
+                    class="x-change-image-item"
+                    placement="right"
+                    width="500px"
+                    trigger="click"
+                    v-if="image.file">
                     <img slot="reference" v-lazy="image.file.url" class="x-link" />
                     <img
                         v-lazy="image.file.url"
@@ -26,26 +27,16 @@
 </template>
 
 <script setup>
-    import { inject } from 'vue';
+    import { storeToRefs } from 'pinia';
     import { useI18n } from 'vue-i18n-bridge';
+    import { useGalleryStore } from '../../stores';
+
     const { t } = useI18n();
 
-    const showFullscreenImageDialog = inject('showFullscreenImageDialog');
-
-    defineProps({
-        previousImagesDialogVisible: {
-            type: Boolean,
-            required: true
-        },
-        previousImagesTable: {
-            type: Array,
-            required: true
-        }
-    });
-
-    const emit = defineEmits(['update:previousImagesDialogVisible']);
+    const { previousImagesDialogVisible, previousImagesTable } = storeToRefs(useGalleryStore());
+    const { showFullscreenImageDialog } = useGalleryStore();
 
     function closeDialog() {
-        emit('update:previousImagesDialogVisible', false);
+        previousImagesDialogVisible.value = false;
     }
 </script>

@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.IO.Compression;
+using System.Text;
 using CefSharp;
 using CefSharp.SchemeHandler;
 using CefSharp.WinForms;
@@ -12,20 +13,26 @@ namespace VRCX
     {
         public static readonly CefService Instance;
         private static readonly Logger logger = LogManager.GetCurrentClassLogger();
+        private static string _lastCefVersionPath = string.Empty;
 
         static CefService()
         {
+            _lastCefVersionPath = Path.Join(Program.AppDataDirectory, "LastCefVersion");
             Instance = new CefService();
         }
 
         internal void Init()
         {
             var userDataDir = Path.Join(Program.AppDataDirectory, "userdata");
+            // delete userdata if Cef version has been downgraded, fixes VRCX not opening after a downgrade
+            CheckCefVersion(userDataDir);
+            
             var cefSettings = new CefSettings
             {
                 RootCachePath = userDataDir,
                 CachePath = Path.Join(userDataDir, "cache"),
-                LogSeverity = LogSeverity.Disable,
+                LogSeverity = Program.LaunchDebug ? LogSeverity.Verbose : LogSeverity.Error,
+                LogFile = Path.Join(Program.AppDataDirectory, "logs", "cef.log"),
                 WindowlessRenderingEnabled = true,
                 PersistSessionCookies = true,
                 UserAgent = Program.Version,
@@ -44,8 +51,7 @@ namespace VRCX
                 ),
                 IsLocal = true
             });
-
-            // cefSettings.CefCommandLineArgs.Add("allow-universal-access-from-files");
+            
             // cefSettings.CefCommandLineArgs.Add("ignore-certificate-errors");
             // cefSettings.CefCommandLineArgs.Add("disable-plugins");
             cefSettings.CefCommandLineArgs.Add("disable-spell-checking");
@@ -99,10 +105,56 @@ namespace VRCX
             
             CefSharpSettings.ShutdownOnExit = false;
             CefSharpSettings.ConcurrentTaskExecution = true;
-
+            
             if (Cef.Initialize(cefSettings, false) == false)
             {
+                logger.Error("Cef failed to initialize");
                 throw new Exception("Cef.Initialize()");
+            }
+        }
+
+        private void CheckCefVersion(string userDataDir)
+        {
+            var currentVersion = Cef.ChromiumVersion;
+            if (File.Exists(_lastCefVersionPath))
+            {
+                var lastCefVersion = File.ReadAllText(_lastCefVersionPath).Trim();
+                var lastCefVersionParts = lastCefVersion.Split('.');
+                var currentVersionParts = currentVersion.Split('.');
+                if (lastCefVersionParts.Length != currentVersionParts.Length)
+                {
+                    logger.Info("Cef version mismatch detected, deleting userdata: {0} -> {1}", lastCefVersion,
+                        currentVersion);
+                    DeleteUserData(userDataDir);
+                }
+
+                for (var i = 0; i < lastCefVersionParts.Length; i++)
+                {
+                    if (int.TryParse(lastCefVersionParts[i], out var lastPart) &&
+                        int.TryParse(currentVersionParts[i], out var currentPart) &&
+                        lastPart > currentPart)
+                    {
+                        logger.Info("Cef downgrade detected, deleting userdata: {0} -> {1}", lastCefVersion,
+                            currentVersion);
+                        DeleteUserData(userDataDir);
+                        break;
+                    }
+                }
+            }
+
+            File.WriteAllBytes(_lastCefVersionPath, Encoding.UTF8.GetBytes(currentVersion));
+            logger.Info("Cef version: {0}", currentVersion);
+        }
+        
+        private static void DeleteUserData(string userDataDir)
+        {
+            if (!Directory.Exists(userDataDir))
+                return;
+            
+            try {
+                Directory.Delete(userDataDir, true);
+            } catch (Exception ex) {
+                logger.Error(ex, "Failed to delete userdata directory: {0}", userDataDir);
             }
         }
 

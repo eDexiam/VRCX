@@ -25,12 +25,9 @@
                 <!--                el-button(type="default" size="small" @click="deleteWorldImage" icon="el-icon-delete") Delete Latest Image-->
             </el-button-group>
             <br />
-            <div
-                v-for="image in previousImagesTable"
-                v-if="image.file"
-                :key="image.version"
-                style="display: inline-block">
+            <div v-for="image in previousImagesTable" :key="image.version" style="display: inline-block">
                 <div
+                    v-if="image.file"
                     class="x-change-image-item"
                     style="cursor: pointer"
                     :class="{ 'current-image': compareCurrentImage(image) }"
@@ -43,35 +40,31 @@
 </template>
 
 <script setup>
-    import { getCurrentInstance, inject, ref } from 'vue';
+    import { storeToRefs } from 'pinia';
+    import { getCurrentInstance, ref } from 'vue';
     import { useI18n } from 'vue-i18n-bridge';
     import { imageRequest } from '../../../api';
-    import { extractFileId } from '../../../composables/shared/utils';
-    import webApiService from '../../../service/webapi';
+    import { AppGlobal } from '../../../service/appConfig';
+    import { $throw } from '../../../service/request';
+    import { extractFileId } from '../../../shared/utils';
+    import { useGalleryStore, useWorldStore } from '../../../stores';
 
     const { t } = useI18n();
 
-    const API = inject('API');
-
     const instance = getCurrentInstance();
     const $message = instance.proxy.$message;
+
+    const { worldDialog } = storeToRefs(useWorldStore());
+    const { previousImagesTable } = storeToRefs(useGalleryStore());
 
     const props = defineProps({
         changeWorldImageDialogVisible: {
             type: Boolean,
             default: false
         },
-        previousImagesTable: {
-            type: Array,
-            default: () => []
-        },
         previousImagesFileId: {
             type: String,
             default: ''
-        },
-        worldDialog: {
-            type: Object,
-            default: () => ({})
         }
     });
 
@@ -84,7 +77,8 @@
         base64SignatureFile: '',
         signatureMd5: '',
         fileId: '',
-        avatarId: ''
+        avatarId: '',
+        worldId: ''
     });
 
     function uploadWorldImage() {
@@ -121,12 +115,13 @@
 
     function onFileChangeWorldImage(e) {
         const clearFile = function () {
-            if (document.querySelector('#WorldImageUploadButton')) {
-                document.querySelector('#WorldImageUploadButton').value = '';
+            const fileInput = /** @type {HTMLInputElement} */ (document.querySelector('#WorldImageUploadButton'));
+            if (fileInput) {
+                fileInput.value = '';
             }
         };
         const files = e.target.files || e.dataTransfer.files;
-        if (!files.length || !props.worldDialog.visible || props.worldDialog.loading) {
+        if (!files.length || !worldDialog.value.visible || worldDialog.value.loading) {
             clearFile();
             return;
         }
@@ -151,15 +146,15 @@
         const r = new FileReader();
         r.onload = async function (file) {
             try {
-                const base64File = await resizeImageToFitLimits(btoa(r.result));
+                const base64File = await resizeImageToFitLimits(btoa(r.result.toString()));
                 // 10MB
                 const fileMd5 = await genMd5(base64File);
-                const fileSizeInBytes = parseInt(file.total, 10);
+                const fileSizeInBytes = parseInt(file.total.toString(), 10);
                 const base64SignatureFile = await genSig(base64File);
                 const signatureMd5 = await genMd5(base64SignatureFile);
                 const signatureSizeInBytes = parseInt(await genLength(base64SignatureFile), 10);
-                const worldId = props.worldDialog.id;
-                const { imageUrl } = props.worldDialog.ref;
+                const worldId = worldDialog.value.id;
+                const { imageUrl } = worldDialog.value.ref;
                 const fileId = extractFileId(imageUrl);
                 if (!fileId) {
                     $message({
@@ -175,7 +170,8 @@
                     base64SignatureFile,
                     signatureMd5,
                     fileId,
-                    worldId
+                    worldId,
+                    ...worldImage.value
                 };
                 const params = {
                     fileMd5,
@@ -204,7 +200,6 @@
     }
 
     async function worldImageInit(args) {
-        // API.$on('WORLDIMAGE:INIT')
         const fileId = args.json.id;
         const fileVersion = args.json.versions[args.json.versions.length - 1].version;
         const params = {
@@ -216,7 +211,6 @@
     }
 
     async function worldImageFileStart(args) {
-        // API.$on('WORLDIMAGE:FILESTART')
         const { url } = args.json;
         const { fileId, fileVersion } = args.params;
         const params = {
@@ -239,9 +233,8 @@
         });
 
         if (json.status !== 200) {
-            // $app.worldDialog.loading = false;
             changeWorldImageDialogLoading.value = false;
-            API.$throw('World image upload failed', json, params.url);
+            $throw(json.status, 'World image upload failed', params.url);
         }
         const args = {
             json,
@@ -251,7 +244,6 @@
     }
 
     async function worldImageFileAWS(args) {
-        // API.$on('WORLDIMAGE:FILEAWS')
         const { fileId, fileVersion } = args.params;
         const params = {
             fileId,
@@ -262,7 +254,6 @@
     }
 
     async function worldImageFileFinish(args) {
-        // API.$on('WORLDIMAGE:FILEFINISH')
         const { fileId, fileVersion } = args.params;
         const params = {
             fileId,
@@ -273,7 +264,6 @@
     }
 
     async function worldImageSigStart(args) {
-        // API.$on('WORLDIMAGE:SIGSTART')
         const { url } = args.json;
         const { fileId, fileVersion } = args.params;
         const params = {
@@ -296,9 +286,8 @@
         });
 
         if (json.status !== 200) {
-            // $app.worldDialog.loading = false;
             changeWorldImageDialogLoading.value = false;
-            API.$throw('World image upload failed', json, params.url);
+            $throw(json.status, 'World image upload failed', params.url);
         }
         const args = {
             json,
@@ -308,7 +297,6 @@
     }
 
     async function worldImageSigAWS(args) {
-        // API.$on('WORLDIMAGE:SIGAWS')
         const { fileId, fileVersion } = args.params;
         const params = {
             fileId,
@@ -318,11 +306,10 @@
         return worldImageSigFinish(res);
     }
     async function worldImageSigFinish(args) {
-        // API.$on('WORLDIMAGE:SIGFINISH')
         const { fileId, fileVersion } = args.params;
         const parmas = {
             id: worldImage.value.worldId,
-            imageUrl: `${API.endpointDomain}/file/${fileId}/${fileVersion}/file`
+            imageUrl: `${AppGlobal.endpointDomain}/file/${fileId}/${fileVersion}/file`
         };
         const res = await imageRequest.setWorldImage(parmas);
         return worldImageSet(res);
@@ -337,7 +324,7 @@
             });
             refresh();
         } else {
-            API.$throw(0, 'World image change failed', args.params.imageUrl);
+            $throw(0, 'World image change failed', args.params.imageUrl);
         }
     }
 
@@ -346,8 +333,8 @@
     function setWorldImage(image) {
         changeWorldImageDialogLoading.value = true;
         const parmas = {
-            id: props.worldDialog.id,
-            imageUrl: `${API.endpointDomain}/file/${props.previousImagesFileId}/${image.version}/file`
+            id: worldDialog.value.id,
+            imageUrl: `${AppGlobal.endpointDomain}/file/${props.previousImagesFileId}/${image.version}/file`
         };
         imageRequest
             .setWorldImage(parmas)
@@ -360,35 +347,11 @@
 
     function compareCurrentImage(image) {
         if (
-            `${API.endpointDomain}/file/${props.previousImagesFileId}/${image.version}/file` ===
-            // FIXME: old:avatarDialog -> new:worldDialog, is this correct?
-            props.worldDialog.ref.imageUrl
+            `${AppGlobal.endpointDomain}/file/${props.previousImagesFileId}/${image.version}/file` ===
+            worldDialog.value.ref.imageUrl
         ) {
             return true;
         }
         return false;
     }
-
-    // $app.methods.deleteWorldImage = function () {
-    //     this.changeWorldImageDialogLoading = true;
-    //     var parmas = {
-    //         fileId: this.previousImagesTableFileId,
-    //         version: this.previousImagesTable[0].version
-    //     };
-    //     vrcPlusIconRequest
-    //         .deleteFileVersion(parmas)
-    //         .then((args) => {
-    //             this.previousImagesTableFileId = args.json.id;
-    //             var images = [];
-    //             args.json.versions.forEach((item) => {
-    //                 if (!item.deleted) {
-    //                     images.unshift(item);
-    //                 }
-    //             });
-    //             this.checkPreviousImageAvailable(images);
-    //         })
-    //         .finally(() => {
-    //             this.changeWorldImageDialogLoading = false;
-    //         });
-    // };
 </script>

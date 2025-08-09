@@ -30,23 +30,22 @@
 </template>
 
 <script setup>
-    import { getCurrentInstance, inject } from 'vue';
+    import { storeToRefs } from 'pinia';
+    import { getCurrentInstance } from 'vue';
     import { useI18n } from 'vue-i18n-bridge';
     import { inviteMessagesRequest, notificationRequest } from '../../../api';
+    import { useGalleryStore } from '../../../stores';
 
     const { t } = useI18n();
     const instance = getCurrentInstance();
     const $message = instance.proxy.$message;
-
-    const API = inject('API');
+    const galleryStore = useGalleryStore();
+    const { uploadImage } = storeToRefs(galleryStore);
 
     const props = defineProps({
         editAndSendInviteResponseDialog: {
             type: Object,
             required: true
-        },
-        uploadImage: {
-            type: String
         },
         sendInviteResponseDialog: {
             type: Object,
@@ -61,11 +60,12 @@
     }
 
     async function saveEditAndSendInviteResponse() {
+        const I = props.sendInviteResponseDialog;
         const D = props.editAndSendInviteResponseDialog;
         D.visible = false;
-        const messageType = D.messageType;
-        const slot = D.inviteMessage.slot;
-        if (D.inviteMessage.message !== D.newMessage) {
+        const messageType = I.messageSlot.messageType;
+        const slot = I.messageSlot.slot;
+        if (I.messageSlot.message !== D.newMessage) {
             const params = {
                 message: D.newMessage
             };
@@ -75,8 +75,7 @@
                     throw err;
                 })
                 .then((args) => {
-                    API.$emit(`INVITE:${messageType.toUpperCase()}`, args);
-                    if (args.json[slot].message === D.inviteMessage.message) {
+                    if (args.json[slot].message === I.messageSlot.message) {
                         $message({
                             message: "VRChat API didn't update message, try again",
                             type: 'error'
@@ -88,12 +87,11 @@
                     return args;
                 });
         }
-        const I = props.sendInviteResponseDialog;
         const params = {
             responseSlot: slot,
             rsvp: true
         };
-        if (props.uploadImage) {
+        if (uploadImage.value) {
             notificationRequest
                 .sendInviteResponsePhoto(params, I.invite.id)
                 .catch((err) => {
@@ -107,9 +105,10 @@
                         message: 'Invite response message sent',
                         type: 'success'
                     });
-
-                    emit('closeInviteDialog');
                     return args;
+                })
+                .finally(() => {
+                    emit('closeInviteDialog');
                 });
         } else {
             notificationRequest
@@ -125,8 +124,10 @@
                         message: 'Invite response message sent',
                         type: 'success'
                     });
-                    emit('closeInviteDialog');
                     return args;
+                })
+                .finally(() => {
+                    emit('closeInviteDialog');
                 });
         }
     }

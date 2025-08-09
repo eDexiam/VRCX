@@ -24,20 +24,9 @@ namespace VRCX
             var isGameRunning = false;
             var isSteamVRRunning = false;
             var isHmdAfk = false;
-            
+
             if (ProcessMonitor.Instance.IsProcessRunning("VRChat"))
                 isGameRunning = true;
-
-            if (Wine.GetIfWine())
-            {
-                var wineTmpPath = Path.Join(Program.AppDataDirectory, "wine.tmp");
-                if (File.Exists(wineTmpPath))
-                {
-                    var wineTmp = File.ReadAllText(wineTmpPath);
-                    if (wineTmp.Contains("isGameRunning=true"))
-                        isGameRunning = true;
-                }
-            }
 
             if (ProcessMonitor.Instance.IsProcessRunning("vrserver"))
                 isSteamVRRunning = true;
@@ -47,9 +36,9 @@ namespace VRCX
 
             // TODO: fix this throwing an exception for being called before the browser is ready. somehow it gets past the checks
             if (MainForm.Instance?.Browser != null && !MainForm.Instance.Browser.IsLoading && MainForm.Instance.Browser.CanExecuteJavascriptInMainFrame)
-                MainForm.Instance.Browser.ExecuteScriptAsync("$app.updateIsGameRunning", isGameRunning, isSteamVRRunning, isHmdAfk);
+                MainForm.Instance.Browser.ExecuteScriptAsync("$app.store.game.updateIsGameRunning", isGameRunning, isSteamVRRunning, isHmdAfk);
         }
-        
+
         public override bool IsGameRunning()
         {
             // unused
@@ -61,7 +50,7 @@ namespace VRCX
             // unused
             return ProcessMonitor.Instance.IsProcessRunning("vrserver");
         }
-        
+
         public override int QuitGame()
         {
             var processes = Process.GetProcessesByName("vrchat");

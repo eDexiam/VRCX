@@ -6,7 +6,7 @@
         width="800px"
         append-to-body
         @close="cancelSendInviteRequest">
-        <template v-if="API.currentUser.$isVRCPlus">
+        <template v-if="currentUser.$isVRCPlus">
             <input class="inviteImageUploadButton" type="file" accept="image/*" @change="inviteImageUpload" />
         </template>
 
@@ -36,7 +36,7 @@
                         type="text"
                         icon="el-icon-edit"
                         size="mini"
-                        @click.stop="showEditAndSendInviteDialog('request', scope.row)"></el-button>
+                        @click.stop="showEditAndSendInviteDialog(scope.row)"></el-button>
                 </template>
             </el-table-column>
         </data-tables>
@@ -45,7 +45,7 @@
             <el-button type="small" @click="cancelSendInviteRequest">{{
                 t('dialog.invite_request_message.cancel')
             }}</el-button>
-            <el-button type="small" @click="API.refreshInviteMessageTableData('request')">{{
+            <el-button type="small" @click="refreshInviteMessageTableData('request')">{{
                 t('dialog.invite_request_message.refresh')
             }}</el-button>
         </template>
@@ -53,35 +53,36 @@
             :visible.sync="isSendInviteConfirmDialogVisible"
             :send-invite-dialog="sendInviteDialog"
             :invite-dialog="inviteDialog"
-            :upload-image="uploadImage"
             @closeInviteDialog="closeInviteDialog" />
         <EditAndSendInviteDialog
             :edit-and-send-invite-dialog.sync="editAndSendInviteDialog"
             :send-invite-dialog="sendInviteDialog"
             :invite-dialog="inviteDialog"
-            :upload-image="uploadImage"
             @closeInviteDialog="closeInviteDialog" />
     </safe-dialog>
 </template>
 
 <script setup>
-    import { inject, ref } from 'vue';
+    import { storeToRefs } from 'pinia';
+    import { ref } from 'vue';
     import { useI18n } from 'vue-i18n-bridge';
+    import { useGalleryStore, useInviteStore, useUserStore } from '../../../stores';
     import EditAndSendInviteDialog from '../InviteDialog/EditAndSendInviteDialog.vue';
     import SendInviteConfirmDialog from '../InviteDialog/SendInviteConfirmDialog.vue';
 
     const { t } = useI18n();
 
-    const API = inject('API');
+    const inviteStore = useInviteStore();
+    const { refreshInviteMessageTableData } = inviteStore;
+    const { inviteRequestMessageTable } = storeToRefs(inviteStore);
+    const galleryStore = useGalleryStore();
+    const { inviteImageUpload } = galleryStore;
+    const { currentUser } = storeToRefs(useUserStore());
 
     const props = defineProps({
         sendInviteRequestDialogVisible: {
             type: Boolean,
             default: false
-        },
-        inviteRequestMessageTable: {
-            type: Object,
-            default: () => ({})
         },
         sendInviteDialog: {
             type: Object,
@@ -91,43 +92,30 @@
             type: Object,
             require: false,
             default: () => ({})
-        },
-        uploadImage: {
-            type: String,
-            default: ''
         }
     });
 
-    const emit = defineEmits(['inviteImageUpload', 'update:sendInviteRequestDialogVisible', 'closeInviteDialog']);
+    const emit = defineEmits(['update:sendInviteRequestDialogVisible', 'closeInviteDialog']);
 
     const isSendInviteConfirmDialogVisible = ref(false);
 
     const editAndSendInviteDialog = ref({
         visible: false,
-        messageType: '',
-        newMessage: '',
-        inviteMessage: {}
+        newMessage: ''
     });
 
-    function inviteImageUpload(event) {
-        emit('inviteImageUpload', event);
-    }
-
-    function showSendInviteConfirmDialog(val) {
+    function showSendInviteConfirmDialog(row) {
+        props.sendInviteDialog.messageSlot = row;
         isSendInviteConfirmDialogVisible.value = true;
-        //
-        props.sendInviteDialog.messageSlot = val.slot;
     }
 
-    function showEditAndSendInviteDialog(messageType, inviteMessage) {
+    function showEditAndSendInviteDialog(row) {
+        props.sendInviteDialog.messageSlot = row;
         editAndSendInviteDialog.value = {
-            newMessage: inviteMessage.message,
-            visible: true,
-            messageType,
-            inviteMessage
+            newMessage: row.message,
+            visible: true
         };
     }
-
     function cancelSendInviteRequest() {
         emit('update:sendInviteRequestDialogVisible', false);
     }

@@ -6,6 +6,7 @@ using System.IO;
 using System.Security.Cryptography;
 using System.Text;
 using librsync.net;
+using Newtonsoft.Json;
 using NLog;
 
 namespace VRCX
@@ -18,6 +19,14 @@ namespace VRCX
         public void Init()
         {
         }
+        
+        public JsonSerializerSettings JsonSerializerSettings = new JsonSerializerSettings
+        {
+            Error = delegate(object _, Newtonsoft.Json.Serialization.ErrorEventArgs args)
+            {
+                args.ErrorContext.Handled = true;
+            }
+        };
 
         public string MD5File(string blob)
         {
@@ -87,22 +96,22 @@ namespace VRCX
             });
         }
 
-        public string CustomCssPath()
+        public string CustomCss()
         {
-            var output = string.Empty;
             var filePath = Path.Join(Program.AppDataDirectory, "custom.css");
             if (File.Exists(filePath))
-                output = filePath;
-            return output;
+                return File.ReadAllText(filePath);
+            
+            return string.Empty;
         }
 
-        public string CustomScriptPath()
+        public string CustomScript()
         {
-            var output = string.Empty;
             var filePath = Path.Join(Program.AppDataDirectory, "custom.js");
             if (File.Exists(filePath))
-                output = filePath;
-            return output;
+                return File.ReadAllText(filePath);
+            
+            return string.Empty;
         }
 
         public string CurrentCulture()

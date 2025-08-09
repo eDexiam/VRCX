@@ -4,21 +4,25 @@
 // This work is licensed under the terms of the MIT license.
 // For a copy, see <https://opensource.org/licenses/MIT>.
 
+using System;
 using DiscordRPC;
 using System.Text;
 using System.Threading;
+using NLog;
 
 namespace VRCX
 {
     public class Discord
     {
+        private readonly Logger _logger = LogManager.GetCurrentClassLogger();
         public static readonly Discord Instance;
-        private readonly ReaderWriterLockSlim m_Lock;
-        private readonly RichPresence m_Presence;
-        private DiscordRpcClient m_Client;
-        private readonly Timer m_Timer;
-        private bool m_Active;
-        public static string DiscordAppId;
+        private readonly ReaderWriterLockSlim _lock;
+        private readonly RichPresence _presence;
+        private DiscordRpcClient _client;
+        private readonly Timer _timer;
+        private bool _active;
+        private string _discordAppId;
+        private const string VrcxUrl = "https://vrcx.app";
 
         static Discord()
         {
@@ -27,22 +31,22 @@ namespace VRCX
 
         public Discord()
         {
-            m_Lock = new ReaderWriterLockSlim();
-            m_Presence = new RichPresence();
-            m_Timer = new Timer(TimerCallback, null, -1, -1);
+            _lock = new ReaderWriterLockSlim();
+            _presence = new RichPresence();
+            _timer = new Timer(TimerCallback, null, -1, -1);
         }
 
         public void Init()
         {
-            m_Timer.Change(0, 1000);
+            _timer.Change(0, 3000);
         }
 
         public void Exit()
         {
             lock (this)
             {
-                m_Timer.Change(-1, -1);
-                m_Client?.Dispose();
+                _timer.Change(-1, -1);
+                _client?.Dispose();
             }
         }
 
@@ -54,49 +58,66 @@ namespace VRCX
                 {
                     Update();
                 }
-                catch
+                catch (Exception ex)
                 {
+                    _logger.Error(ex, "Error updating Discord Rich Presence {Error}", ex.Message);
                 }
             }
         }
 
         private void Update()
         {
-            if (m_Client == null && m_Active)
+            if (_client == null && _active)
             {
-                m_Client = new DiscordRpcClient(DiscordAppId);
-                if (!m_Client.Initialize())
+                _client = new DiscordRpcClient(_discordAppId);
+                _client.OnReady += (sender, e) =>
                 {
-                    m_Client.Dispose();
-                    m_Client = null;
+                    _logger.Info("Discord Rich Presence connected: {User}", e.User.DisplayName);
+                };
+                _client.OnError += (sender, e) =>
+                {
+                    _logger.Error("Discord Rich Presence error: {Error}", e.Message);
+                };
+                _client.OnConnectionFailed += (sender, e) =>
+                {
+                    _logger.Error("Discord Rich Presence connection failed: {Error}", e.Type);
+                };
+                _client.OnConnectionEstablished += (sender, e) =>
+                {
+                    _logger.Info("Discord Rich Presence connection established");
+                };
+                if (!_client.Initialize())
+                {
+                    _client.Dispose();
+                    _client = null;
                 }
             }
 
-            if (m_Client != null && !m_Active)
+            if (_client != null && !_active)
             {
-                m_Client.Dispose();
-                m_Client = null;
+                _client.Dispose();
+                _client = null;
             }
 
-            if (m_Client != null && !m_Lock.IsWriteLockHeld)
+            if (_client != null && !_lock.IsWriteLockHeld)
             {
-                m_Lock.EnterReadLock();
+                _lock.EnterReadLock();
                 try
                 {
-                    m_Client.SetPresence(m_Presence);
+                    _client.SetPresence(_presence);
                 }
                 finally
                 {
-                    m_Lock.ExitReadLock();
+                    _lock.ExitReadLock();
                 }
-                m_Client.Invoke();
+                _client.Invoke();
             }
         }
 
         public bool SetActive(bool active)
         {
-            m_Active = active;
-            return m_Active;
+            _active = active;
+            return _active;
         }
 
         // https://stackoverflow.com/questions/1225052/best-way-to-shorten-utf8-string-based-on-byte-length
@@ -114,102 +135,113 @@ namespace VRCX
             }
             return Encoding.UTF8.GetString(bytesArr, 0, bytesArr.Length - bytesToRemove);
         }
-
-        public void SetText(string details, string state)
+        
+        public void SetAssets(
+            string details,
+            string state,
+            string detailsUrl,
+            
+            string largeKey,
+            string largeText,
+            
+            string smallKey,
+            string smallText,
+            
+            double startUnixMilliseconds,
+            double endUnixMilliseconds,
+            
+            string partyId,
+            int partySize,
+            int partyMax,
+            string buttonText,
+            string buttonUrl,
+            string appId,
+            int activityType)
         {
-            if (m_Client == null || m_Lock.IsReadLockHeld)
-                return;
-
-            m_Lock.EnterWriteLock();
-            try
-            {
-                m_Presence.Details = LimitByteLength(details, 127);
-                m_Presence.State = LimitByteLength(state, 127);
-            }
-            finally
-            {
-                m_Lock.ExitWriteLock();
-            }
-        }
-
-        public void SetAssets(string largeKey, string largeText, string smallKey, string smallText, string partyId, int partySize, int partyMax, string buttonText, string buttonUrl, string appId)
-        {
-            m_Lock.EnterWriteLock();
+            _lock.EnterWriteLock();
             try
             {
                 if (string.IsNullOrEmpty(largeKey) &&
                     string.IsNullOrEmpty(smallKey))
                 {
-                    m_Presence.Assets = null;
+                    _presence.Assets = null;
+                    _presence.Party = null;
+                    _presence.Timestamps = null;
+                    _lock.ExitWriteLock();
+                    return;
+                }
+                
+                _presence.Details = LimitByteLength(details, 127);
+                _presence.DetailsUrl = !string.IsNullOrEmpty(detailsUrl) ? detailsUrl : null;
+                // _presence.StateUrl
+                _presence.State = LimitByteLength(state, 127);
+                _presence.Assets ??= new Assets();
+                
+                _presence.Assets.LargeImageKey = largeKey;
+                _presence.Assets.LargeImageText = largeText;
+                _presence.Assets.LargeImageUrl = VrcxUrl;
+                
+                _presence.Assets.SmallImageKey = smallKey;
+                _presence.Assets.SmallImageText = smallText;
+                // m_Presence.Assets.SmallImageUrl
+                
+                if (startUnixMilliseconds == 0)
+                {
+                    _presence.Timestamps = null;
                 }
                 else
                 {
-                    m_Presence.Assets ??= new Assets();
-                    m_Presence.Party ??= new Party();
-                    m_Presence.Assets.LargeImageKey = largeKey;
-                    m_Presence.Assets.LargeImageText = largeText;
-                    m_Presence.Assets.SmallImageKey = smallKey;
-                    m_Presence.Assets.SmallImageText = smallText;
-                    m_Presence.Party.ID = partyId;
-                    m_Presence.Party.Size = partySize;
-                    m_Presence.Party.Max = partyMax;
-                    Button[] buttons = [];
-                    if (!string.IsNullOrEmpty(buttonUrl))
-                    {
-                        buttons =
-                        [
-                            new Button { Label = buttonText, Url = buttonUrl }
-                        ];
-                    }
-                    m_Presence.Buttons = buttons;
-                    if (DiscordAppId != appId)
-                    {
-                        DiscordAppId = appId;
-                        if (m_Client != null)
-                        {
-                            m_Client.Dispose();
-                            m_Client = null;
-                        }
-                        Update();
-                    }
-                }
-            }
-            finally
-            {
-                m_Lock.ExitWriteLock();
-            }
-        }
-
-        public void SetTimestamps(double startUnixMilliseconds, double endUnixMilliseconds)
-        {
-            var _startUnixMilliseconds = (ulong)startUnixMilliseconds;
-            var _endUnixMilliseconds = (ulong)endUnixMilliseconds;
-
-            m_Lock.EnterWriteLock();
-            try
-            {
-                if (_startUnixMilliseconds == 0)
-                {
-                    m_Presence.Timestamps = null;
-                }
-                else
-                {
-                    m_Presence.Timestamps ??= new Timestamps();
-                    m_Presence.Timestamps.StartUnixMilliseconds = _startUnixMilliseconds;
-
-                    if (_endUnixMilliseconds == 0)
-                    {
-                        m_Presence.Timestamps.End = null;
-                    }
+                    _presence.Timestamps ??= new Timestamps();
+                    _presence.Timestamps.StartUnixMilliseconds = (ulong)startUnixMilliseconds;
+                    if (endUnixMilliseconds == 0)
+                        _presence.Timestamps.End = null;
                     else
-                    {
-                        m_Presence.Timestamps.EndUnixMilliseconds = _endUnixMilliseconds;
-                    }
+                        _presence.Timestamps.EndUnixMilliseconds = (ulong)endUnixMilliseconds;
                 }
+
+                if (partyMax == 0)
+                {
+                    _presence.Party = null;
+                }
+                else
+                {
+                    _presence.Party ??= new Party();
+                    _presence.Party.ID = partyId;
+                    _presence.Party.Size = partySize;
+                    _presence.Party.Max = partyMax;
+                }
+
+                _presence.Type = (ActivityType)activityType;
+                _presence.StatusDisplay = StatusDisplayType.Details;
+                
+                Button[] buttons = [];
+                if (!string.IsNullOrEmpty(buttonUrl))
+                {
+                    buttons =
+                    [
+                        new Button { Label = buttonText, Url = buttonUrl }
+                    ];
+                }
+                _presence.Buttons = buttons;
+                
+                if (_discordAppId != appId)
+                {
+                    _discordAppId = appId;
+                    if (_client != null)
+                    {
+                        _client.Dispose();
+                        _client = null;
+                    }
+                    Update();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, "Error setting Discord Rich Presence assets: {Error}", ex.Message);
             }
             finally
             {
-                m_Lock.ExitWriteLock();
+                _lock.ExitWriteLock();
             }
         }
     }

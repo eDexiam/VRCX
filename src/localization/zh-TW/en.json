@@ -257,7 +257,7 @@
                 "vrchat_credits": "擁有的 VRChat 點數",
                 "refresh": "點擊以重新整理",
                 "logout": "登出",
-                "manage_gallery_icon": "管理相簿 / 圖示 / 表情符號",
+                "manage_gallery_inventory_icon": "管理相簿 / 圖示 / 表情符號",
                 "export_friend_list": "匯出好友列表",
                 "export_own_avatars": "匯出私有角色",
                 "discord_names": "Discord 名稱",
@@ -539,10 +539,6 @@
                         "header": "關閉 VRChat 時自動管理快取",
                         "description": "自動從快取中刪除舊版本"
                     },
-                    "local_world_persistence": {
-                        "header": "本地世界狀態",
-                        "description": "本地主機 Web 伺服器 (需要重新啟動)"
-                    },
                     "save_instance_prints_to_file": {
                         "header": "將房間拍立得保存到檔案",
                         "header_tooltip": "需要 \"--enable-sdk-log-levels\" VRC 啟動選項",
@@ -713,7 +709,7 @@
                 "request_invite_with_message": "請求邀請（訊息）",
                 "invite_to_group": "邀情到群組",
                 "send_boop": "Send Boop",
-                "manage_gallery_icon": "管理相簿 / 圖示",
+                "manage_gallery_inventory_icon": "管理相簿 / 圖示",
                 "accept_friend_request": "接受好友邀請",
                 "decline_friend_request": "回絕好友邀請",
                 "cancel_friend_request": "取消好友邀請",
