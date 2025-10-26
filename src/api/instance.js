@@ -1,5 +1,6 @@
-import { $app } from '../app';
-import { t } from '../plugin';
+import { ElMessage } from 'element-plus';
+
+import { i18n } from '../plugin/i18n';
 import { request } from '../service/request';
 import { useInstanceStore } from '../stores';
 
@@ -18,6 +19,35 @@ const instanceReq = {
             };
             args.ref = instanceStore.applyInstance(json);
             return args;
+        });
+    },
+
+    /**
+     * @param {{worldId: string, instanceId: string}} params
+     * @returns {Promise<{json: any, ref: any, cache?: boolean, params}>}
+     */
+    getCachedInstance(params) {
+        const instanceStore = useInstanceStore();
+        return new Promise((resolve, reject) => {
+            const ref = instanceStore.cachedInstances.get(
+                `${params.worldId}:${params.instanceId}`
+            );
+            if (typeof ref === 'undefined') {
+                instanceReq
+                    .getInstance(params)
+                    .then((args) => {
+                        args.ref = instanceStore.applyInstance(args.json);
+                        resolve(args);
+                    })
+                    .catch(reject);
+            } else {
+                resolve({
+                    cache: true,
+                    json: ref,
+                    params,
+                    ref
+                });
+            }
         });
     },
 
@@ -110,14 +140,14 @@ const instanceReq = {
             })
             .catch((err) => {
                 if (err?.error?.message) {
-                    $app.$message({
+                    ElMessage({
                         message: err.error.message,
                         type: 'error'
                     });
                     throw err;
                 }
-                $app.$message({
-                    message: t('message.instance.not_allowed'),
+                ElMessage({
+                    message: i18n.global.t('message.instance.not_allowed'),
                     type: 'error'
                 });
                 throw err;

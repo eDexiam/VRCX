@@ -1,8 +1,7 @@
+import { ElMessage, ElMessageBox } from 'element-plus';
+
 import Noty from 'noty';
-import { $app } from '../app.js';
-import { t } from '../plugin';
-import { statusCodes } from '../shared/constants/api.js';
-import { escapeTag } from '../shared/utils';
+
 import {
     useAuthStore,
     useAvatarStore,
@@ -10,12 +9,18 @@ import {
     useUpdateLoopStore,
     useUserStore
 } from '../stores';
-import { AppGlobal } from './appConfig.js';
-import webApiService from './webapi.js';
+import { AppDebug } from './appConfig.js';
+import { escapeTag } from '../shared/utils';
+import { i18n } from '../plugin/i18n';
+import { statusCodes } from '../shared/constants/api.js';
 import { watchState } from './watchState';
+
+import webApiService from './webapi.js';
 
 const pendingGetRequests = new Map();
 export let failedGetRequests = new Map();
+
+const t = i18n.global.t;
 
 /**
  * @template T
@@ -38,7 +43,7 @@ export function request(endpoint, options) {
     }
     let req;
     const init = {
-        url: `${AppGlobal.endpointDomain}/${endpoint}`,
+        url: `${AppDebug.endpointDomain}/${endpoint}`,
         method: 'GET',
         ...options
     };
@@ -50,7 +55,7 @@ export function request(endpoint, options) {
             if (lastRun >= Date.now() - 900000) {
                 // 15mins
                 $throw(
-                    0,
+                    -1,
                     t('api.error.message.403_404_bailing_request'),
                     endpoint
                 );
@@ -102,14 +107,14 @@ export function request(endpoint, options) {
                 throw `API request blocked while logged out: ${endpoint}`;
             }
             if (!response.data) {
-                if (AppGlobal.debugWebRequests) {
+                if (AppDebug.debugWebRequests) {
                     console.log(init, 'no data', response);
                 }
                 return response;
             }
             try {
                 response.data = JSON.parse(response.data);
-                if (AppGlobal.debugWebRequests) {
+                if (AppDebug.debugWebRequests) {
                     console.log(init, 'parsed data', response.data);
                 }
                 return response;
@@ -179,10 +184,10 @@ export function request(endpoint, options) {
                 }
             }
             if (status === 403 && endpoint === 'config') {
-                $app.$alert(
+                ElMessageBox.alert(
                     t('api.error.message.vpn_in_use'),
                     `403 ${t('api.error.message.login_error')}`
-                );
+                ).catch(() => {});
                 authStore.handleLogoutEvent();
                 $throw(403, endpoint);
             }
@@ -191,7 +196,7 @@ export function request(endpoint, options) {
                 status === 404 &&
                 endpoint.startsWith('avatars/')
             ) {
-                $app.$message({
+                ElMessage({
                     message: t('message.api_handler.avatar_private_or_deleted'),
                     type: 'error'
                 });
@@ -200,6 +205,10 @@ export function request(endpoint, options) {
             }
             if (status === 404 && endpoint.endsWith('/persist/exists')) {
                 return false;
+            }
+            if (status === 404 && endpoint.endsWith('/respond')) {
+                // ignore when responding to expired notification
+                return null;
             }
             if (
                 init.method === 'GET' &&
@@ -276,15 +285,36 @@ export function $throw(code, error, endpoint) {
         );
     }
     const text = message.map((s) => escapeTag(s)).join('<br>');
-    if (text.length) {
-        if (AppGlobal.errorNoty) {
-            AppGlobal.errorNoty.close();
+    let ignoreError = false;
+    if (
+        (code === 404 || code === -1) &&
+        endpoint.split('/').length === 2 &&
+        (endpoint.startsWith('users/') ||
+            endpoint.startsWith('worlds/') ||
+            endpoint.startsWith('avatars/') ||
+            endpoint.startsWith('groups/') ||
+            endpoint.startsWith('file/'))
+    ) {
+        ignoreError = true;
+    }
+    if (
+        (code === 403 || code === 404 || code === -1) &&
+        endpoint.startsWith('instances/')
+    ) {
+        ignoreError = true;
+    }
+    if (endpoint.startsWith('analysis/')) {
+        ignoreError = true;
+    }
+    if (text.length && !ignoreError) {
+        if (AppDebug.errorNoty) {
+            AppDebug.errorNoty.close();
         }
-        AppGlobal.errorNoty = new Noty({
+        AppDebug.errorNoty = new Noty({
             type: 'error',
             text
         });
-        AppGlobal.errorNoty.show();
+        AppDebug.errorNoty.show();
     }
     const e = new Error(text);
     e.status = code;

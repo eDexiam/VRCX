@@ -7,6 +7,9 @@ declare global {
 
     interface Window {
         $app: any;
+        $pinia: any;
+        $vr: any;
+        $debug: AppDebug;
         AppApi: AppApi;
         AppApiVr: AppApiVr;
         WebApi: WebApi;
@@ -17,6 +20,8 @@ declare global {
         AssetBundleManager: AssetBundleManager;
         webApiService: webApiService;
         request: any;
+        utils: any;
+        dayjs: any;
         configRepository: any;
         datebase: any;
         gameLogService: any;
@@ -30,6 +35,7 @@ declare global {
             ) => Promise<any>;
         };
         electron: {
+            getArch: () => Promise<string>;
             openFileDialog: () => Promise<string>;
             openDirectoryDialog: () => Promise<string>;
             desktopNotification: (
@@ -52,6 +58,7 @@ declare global {
             onWindowStateChange: (
                 Function: (event: any, state: { windowState: any }) => void
             ) => void;
+            onBrowserFocus: (Function: (event: any) => void) => void;
             restartApp: () => Promise<void>;
             getWristOverlayWindow: () => Promise<boolean>;
             getHmdOverlayWindow: () => Promise<boolean>;
@@ -62,11 +69,13 @@ declare global {
                 menuButton: bool,
                 overlayHand: int
             ) => Promise<void>;
+            ipcRenderer: {
+                on(channel: String, func: (...args: unknown[]) => void);
+            };
         };
-        __APP_GLOBALS__: AppGlobals;
     }
 
-    interface AppGlobals {
+    interface AppDebug {
         debug: boolean;
         debugWebSocket: boolean;
         debugUserDiff: boolean;
@@ -74,6 +83,8 @@ declare global {
         debugGameLog: boolean;
         debugWebRequests: boolean;
         debugFriendState: boolean;
+        debugIPC: boolean;
+        debugVrcPlus: boolean;
         errorNoty: any;
         dontLogMeOut: boolean;
         endpointDomain: string;
@@ -139,7 +150,8 @@ declare global {
             buttonText: string,
             buttonUrl: string,
             appId: string,
-            activityType: number
+            activityType: number,
+            statusDisplayType: number
         ): Promise<void>;
         SetActive(active: boolean): Promise<boolean>;
     };
@@ -165,7 +177,6 @@ declare global {
         ): Promise<void>;
         RestartApplication(isUpgrade: boolean): Promise<void>;
         CheckForUpdateExe(): Promise<boolean>;
-        ExecuteAppFunction(key: string, json: string): Promise<void>;
         ExecuteVrFeedFunction(key: string, json: string): Promise<void>;
         ExecuteVrOverlayFunction(key: string, json: string): Promise<void>;
         FocusWindow(): Promise<void>;
@@ -176,13 +187,9 @@ declare global {
         CopyImageToClipboard(path: string): Promise<void>;
         FlashWindow(): Promise<void>;
         SetUserAgent(): Promise<void>;
-        IsRunningUnderWine(): Promise<boolean>;
 
         // Common Functions
-        MD5File(blob: string): Promise<string>;
         GetColourFromUserID(userId: string): Promise<number>;
-        SignFile(blob: string): Promise<string>;
-        FileLength(blob: string): Promise<string>;
         OpenLink(url: string): Promise<void>;
         GetLaunchCommand(): Promise<string>;
         IPCAnnounceStart(): Promise<void>;
@@ -196,9 +203,16 @@ declare global {
         GetColourBulk(userIds: string[]): Promise<Record<string, number>>;
         SetAppLauncherSettings(
             enabled: boolean,
-            killOnExit: boolean
+            killOnExit: boolean,
+            runProcessOnce: boolean
         ): Promise<void>;
         GetFileBase64(path: string): Promise<string | null>;
+        TryOpenInstanceInVrc(launchUrl: string): Promise<boolean>;
+
+        // Image Upload (Cef Only)
+        MD5File(blob: string): Promise<string>;
+        SignFile(blob: string): Promise<string>;
+        FileLength(blob: string): Promise<string>;
 
         // Folders
         GetVRChatAppDataLocation(): Promise<string>;
@@ -290,6 +304,8 @@ declare global {
             searchType?: number
         ): Promise<string>;
         GetLastScreenshot(): Promise<string>;
+        DeleteScreenshotMetadata(path: string): Promise<boolean>;
+        DeleteAllScreenshotMetadata(): Promise<void>;
 
         // Moderations
         GetVRChatModerations(
@@ -313,8 +329,7 @@ declare global {
         // Update
         DownloadUpdate(
             fileUrl: string,
-            fileName: string,
-            hashUrl: string,
+            hashString: string,
             downloadSize: number
         ): Promise<void>;
         CancelUpdate(): Promise<void>;
@@ -348,7 +363,6 @@ declare global {
         GetUptime(): Promise<number>;
         CurrentCulture(): Promise<string>;
         CustomVrScript(): Promise<string>;
-        IsRunningUnderWine(): Promise<boolean>;
         GetExecuteVrFeedFunctionQueue(): Promise<Map<string, string>>;
         GetExecuteVrOverlayFunctionQueue(): Promise<Map<string, string>>;
     };

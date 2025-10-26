@@ -153,9 +153,6 @@
                 "refresh": "Kliknij, aby odświeżyć",
                 "logout": "Wyloguj się",
                 "manage_gallery_inventory_icon": "Zarządzaj obrazkami/ikonami/emoji",
-                "export_friend_list": "Eksportuj listę znajomych",
-                "export_own_avatars": "Eksportuj własne awatary",
-                "discord_names": "Nazwy Discord",
                 "export_notes": "Eksportuj notatki"
             },
             "game_info": {
@@ -520,6 +517,13 @@
                     }
                 }
             }
+        },
+        "tools": {
+            "export": {
+                "discord_names": "Nazwy Discord",
+                "export_friend_list": "Eksportuj listę znajomych",
+                "export_own_avatars": "Eksportuj własne awatary"
+            }
         }
     },
     "side_panel": {
@@ -869,7 +873,8 @@
                 "role_description": "Opis:",
                 "role_updated_at": "Zaktualizowano:",
                 "role_created_at": "Data utworzenia:",
-                "role_permissions": "Uprawnienia:"
+                "role_permissions": "Uprawnienia:",
+                "last_visited": "Ostatnia wizyta"
             },
             "posts": {
                 "header": "Posty",
@@ -1072,7 +1077,6 @@
             "location": "Lokalizacja",
             "copy_tooltip": "Skopiuj do schowka",
             "start_as_desktop": "Uruchom jako PC (bez VR)",
-            "info": "Informacje",
             "invite": "Zaproś",
             "launch": "Uruchom"
         },

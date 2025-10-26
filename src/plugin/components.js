@@ -1,7 +1,6 @@
-import Vue from 'vue';
 import AvatarInfo from '../components/AvatarInfo.vue';
 import CountdownTimer from '../components/CountdownTimer.vue';
-import SafeDialog from '../components/dialogs/SafeDialog.vue';
+import DataTable from '../components/DataTable.vue';
 import DisplayName from '../components/DisplayName.vue';
 import InstanceInfo from '../components/InstanceInfo.vue';
 import InviteYourself from '../components/InviteYourself.vue';
@@ -9,18 +8,18 @@ import LastJoin from '../components/LastJoin.vue';
 import Launch from '../components/Launch.vue';
 import Location from '../components/Location.vue';
 import LocationWorld from '../components/LocationWorld.vue';
-import SimpleSwitch from '../components/SimpleSwitch.vue';
 import Timer from '../components/Timer.vue';
 
-Vue.component('SafeDialog', SafeDialog);
-Vue.component('SimpleSwitch', SimpleSwitch);
-Vue.component('Location', Location);
-Vue.component('Timer', Timer);
-Vue.component('InstanceInfo', InstanceInfo);
-Vue.component('LastJoin', LastJoin);
-Vue.component('CountdownTimer', CountdownTimer);
-Vue.component('AvatarInfo', AvatarInfo);
-Vue.component('DisplayName', DisplayName);
-Vue.component('InviteYourself', InviteYourself);
-Vue.component('Launch', Launch);
-Vue.component('LocationWorld', LocationWorld);
+export function initComponents(app) {
+    app.component('Location', Location);
+    app.component('Timer', Timer);
+    app.component('InstanceInfo', InstanceInfo);
+    app.component('LastJoin', LastJoin);
+    app.component('CountdownTimer', CountdownTimer);
+    app.component('AvatarInfo', AvatarInfo);
+    app.component('DisplayName', DisplayName);
+    app.component('InviteYourself', InviteYourself);
+    app.component('Launch', Launch);
+    app.component('LocationWorld', LocationWorld);
+    app.component('DataTable', DataTable);
+}

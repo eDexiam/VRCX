@@ -1,14 +1,9 @@
-import dayjs from 'dayjs';
+import { reactive, ref, watch } from 'vue';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import { defineStore } from 'pinia';
-import { computed, reactive, watch } from 'vue';
-import * as workerTimers from 'worker-timers';
-import { userRequest } from '../api';
-import { $app } from '../app';
-import configRepository from '../service/config';
-import { database } from '../service/database';
-import { AppGlobal } from '../service/appConfig';
-import gameLogService from '../service/gamelog.js';
-import { watchState } from '../service/watchState';
+
+import dayjs from 'dayjs';
+
 import {
     convertYoutubeTime,
     formatSeconds,
@@ -17,21 +12,30 @@ import {
     parseLocation,
     replaceBioSymbols
 } from '../shared/utils';
+import { AppDebug } from '../service/appConfig';
+import { database } from '../service/database';
+import { useAdvancedSettingsStore } from './settings/advanced';
+import { useAppearanceSettingsStore } from './settings/appearance';
 import { useFriendStore } from './friend';
 import { useGalleryStore } from './gallery';
 import { useGameStore } from './game';
+import { useGeneralSettingsStore } from './settings/general';
 import { useInstanceStore } from './instance';
 import { useLocationStore } from './location';
 import { useNotificationStore } from './notification';
 import { usePhotonStore } from './photon';
-import { useAdvancedSettingsStore } from './settings/advanced';
-import { useAppearanceSettingsStore } from './settings/appearance';
-import { useGeneralSettingsStore } from './settings/general';
 import { useSharedFeedStore } from './sharedFeed';
 import { useUiStore } from './ui';
 import { useUserStore } from './user';
 import { useVrStore } from './vr';
 import { useVrcxStore } from './vrcx';
+import { userRequest } from '../api';
+import { watchState } from '../service/watchState';
+
+import configRepository from '../service/config';
+import gameLogService from '../service/gamelog.js';
+
+import * as workerTimers from 'worker-timers';
 
 export const useGameLogStore = defineStore('GameLog', () => {
     const notificationStore = useNotificationStore();
@@ -49,104 +53,72 @@ export const useGameLogStore = defineStore('GameLog', () => {
     const galleryStore = useGalleryStore();
     const photonStore = usePhotonStore();
     const sharedFeedStore = useSharedFeedStore();
+
     const state = reactive({
-        nowPlaying: {
-            url: '',
-            name: '',
-            length: 0,
-            startTime: 0,
-            offset: 0,
-            elapsed: 0,
-            percentage: 0,
-            remainingText: '',
-            playing: false,
-            thumbnailUrl: ''
-        },
-        gameLogTable: {
-            data: [],
-            loading: false,
-            search: '',
-            filter: [],
-            tableProps: {
-                stripe: true,
-                size: 'mini',
-                defaultSort: {
-                    prop: 'created_at',
-                    order: 'descending'
-                }
-            },
-            pageSize: 15,
-            paginationProps: {
-                small: true,
-                layout: 'sizes,prev,pager,next,total',
-                pageSizes: [10, 15, 20, 25, 50, 100]
-            },
-            vip: false
-        },
-        gameLogSessionTable: [],
-        lastVideoUrl: '',
-        lastResourceloadUrl: '',
         lastLocationAvatarList: new Map()
     });
 
-    async function init() {
-        state.gameLogTable.filter = JSON.parse(
-            await configRepository.getString('VRCX_gameLogTableFilters', '[]')
-        );
-        // gameLog loads before favorites
-        // await configRepository.getBool(
-        //     'VRCX_gameLogTableVIPFilter',
-        //     false
-        // );
-    }
-
-    init();
-
-    const gameLogTable = computed({
-        get: () => state.gameLogTable,
-        set: (value) => {
-            state.gameLogTable = value;
-        }
+    const gameLogTable = ref({
+        data: [],
+        loading: false,
+        search: '',
+        filter: [],
+        tableProps: {
+            stripe: true,
+            size: 'small',
+            defaultSort: {
+                prop: 'created_at',
+                order: 'descending'
+            }
+        },
+        pageSize: 15,
+        pageSizeLinked: true,
+        paginationProps: {
+            small: true,
+            layout: 'sizes,prev,pager,next,total',
+            pageSizes: [10, 15, 20, 25, 50, 100]
+        },
+        vip: false
     });
 
-    const gameLogSessionTable = computed({
-        get: () => state.gameLogSessionTable,
-        set: (value) => {
-            state.gameLogSessionTable = value;
-        }
+    const gameLogSessionTable = ref([]);
+
+    const nowPlaying = ref({
+        url: '',
+        name: '',
+        length: 0,
+        startTime: 0,
+        offset: 0,
+        elapsed: 0,
+        percentage: 0,
+        remainingText: '',
+        playing: false,
+        thumbnailUrl: ''
     });
 
-    const nowPlaying = computed({
-        get: () => state.nowPlaying,
-        set: (value) => {
-            state.nowPlaying = value;
-        }
-    });
+    const lastVideoUrl = ref('');
 
-    const lastVideoUrl = computed({
-        get: () => state.lastVideoUrl,
-        set: (value) => {
-            state.lastVideoUrl = value;
-        }
-    });
-
-    const lastResourceloadUrl = computed({
-        get: () => state.lastResourceloadUrl,
-        set: (value) => {
-            state.lastResourceloadUrl = value;
-        }
-    });
+    const lastResourceloadUrl = ref('');
 
     watch(
         () => watchState.isLoggedIn,
         (isLoggedIn) => {
-            state.gameLogTable.data = [];
-            state.gameLogSessionTable = [];
+            gameLogTable.value.data = [];
+            gameLogSessionTable.value = [];
             if (isLoggedIn) {
                 initGameLogTable();
             }
         },
         { flush: 'sync' }
+    );
+
+    watch(
+        () => watchState.isFavoritesLoaded,
+        (isFavoritesLoaded) => {
+            if (isFavoritesLoaded && gameLogTable.value.vip) {
+                gameLogTableLookup(); // re-apply VIP filter after friends are loaded
+            }
+        }
     );
 
     watch(
@@ -159,8 +131,20 @@ export const useGameLogStore = defineStore('GameLog', () => {
         { flush: 'sync' }
     );
 
+    async function init() {
+        gameLogTable.value.filter = JSON.parse(
+            await configRepository.getString('VRCX_gameLogTableFilters', '[]')
+        );
+        gameLogTable.value.vip = await configRepository.getBool(
+            'VRCX_gameLogTableVIPFilter',
+            false
+        );
+    }
+
+    init();
+
     function clearNowPlaying() {
-        state.nowPlaying = {
+        nowPlaying.value = {
             url: '',
             name: '',
             length: 0,
@@ -176,7 +160,7 @@ export const useGameLogStore = defineStore('GameLog', () => {
     }
 
     function setNowPlaying(ctx) {
-        if (state.nowPlaying.url !== ctx.videoUrl) {
+        if (nowPlaying.value.url !== ctx.videoUrl) {
             if (!ctx.userId && ctx.displayName) {
                 for (const ref of userStore.cachedUsers.values()) {
                     if (ref.displayName === ctx.displayName) {
@@ -194,7 +178,7 @@ export const useGameLogStore = defineStore('GameLog', () => {
                 displayName = ` (${ctx.displayName})`;
             }
             const name = `${ctx.videoName}${displayName}`;
-            state.nowPlaying = {
+            nowPlaying.value = {
                 url: ctx.videoUrl,
                 name,
                 length: ctx.videoLength,
@@ -207,8 +191,8 @@ export const useGameLogStore = defineStore('GameLog', () => {
                 thumbnailUrl: ctx.thumbnailUrl
             };
         } else {
-            state.nowPlaying = {
-                ...state.nowPlaying,
+            nowPlaying.value = {
+                ...nowPlaying.value,
                 length: ctx.videoLength,
                 offset: ctx.videoPos,
                 elapsed: 0,
@@ -217,23 +201,23 @@ export const useGameLogStore = defineStore('GameLog', () => {
                 thumbnailUrl: ctx.thumbnailUrl
             };
             if (ctx.updatedAt && ctx.videoPos) {
-                state.nowPlaying.startTime =
+                nowPlaying.value.startTime =
                     Date.parse(ctx.updatedAt) / 1000 - ctx.videoPos;
             } else {
-                state.nowPlaying.startTime =
+                nowPlaying.value.startTime =
                     Date.parse(ctx.created_at) / 1000 - ctx.videoPos;
             }
         }
         vrStore.updateVrNowPlaying();
-        if (!state.nowPlaying.playing && ctx.videoLength > 0) {
-            state.nowPlaying.playing = true;
+        if (!nowPlaying.value.playing && ctx.videoLength > 0) {
+            nowPlaying.value.playing = true;
             updateNowPlaying();
         }
     }
 
     function updateNowPlaying() {
-        const np = state.nowPlaying;
-        if (!state.nowPlaying.playing) {
+        const np = nowPlaying.value;
+        if (!nowPlaying.value.playing) {
             return;
         }
 
@@ -256,7 +240,7 @@ export const useGameLogStore = defineStore('GameLog', () => {
         console.log('Loading player list from game log...');
         let ctx;
         let i;
-        const data = state.gameLogSessionTable;
+        const data = gameLogSessionTable.value;
         if (data.length === 0) {
             return;
         }
@@ -354,27 +338,27 @@ export const useGameLogStore = defineStore('GameLog', () => {
     async function gameLogTableLookup() {
         await configRepository.setString(
             'VRCX_gameLogTableFilters',
-            JSON.stringify(state.gameLogTable.filter)
+            JSON.stringify(gameLogTable.value.filter)
         );
         await configRepository.setBool(
             'VRCX_gameLogTableVIPFilter',
-            state.gameLogTable.vip
+            gameLogTable.value.vip
         );
-        state.gameLogTable.loading = true;
+        gameLogTable.value.loading = true;
         let vipList = [];
-        if (state.gameLogTable.vip) {
+        if (gameLogTable.value.vip) {
             vipList = Array.from(friendStore.localFavoriteFriends.values());
         }
-        state.gameLogTable.data = await database.lookupGameLogDatabase(
-            state.gameLogTable.search,
-            state.gameLogTable.filter,
+        gameLogTable.value.data = await database.lookupGameLogDatabase(
+            gameLogTable.value.search,
+            gameLogTable.value.filter,
             vipList
         );
-        state.gameLogTable.loading = false;
+        gameLogTable.value.loading = false;
     }
 
     function addGameLog(entry) {
-        state.gameLogSessionTable.push(entry);
+        gameLogSessionTable.value.push(entry);
         sharedFeedStore.updateSharedFeed(false);
         if (entry.type === 'VideoPlay') {
             // event time can be before last gameLog entry
@@ -383,7 +367,7 @@ export const useGameLogStore = defineStore('GameLog', () => {
 
         // If the VIP friend filter is enabled, logs from other friends will be ignored.
         if (
-            state.gameLogTable.vip &&
+            gameLogTable.value.vip &&
             !friendStore.localFavoriteFriends.has(entry.userId) &&
             (entry.type === 'OnPlayerJoined' ||
                 entry.type === 'OnPlayerLeft' ||
@@ -404,15 +388,15 @@ export const useGameLogStore = defineStore('GameLog', () => {
             return;
         }
         if (
-            state.gameLogTable.filter.length > 0 &&
-            !state.gameLogTable.filter.includes(entry.type)
+            gameLogTable.value.filter.length > 0 &&
+            !gameLogTable.value.filter.includes(entry.type)
         ) {
             return;
         }
         if (!gameLogSearch(entry)) {
             return;
         }
-        state.gameLogTable.data.push(entry);
+        gameLogTable.value.data.push(entry);
         sweepGameLog();
         uiStore.notifyMenu('gameLog');
     }
@@ -427,7 +411,7 @@ export const useGameLogStore = defineStore('GameLog', () => {
     }
 
     function gameLogSearch(row) {
-        const value = state.gameLogTable.search.toUpperCase();
+        const value = gameLogTable.value.search.toUpperCase();
         if (!value) {
             return true;
         }
@@ -496,7 +480,7 @@ export const useGameLogStore = defineStore('GameLog', () => {
     }
 
     function sweepGameLog() {
-        const { data } = state.gameLogTable;
+        const { data } = gameLogTable.value;
         const j = data.length;
         if (j > vrcxStore.maxTableSize) {
             data.splice(0, j - vrcxStore.maxTableSize);
@@ -506,14 +490,14 @@ export const useGameLogStore = defineStore('GameLog', () => {
         date.setDate(date.getDate() - 1); // 24 hour limit
         const limit = date.toJSON();
         let i = 0;
-        const k = state.gameLogSessionTable.length;
-        while (i < k && state.gameLogSessionTable[i].created_at < limit) {
+        const k = gameLogSessionTable.value.length;
+        while (i < k && gameLogSessionTable.value[i].created_at < limit) {
             ++i;
         }
         if (i === k) {
-            state.gameLogSessionTable = [];
+            gameLogSessionTable.value = [];
         } else if (i) {
-            state.gameLogSessionTable.splice(0, i);
+            gameLogSessionTable.value.splice(0, i);
         }
     }
 
@@ -613,7 +597,10 @@ export const useGameLogStore = defineStore('GameLog', () => {
                     console.error('Missing userId:', gameLog.displayName);
                 } else if (userId === userStore.currentUser.id) {
                     // skip
-                } else if (friendStore.friends.has(userId)) {
+                } else if (
+                    friendStore.friends.has(userId) &&
+                    typeof ref !== 'undefined'
+                ) {
                     locationStore.lastLocation.friendList.set(userId, userMap);
                     if (
                         ref.location !== locationStore.lastLocation.location &&
@@ -627,7 +614,7 @@ export const useGameLogStore = defineStore('GameLog', () => {
                     // set $location_at to join time if user isn't a friend
                     ref.$location_at = joinTime;
                 } else {
-                    if (AppGlobal.debugGameLog || AppGlobal.debugWebRequests) {
+                    if (AppDebug.debugGameLog || AppDebug.debugWebRequests) {
                         console.log('Fetching user from gameLog:', userId);
                     }
                     userRequest.getUser({ userId });
@@ -660,6 +647,7 @@ export const useGameLogStore = defineStore('GameLog', () => {
                             'Sort by Last Seen'
                         )
                     ) {
+                        // TODO: remove
                         friendStore.sortVIPFriends = true;
                         friendStore.sortOnlineFriends = true;
                     }
@@ -698,27 +686,27 @@ export const useGameLogStore = defineStore('GameLog', () => {
                 break;
             case 'video-play':
                 gameLog.videoUrl = decodeURI(gameLog.videoUrl);
-                if (state.lastVideoUrl === gameLog.videoUrl) {
+                if (lastVideoUrl.value === gameLog.videoUrl) {
                     break;
                 }
-                state.lastVideoUrl = gameLog.videoUrl;
+                lastVideoUrl.value = gameLog.videoUrl;
                 addGameLogVideo(gameLog, location, userId);
                 break;
             case 'video-sync':
                 const timestamp = gameLog.timestamp.replace(/,/g, '');
-                if (state.nowPlaying.playing) {
-                    state.nowPlaying.offset = parseInt(timestamp, 10);
+                if (nowPlaying.value.playing) {
+                    nowPlaying.value.offset = parseInt(timestamp, 10);
                 }
                 break;
             case 'resource-load-string':
             case 'resource-load-image':
                 if (
                     !generalSettingsStore.logResourceLoad ||
-                    state.lastResourceloadUrl === gameLog.resourceUrl
+                    lastResourceloadUrl.value === gameLog.resourceUrl
                 ) {
                     break;
                 }
-                state.lastResourceloadUrl = gameLog.resourceUrl;
+                lastResourceloadUrl.value = gameLog.resourceUrl;
                 entry = {
                     created_at: gameLog.dt,
                     type:
@@ -744,7 +732,7 @@ export const useGameLogStore = defineStore('GameLog', () => {
                 vrcxStore.processScreenshot(gameLog.screenshotPath);
                 break;
             case 'api-request':
-                if (AppGlobal.debugWebRequests) {
+                if (AppDebug.debugWebRequests) {
                     console.log('API Request:', gameLog.url);
                 }
                 // const userId = '';
@@ -1065,7 +1053,7 @@ export const useGameLogStore = defineStore('GameLog', () => {
         if (displayName === 'Random') {
             displayName = '';
         }
-        if (videoUrl === state.nowPlaying.url) {
+        if (videoUrl === nowPlaying.value.url) {
             const entry = {
                 updatedAt: gameLog.dt,
                 videoUrl,
@@ -1136,7 +1124,7 @@ export const useGameLogStore = defineStore('GameLog', () => {
             // ummm okay
             videoPos = 0;
         }
-        if (videoUrl === state.nowPlaying.url) {
+        if (videoUrl === nowPlaying.value.url) {
             const entry = {
                 updatedAt: gameLog.dt,
                 videoUrl,
@@ -1202,7 +1190,7 @@ export const useGameLogStore = defineStore('GameLog', () => {
         if (videoId === '9999') {
             videoId = 'YouTube';
         }
-        if (videoUrl === state.nowPlaying.url) {
+        if (videoUrl === nowPlaying.value.url) {
             const entry = {
                 updatedAt: gameLog.dt,
                 videoUrl,
@@ -1262,7 +1250,7 @@ export const useGameLogStore = defineStore('GameLog', () => {
         const videoName = replaceBioSymbols(data[4]);
         const videoUrl = videoName;
         const videoId = 'LSMedia';
-        if (videoUrl === state.nowPlaying.url) {
+        if (videoUrl === nowPlaying.value.url) {
             const entry = {
                 updatedAt: gameLog.dt,
                 videoUrl,
@@ -1321,7 +1309,7 @@ export const useGameLogStore = defineStore('GameLog', () => {
             clearNowPlaying();
             return;
         }
-        if (videoUrl === state.nowPlaying.url) {
+        if (videoUrl === nowPlaying.value.url) {
             const entry = {
                 updatedAt: gameLog.dt,
                 videoUrl,
@@ -1359,7 +1347,7 @@ export const useGameLogStore = defineStore('GameLog', () => {
 
     async function getGameLogTable() {
         await database.initTables();
-        state.gameLogSessionTable = await database.getGamelogDatabase();
+        gameLogSessionTable.value = await database.getGamelogDatabase();
         const dateTill = await database.getLastDateGameLogDatabase();
         updateGameLog(dateTill);
     }
@@ -1387,7 +1375,7 @@ export const useGameLogStore = defineStore('GameLog', () => {
             rawLogs.slice(3)
         );
         if (
-            AppGlobal.debugGameLog &&
+            AppDebug.debugGameLog &&
             gameLog.type !== 'photon-id' &&
             gameLog.type !== 'api-request' &&
             gameLog.type !== 'udon-exception'
@@ -1399,7 +1387,7 @@ export const useGameLogStore = defineStore('GameLog', () => {
 
     async function disableGameLogDialog() {
         if (gameStore.isGameRunning) {
-            $app.$message({
+            ElMessage({
                 message:
                     'VRChat needs to be closed before this option can be changed',
                 type: 'error'
@@ -1407,14 +1395,13 @@ export const useGameLogStore = defineStore('GameLog', () => {
             return;
         }
         if (!advancedSettingsStore.gameLogDisabled) {
-            $app.$confirm('Continue? Disable GameLog', 'Confirm', {
+            ElMessageBox.confirm('Continue? Disable GameLog', 'Confirm', {
                 confirmButtonText: 'Confirm',
                 cancelButtonText: 'Cancel',
-                type: 'info',
-                callback: async (action) => {
-                    if (action === 'confirm') {
-                        advancedSettingsStore.setGameLogDisabled();
-                    }
+                type: 'info'
+            }).then(({ action }) => {
+                if (action === 'confirm') {
+                    advancedSettingsStore.setGameLogDisabled();
                 }
             });
         } else {
@@ -1423,19 +1410,21 @@ export const useGameLogStore = defineStore('GameLog', () => {
     }
 
     async function initGameLogTable() {
-        state.gameLogTable.data = await database.lookupGameLogDatabase(
-            state.gameLogTable.search,
-            state.gameLogTable.filter
+        gameLogTable.value.data = await database.lookupGameLogDatabase(
+            gameLogTable.value.search,
+            gameLogTable.value.filter
         );
     }
 
     return {
         state,
+
         nowPlaying,
         gameLogTable,
         gameLogSessionTable,
         lastVideoUrl,
         lastResourceloadUrl,
+
         initGameLogTable,
         clearNowPlaying,
         tryLoadPlayerList,

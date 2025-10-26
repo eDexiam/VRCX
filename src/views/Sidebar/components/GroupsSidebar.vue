@@ -1,17 +1,15 @@
 <template>
     <div class="x-friend-list" style="padding: 10px 5px">
-        <template v-for="(group, index) in groupedGroupInstances">
-            <div
-                :key="getGroupId(group)"
-                class="x-friend-group x-link"
-                :style="{ paddingTop: index === 0 ? '0px' : '10px' }">
+        <template v-for="(group, index) in groupedGroupInstances" :key="getGroupId(group)">
+            <div class="x-friend-group x-link" :style="{ paddingTop: index === 0 ? '0px' : '10px' }">
                 <div @click="toggleGroupSidebarCollapse(getGroupId(group))" style="display: flex; align-items: center">
-                    <i
-                        class="el-icon-arrow-right"
-                        :style="{
-                            transform: groupInstancesCfg[getGroupId(group)].isCollapsed ? '' : 'rotate(90deg)',
-                            transition: 'transform 0.3s'
-                        }"></i>
+                    <el-icon
+                        class="rotation-transition"
+                        :class="{
+                            'is-rotated': !groupInstancesCfg[getGroupId(group)].isCollapsed
+                        }"
+                        ><ArrowRight
+                    /></el-icon>
                     <span style="margin-left: 5px">{{ group[0].group.name }} – {{ group.length }}</span>
                 </div>
             </div>
@@ -24,7 +22,7 @@
                     @click="showGroupDialog(ref.instance.ownerId)">
                     <template v-if="isAgeGatedInstancesVisible || !(ref.ageGate || ref.location?.includes('~ageGate'))">
                         <div class="avatar">
-                            <img v-lazy="getSmallGroupIconUrl(ref.group.iconUrl)" />
+                            <img :src="getSmallGroupIconUrl(ref.group.iconUrl)" loading="lazy" />
                         </div>
                         <div class="detail">
                             <span class="name">
@@ -43,10 +41,12 @@
 </template>
 
 <script setup>
-    import { storeToRefs } from 'pinia';
     import { computed, ref } from 'vue';
-    import { convertFileUrlToImageUrl } from '../../../shared/utils';
+    import { ArrowRight } from '@element-plus/icons-vue';
+    import { storeToRefs } from 'pinia';
+
     import { useAppearanceSettingsStore, useGroupStore } from '../../../stores';
+    import { convertFileUrlToImageUrl } from '../../../shared/utils';
 
     const { isAgeGatedInstancesVisible } = storeToRefs(useAppearanceSettingsStore());
     const { showGroupDialog, sortGroupInstancesByInGame } = useGroupStore();
@@ -102,5 +102,11 @@
     }
     .x-link:hover span {
         text-decoration: underline;
+    }
+    .is-rotated {
+        transform: rotate(90deg);
+    }
+    .rotation-transition {
+        transition: transform 0.2s ease-in-out;
     }
 </style>

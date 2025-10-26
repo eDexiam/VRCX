@@ -1,6 +1,10 @@
-import Vue from 'vue';
+import { reactive } from 'vue';
 
-const AppGlobal = Vue.observable({
+import dayjs from 'dayjs';
+
+import * as utils from '../shared/utils';
+
+const AppDebug = reactive({
     debug: false,
     debugWebSocket: false,
     debugUserDiff: false,
@@ -8,6 +12,8 @@ const AppGlobal = Vue.observable({
     debugGameLog: false,
     debugWebRequests: false,
     debugFriendState: false,
+    debugIPC: false,
+    debugVrcPlus: false,
     errorNoty: null,
     dontLogMeOut: false,
     endpointDomain: 'https://api.vrchat.cloud/api/1',
@@ -16,6 +22,8 @@ const AppGlobal = Vue.observable({
     websocketDomainVrchat: 'wss://pipeline.vrchat.cloud'
 });
 
-window.__APP_GLOBALS__ = AppGlobal;
+window.$debug = AppDebug;
+window.utils = utils;
+window.dayjs = dayjs;
 
-export { AppGlobal };
+export { AppDebug };

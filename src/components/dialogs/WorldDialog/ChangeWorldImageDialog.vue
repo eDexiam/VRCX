@@ -1,74 +1,75 @@
 <template>
-    <safe-dialog
+    <el-dialog
         class="x-dialog"
-        :visible="changeWorldImageDialogVisible"
+        :model-value="changeWorldImageDialogVisible"
         :title="t('dialog.change_content_image.world')"
         width="850px"
         append-to-body
         @close="closeDialog">
-        <div v-loading="changeWorldImageDialogLoading">
+        <div>
             <input
                 id="WorldImageUploadButton"
                 type="file"
                 accept="image/*"
                 style="display: none"
                 @change="onFileChangeWorldImage" />
+            <el-progress
+                v-if="changeWorldImageDialogLoading"
+                :show-text="false"
+                :indeterminate="true"
+                :percentage="100"
+                :stroke-width="3"
+                style="margin-bottom: 12px" />
             <span>{{ t('dialog.change_content_image.description') }}</span>
             <br />
             <el-button-group style="padding-bottom: 10px; padding-top: 10px">
-                <el-button type="default" size="small" icon="el-icon-refresh" @click="refresh">{{
-                    t('dialog.change_content_image.refresh')
-                }}</el-button>
-                <el-button type="default" size="small" icon="el-icon-upload2" @click="uploadWorldImage">{{
-                    t('dialog.change_content_image.upload')
-                }}</el-button>
-                <!--                el-button(type="default" size="small" @click="deleteWorldImage" icon="el-icon-delete") Delete Latest Image-->
+                <el-button
+                    type="default"
+                    size="small"
+                    :icon="Upload"
+                    :loading="changeWorldImageDialogLoading"
+                    :disabled="changeWorldImageDialogLoading"
+                    @click="uploadWorldImage">
+                    {{ t('dialog.change_content_image.upload') }}
+                </el-button>
             </el-button-group>
             <br />
-            <div v-for="image in previousImagesTable" :key="image.version" style="display: inline-block">
-                <div
-                    v-if="image.file"
-                    class="x-change-image-item"
-                    style="cursor: pointer"
-                    :class="{ 'current-image': compareCurrentImage(image) }"
-                    @click="setWorldImage(image)">
-                    <img v-lazy="image.file.url" class="image" />
-                </div>
+            <div class="x-change-image-item">
+                <img :src="previousImageUrl" class="img-size" loading="lazy" />
             </div>
         </div>
-    </safe-dialog>
+    </el-dialog>
 </template>
 
 <script setup>
+    import { ElMessage } from 'element-plus';
+    import { Upload } from '@element-plus/icons-vue';
+    import { ref } from 'vue';
     import { storeToRefs } from 'pinia';
-    import { getCurrentInstance, ref } from 'vue';
-    import { useI18n } from 'vue-i18n-bridge';
-    import { imageRequest } from '../../../api';
-    import { AppGlobal } from '../../../service/appConfig';
+    import { useI18n } from 'vue-i18n';
+
+    import { imageRequest, worldRequest } from '../../../api';
     import { $throw } from '../../../service/request';
+    import { AppDebug } from '../../../service/appConfig';
     import { extractFileId } from '../../../shared/utils';
-    import { useGalleryStore, useWorldStore } from '../../../stores';
+    import { handleImageUploadInput } from '../../../shared/utils/imageUpload';
+    import { useWorldStore } from '../../../stores';
 
     const { t } = useI18n();
 
-    const instance = getCurrentInstance();
-    const $message = instance.proxy.$message;
-
     const { worldDialog } = storeToRefs(useWorldStore());
-    const { previousImagesTable } = storeToRefs(useGalleryStore());
+    const { applyWorld } = useWorldStore();
 
-    const props = defineProps({
+    defineProps({
         changeWorldImageDialogVisible: {
             type: Boolean,
-            default: false
+            required: true
         },
-        previousImagesFileId: {
+        previousImageUrl: {
             type: String,
             default: ''
         }
     });
-
-    const emit = defineEmits(['update:changeWorldImageDialogVisible', 'refresh']);
 
     const changeWorldImageDialogLoading = ref(false);
     const worldImage = ref({
@@ -77,20 +78,13 @@
         base64SignatureFile: '',
         signatureMd5: '',
         fileId: '',
-        avatarId: '',
         worldId: ''
     });
 
-    function uploadWorldImage() {
-        document.getElementById('WorldImageUploadButton').click();
-    }
+    const emit = defineEmits(['update:changeWorldImageDialogVisible', 'update:previousImageUrl']);
 
     function closeDialog() {
         emit('update:changeWorldImageDialogVisible', false);
-    }
-
-    function refresh() {
-        emit('refresh', 'Change');
     }
 
     async function resizeImageToFitLimits(file) {
@@ -98,103 +92,72 @@
         return response;
     }
 
-    async function genMd5(file) {
-        const response = await AppApi.MD5File(file);
-        return response;
-    }
-
-    async function genSig(file) {
-        const response = await AppApi.SignFile(file);
-        return response;
-    }
-
-    async function genLength(file) {
-        const response = await AppApi.FileLength(file);
-        return response;
-    }
-
     function onFileChangeWorldImage(e) {
-        const clearFile = function () {
-            const fileInput = /** @type {HTMLInputElement} */ (document.querySelector('#WorldImageUploadButton'));
-            if (fileInput) {
-                fileInput.value = '';
-            }
-        };
-        const files = e.target.files || e.dataTransfer.files;
-        if (!files.length || !worldDialog.value.visible || worldDialog.value.loading) {
-            clearFile();
+        const { file, clearInput } = handleImageUploadInput(e, {
+            inputSelector: '#WorldImageUploadButton',
+            tooLargeMessage: () => t('message.file.too_large'),
+            invalidTypeMessage: () => t('message.file.not_image')
+        });
+        if (!file) {
             return;
         }
-        if (files[0].size >= 100000000) {
-            // 100MB
-            $message({
-                message: t('message.file.too_large'),
-                type: 'error'
-            });
-            clearFile();
+        if (!worldDialog.value.visible || worldDialog.value.loading) {
+            clearInput();
             return;
         }
-        if (!files[0].type.match(/image.*/)) {
-            $message({
-                message: t('message.file.not_image'),
-                type: 'error'
-            });
-            clearFile();
-            return;
-        }
-        changeWorldImageDialogLoading.value = true;
+
         const r = new FileReader();
-        r.onload = async function (file) {
+        const finalize = () => {
+            changeWorldImageDialogLoading.value = false;
+            clearInput();
+        };
+        r.onerror = finalize;
+        r.onabort = finalize;
+        r.onload = async function () {
             try {
                 const base64File = await resizeImageToFitLimits(btoa(r.result.toString()));
                 // 10MB
-                const fileMd5 = await genMd5(base64File);
-                const fileSizeInBytes = parseInt(file.total.toString(), 10);
-                const base64SignatureFile = await genSig(base64File);
-                const signatureMd5 = await genMd5(base64SignatureFile);
-                const signatureSizeInBytes = parseInt(await genLength(base64SignatureFile), 10);
-                const worldId = worldDialog.value.id;
-                const { imageUrl } = worldDialog.value.ref;
-                const fileId = extractFileId(imageUrl);
-                if (!fileId) {
-                    $message({
-                        message: t('message.world.image_invalid'),
-                        type: 'error'
-                    });
-                    clearFile();
-                    return;
-                }
-                worldImage.value = {
-                    base64File,
-                    fileMd5,
-                    base64SignatureFile,
-                    signatureMd5,
-                    fileId,
-                    worldId,
-                    ...worldImage.value
-                };
-                const params = {
-                    fileMd5,
-                    fileSizeInBytes,
-                    signatureMd5,
-                    signatureSizeInBytes
-                };
-
-                // Upload chaining
-                await initiateUpload(params, fileId);
+                await initiateUploadLegacy(base64File, file);
+                // await initiateUpload(base64File);
             } catch (error) {
                 console.error('World image upload process failed:', error);
             } finally {
-                changeWorldImageDialogLoading.value = false;
-                clearFile();
+                finalize();
             }
         };
-        r.readAsBinaryString(files[0]);
+
+        changeWorldImageDialogLoading.value = true;
+        try {
+            r.readAsBinaryString(file);
+        } catch (error) {
+            console.error('Failed to read file', error);
+            finalize();
+        }
     }
 
-    // ------------ Upload Process Start ------------
-
-    async function initiateUpload(params, fileId) {
+    async function initiateUploadLegacy(base64File, file) {
+        const fileMd5 = await AppApi.MD5File(base64File);
+        const fileSizeInBytes = parseInt(file.size, 10);
+        const base64SignatureFile = await AppApi.SignFile(base64File);
+        const signatureMd5 = await AppApi.MD5File(base64SignatureFile);
+        const signatureSizeInBytes = parseInt(await AppApi.FileLength(base64SignatureFile), 10);
+        const worldId = worldDialog.value.id;
+        const { imageUrl } = worldDialog.value.ref;
+        const fileId = extractFileId(imageUrl);
+        worldImage.value = {
+            base64File,
+            fileMd5,
+            base64SignatureFile,
+            signatureMd5,
+            fileId,
+            worldId
+        };
+        const params = {
+            fileMd5,
+            fileSizeInBytes,
+            signatureMd5,
+            signatureSizeInBytes
+        };
         const res = await imageRequest.uploadWorldImage(params, fileId);
         return worldImageInit(res);
     }
@@ -307,22 +270,22 @@
     }
     async function worldImageSigFinish(args) {
         const { fileId, fileVersion } = args.params;
-        const parmas = {
+        const params = {
             id: worldImage.value.worldId,
-            imageUrl: `${AppGlobal.endpointDomain}/file/${fileId}/${fileVersion}/file`
+            imageUrl: `${AppDebug.endpointDomain}/file/${fileId}/${fileVersion}/file`
         };
-        const res = await imageRequest.setWorldImage(parmas);
+        const res = await imageRequest.setWorldImage(params);
         return worldImageSet(res);
     }
 
     function worldImageSet(args) {
         changeWorldImageDialogLoading.value = false;
         if (args.json.imageUrl === args.params.imageUrl) {
-            $message({
+            ElMessage({
                 message: t('message.world.image_changed'),
                 type: 'success'
             });
-            refresh();
+            emit('update:previousImageUrl', args.json.imageUrl);
         } else {
             $throw(0, 'World image change failed', args.params.imageUrl);
         }
@@ -330,28 +293,32 @@
 
     // ------------ Upload Process End ------------
 
-    function setWorldImage(image) {
-        changeWorldImageDialogLoading.value = true;
-        const parmas = {
+    async function initiateUpload(base64File) {
+        const args = await worldRequest.uploadWorldImage(base64File);
+        const fileUrl = args.json.versions[args.json.versions.length - 1].file.url;
+        const worldArgs = await worldRequest.saveWorld({
             id: worldDialog.value.id,
-            imageUrl: `${AppGlobal.endpointDomain}/file/${props.previousImagesFileId}/${image.version}/file`
-        };
-        imageRequest
-            .setWorldImage(parmas)
-            .then((args) => worldImageSet(args))
-            .finally(() => {
-                changeWorldImageDialogLoading.value = false;
-                closeDialog();
-            });
+            imageUrl: fileUrl
+        });
+        const ref = applyWorld(worldArgs.json);
+        changeWorldImageDialogLoading.value = false;
+        emit('update:previousImageUrl', ref.imageUrl);
+        ElMessage({
+            message: t('message.world.image_changed'),
+            type: 'success'
+        });
+
+        // closeDialog();
     }
 
-    function compareCurrentImage(image) {
-        if (
-            `${AppGlobal.endpointDomain}/file/${props.previousImagesFileId}/${image.version}/file` ===
-            worldDialog.value.ref.imageUrl
-        ) {
-            return true;
-        }
-        return false;
+    function uploadWorldImage() {
+        document.getElementById('WorldImageUploadButton').click();
     }
 </script>
+
+<style lang="scss" scoped>
+    .img-size {
+        width: 500px;
+        height: 375px;
+    }
+</style>

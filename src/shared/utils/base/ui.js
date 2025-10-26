@@ -1,6 +1,10 @@
+import { ElMessage } from 'element-plus';
 import { storeToRefs } from 'pinia';
-import { useAppearanceSettingsStore } from '../../../stores';
+
 import { THEME_CONFIG } from '../../constants';
+import { i18n } from '../../../plugin/i18n';
+import { router } from '../../../plugin/router';
+import { useAppearanceSettingsStore } from '../../../stores';
 
 /**
  *
@@ -23,12 +27,25 @@ function changeAppDarkStyle(isDark) {
 }
 
 function changeAppThemeStyle(themeMode) {
-    const themeConfig = THEME_CONFIG[themeMode];
-    if (!themeConfig) return;
+    if (themeMode === 'system') {
+        themeMode = systemIsDarkMode() ? 'dark' : 'light';
+    }
+
+    let themeConfig = THEME_CONFIG[themeMode];
+    if (!themeConfig) {
+        console.error('Invalid theme mode:', themeMode);
+        // load system theme as fallback
+        themeMode = systemIsDarkMode() ? 'dark' : 'light';
+        themeConfig = THEME_CONFIG[themeMode];
+    }
 
     let filePathPrefix = 'file://vrcx/';
     if (LINUX) {
         filePathPrefix = './';
+    }
+    if (process.env.NODE_ENV === 'development') {
+        filePathPrefix = 'http://localhost:9000/';
+        console.log('Using development file path prefix:', filePathPrefix);
     }
 
     let $appThemeStyle = document.getElementById('app-theme-style');
@@ -38,63 +55,31 @@ function changeAppThemeStyle(themeMode) {
         $appThemeStyle.rel = 'stylesheet';
         document.head.appendChild($appThemeStyle);
     }
-    $appThemeStyle.href = themeConfig.cssFile
-        ? `${filePathPrefix}${themeConfig.cssFile}`
-        : '';
+    $appThemeStyle.href = themeConfig.cssFile ? themeConfig.cssFile : '';
 
-    let $appThemeDarkStyle = document.getElementById('app-theme-dark-style');
-    const darkThemeCssPath = `${filePathPrefix}theme.dark.css`;
-    const shouldApplyDarkBase =
-        themeConfig.requiresDarkBase ||
-        (themeMode === 'system' && systemIsDarkMode());
-
-    if (shouldApplyDarkBase) {
-        if (!$appThemeDarkStyle) {
-            $appThemeDarkStyle = document.createElement('link');
-            $appThemeDarkStyle.setAttribute('id', 'app-theme-dark-style');
-            $appThemeDarkStyle.rel = 'stylesheet';
-            $appThemeDarkStyle.href = darkThemeCssPath;
-            document.head.insertBefore($appThemeDarkStyle, $appThemeStyle);
-        } else if ($appThemeDarkStyle.href !== darkThemeCssPath) {
-            $appThemeDarkStyle.href = darkThemeCssPath;
-        }
+    if (themeConfig.isDark) {
+        document.documentElement.classList.add('dark');
     } else {
-        $appThemeDarkStyle && $appThemeDarkStyle.remove();
+        document.documentElement.classList.remove('dark');
     }
+    changeAppDarkStyle(themeConfig.isDark);
 
-    let isDarkForExternalApp = themeConfig.isDark;
-    if (isDarkForExternalApp === 'system') {
-        isDarkForExternalApp = systemIsDarkMode();
-    }
-    changeAppDarkStyle(isDarkForExternalApp);
-}
-
-/**
- * CJK character in Japanese, Korean, Chinese are different
- * so change font-family order when users change language to display CJK character correctly
- * @param {string} lang
- */
-function changeCJKFontsOrder(lang) {
-    const otherFonts = window
-        .getComputedStyle(document.body)
-        .fontFamily.split(',')
-        .filter((item) => !item.includes('Noto Sans'))
-        .join(', ');
-    const notoSans = 'Noto Sans';
-
-    const fontFamilies = {
-        ja_JP: ['JP', 'KR', 'TC', 'SC'],
-        ko: ['KR', 'JP', 'TC', 'SC'],
-        zh_TW: ['TC', 'JP', 'KR', 'SC'],
-        zh_CN: ['SC', 'JP', 'KR', 'TC']
-    };
-
-    if (fontFamilies[lang]) {
-        const CJKFamily = fontFamilies[lang]
-            .map((item) => `${notoSans} ${item}`)
-            .join(', ');
-        document.body.style.fontFamily = `${CJKFamily}, ${otherFonts}`;
-    }
+    // let $appThemeDarkStyle = document.getElementById('app-theme-dark-style');
+    // const darkThemeCssPath = `${filePathPrefix}theme.dark.css`;
+    // const shouldApplyDarkBase = themeConfig.isDark;
+    // if (shouldApplyDarkBase) {
+    //     if (!$appThemeDarkStyle) {
+    //         $appThemeDarkStyle = document.createElement('link');
+    //         $appThemeDarkStyle.setAttribute('id', 'app-theme-dark-style');
+    //         $appThemeDarkStyle.rel = 'stylesheet';
+    //         $appThemeDarkStyle.href = darkThemeCssPath;
+    //         document.head.insertBefore($appThemeDarkStyle, $appThemeStyle);
+    //     } else if ($appThemeDarkStyle.href !== darkThemeCssPath) {
+    //         $appThemeDarkStyle.href = darkThemeCssPath;
+    //     }
+    // } else {
+    //     $appThemeDarkStyle && $appThemeDarkStyle.remove();
+    // }
 }
 
 /**
@@ -224,28 +209,91 @@ function HSVtoRGB(h, s, v) {
     return `#${decColor.toString(16).substr(1)}`;
 }
 
-function adjustDialogZ(el) {
-    let z = 0;
-    document.querySelectorAll('.v-modal,.el-dialog__wrapper').forEach((v) => {
+function getNextDialogIndex() {
+    let z = 2000;
+    document.querySelectorAll('.el-overlay,.el-modal-dialog').forEach((v) => {
+        if (v.style.display === 'none') {
+            return;
+        }
         const _z = Number(v.style.zIndex) || 0;
-        if (_z && _z > z && v !== el) {
+        if (_z > z) {
             z = _z;
         }
     });
-    if (z) {
-        el.style.zIndex = z + 1;
+    return z + 1;
+}
+
+function changeHtmlLangAttribute(language) {
+    const htmlElement = document.documentElement;
+    htmlElement.setAttribute('lang', language);
+}
+
+// prevent flicker on login page
+function setLoginContainerStyle(isDarkMode) {
+    const loginContainerStyle = document.createElement('style');
+    loginContainerStyle.id = 'login-container-style';
+    loginContainerStyle.type = 'text/css';
+
+    const backgroundColor = isDarkMode ? '#101010' : '#ffffff';
+    const inputBackgroundColor = isDarkMode ? '#333333' : '#ffffff';
+    const inputBorder = isDarkMode ? '1px solid #3b3b3b' : '1px solid #DCDFE6';
+
+    loginContainerStyle.innerHTML = `
+    .x-login-container {
+        background-color: ${backgroundColor} !important;
+        transition: background-color 0.3s ease;
     }
+
+    .x-login-container .el-input__wrapper {
+        background-color: ${inputBackgroundColor} !important;
+        border: ${inputBorder} !important;
+        transition: background-color 0.3s ease, border-color 0.3s ease;
+    }
+        `;
+
+    document.head.insertBefore(loginContainerStyle, document.head.firstChild);
+}
+
+async function getThemeMode(configRepository) {
+    const initThemeMode = await configRepository.getString(
+        'VRCX_ThemeMode',
+        'system'
+    );
+
+    let isDarkMode;
+
+    if (initThemeMode === 'light') {
+        isDarkMode = false;
+    } else if (initThemeMode === 'system') {
+        isDarkMode = systemIsDarkMode();
+    } else {
+        isDarkMode = true;
+    }
+
+    return { initThemeMode, isDarkMode };
+}
+
+function redirectToToolsTab() {
+    router.push({ name: 'tools' });
+    ElMessage({
+        message: i18n.global.t('view.tools.redirect_message'),
+        type: 'primary',
+        duration: 3000
+    });
 }
 
 export {
     systemIsDarkMode,
     changeAppDarkStyle,
     changeAppThemeStyle,
-    changeCJKFontsOrder,
     updateTrustColorClasses,
     refreshCustomCss,
     refreshCustomScript,
     HueToHex,
     HSVtoRGB,
-    adjustDialogZ
+    getNextDialogIndex,
+    changeHtmlLangAttribute,
+    setLoginContainerStyle,
+    getThemeMode,
+    redirectToToolsTab
 };

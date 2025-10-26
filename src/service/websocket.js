@@ -1,7 +1,5 @@
 import Noty from 'noty';
-import * as workerTimers from 'worker-timers';
-import { groupRequest } from '../api';
-import { escapeTag, parseLocation } from '../shared/utils';
+
 import {
     useFriendStore,
     useGalleryStore,
@@ -13,9 +11,13 @@ import {
     useUiStore,
     useUserStore
 } from '../stores';
-import { AppGlobal } from './appConfig';
+import { escapeTag, parseLocation } from '../shared/utils';
+import { AppDebug } from './appConfig';
+import { groupRequest } from '../api';
 import { request } from './request';
 import { watchState } from './watchState';
+
+import * as workerTimers from 'worker-timers';
 
 let webSocket = null;
 let lastWebSocketMessage = '';
@@ -49,9 +51,9 @@ function connectWebSocket(token) {
     if (webSocket !== null) {
         return;
     }
-    const socket = new WebSocket(`${AppGlobal.websocketDomain}/?auth=${token}`);
+    const socket = new WebSocket(`${AppDebug.websocketDomain}/?auth=${token}`);
     socket.onopen = () => {
-        if (AppGlobal.debugWebSocket) {
+        if (AppDebug.debugWebSocket) {
             console.log('WebSocket connected');
         }
     };
@@ -64,7 +66,7 @@ function connectWebSocket(token) {
         } catch (err) {
             console.error('Error closing WebSocket:', err);
         }
-        if (AppGlobal.debugWebSocket) {
+        if (AppDebug.debugWebSocket) {
             console.log('WebSocket closed');
         }
         workerTimers.setTimeout(() => {
@@ -78,10 +80,10 @@ function connectWebSocket(token) {
         }, 5000);
     };
     socket.onerror = () => {
-        if (AppGlobal.errorNoty) {
-            AppGlobal.errorNoty.close();
+        if (AppDebug.errorNoty) {
+            AppDebug.errorNoty.close();
         }
-        AppGlobal.errorNoty = new Noty({
+        AppDebug.errorNoty = new Noty({
             type: 'error',
             text: 'WebSocket Error'
         }).show();
@@ -109,7 +111,7 @@ function connectWebSocket(token) {
             handlePipeline({
                 json
             });
-            if (AppGlobal.debugWebSocket && json.content) {
+            if (AppDebug.debugWebSocket && json.content) {
                 let displayName = '';
                 const user = userStore.cachedUsers.get(json.content.userId);
                 if (user) {
@@ -167,10 +169,10 @@ function handlePipeline(args) {
     const { type, content, err } = args.json;
     if (typeof err !== 'undefined') {
         console.error('PIPELINE: error', args);
-        if (AppGlobal.errorNoty) {
-            AppGlobal.errorNoty.close();
+        if (AppDebug.errorNoty) {
+            AppDebug.errorNoty.close();
         }
-        AppGlobal.errorNoty = new Noty({
+        AppDebug.errorNoty = new Noty({
             type: 'error',
             text: escapeTag(`WebSocket Error: ${err}`)
         }).show();

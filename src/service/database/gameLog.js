@@ -1,5 +1,6 @@
-import sqliteService from '../sqlite.js';
 import { dbVars } from '../database';
+
+import sqliteService from '../sqlite.js';
 
 const gameLog = {
     async getGamelogDatabase() {
@@ -267,7 +268,7 @@ const gameLog = {
 
     async getVisitCount(worldId) {
         var ref = {
-            visitCount: '',
+            visitCount: 0,
             worldId: ''
         };
         await sqliteService.execute(
@@ -304,13 +305,58 @@ const gameLog = {
         return ref;
     },
 
-    async getLastSeen(input, inCurrentWorld) {
-        if (inCurrentWorld) {
-            var count = 2;
-        } else {
-            var count = 1;
-        }
+    async getLastGroupVisit(groupName) {
         var ref = {
+            created_at: '',
+            groupName: ''
+        };
+        await sqliteService.execute(
+            (row) => {
+                ref = {
+                    created_at: row[0],
+                    groupName: row[1]
+                };
+            },
+            `SELECT created_at, group_name FROM gamelog_location WHERE group_name = @groupName ORDER BY id DESC LIMIT 1`,
+            {
+                '@groupName': groupName
+            }
+        );
+        return ref;
+    },
+
+    async getPreviousInstancesByGroupId(groupId) {
+        const data = new Map();
+        await sqliteService.execute(
+            (dbRow) => {
+                let time = 0;
+                if (dbRow[2]) {
+                    time = dbRow[2];
+                }
+                var ref = data.get(dbRow[1]);
+                if (typeof ref !== 'undefined') {
+                    time += ref.time;
+                }
+                var row = {
+                    created_at: dbRow[0],
+                    location: dbRow[1],
+                    time,
+                    worldName: dbRow[3],
+                    groupName: dbRow[4]
+                };
+                data.set(row.location, row);
+            },
+            `SELECT created_at, location, time, world_name, group_name FROM gamelog_location WHERE location LIKE '%${groupId}%' ORDER BY id DESC`,
+            {
+                '@groupId': groupId
+            }
+        );
+        return data;
+    },
+
+    async getLastSeen(input, inCurrentWorld) {
+        const count = inCurrentWorld ? 2 : 1;
+        let ref = {
             created_at: '',
             userId: ''
         };
@@ -919,7 +965,7 @@ const gameLog = {
                 SELECT DISTINCT location, world_name, group_name
                 FROM gamelog_location
             )
-            SELECT gamelog_join_leave.created_at, strftime("%s", gamelog_join_leave.created_at) * 1000 created_at_ts, gamelog_join_leave.location, gamelog_join_leave.time, grouped_locations.world_name, grouped_locations.group_name, gamelog_join_leave.id, gamelog_join_leave.type
+            SELECT gamelog_join_leave.created_at, strftime('%s', gamelog_join_leave.created_at) * 1000 created_at_ts, gamelog_join_leave.location, gamelog_join_leave.time, grouped_locations.world_name, grouped_locations.group_name, gamelog_join_leave.id, gamelog_join_leave.type
             FROM gamelog_join_leave
             INNER JOIN grouped_locations ON gamelog_join_leave.location = grouped_locations.location
             WHERE user_id = @userId OR display_name = @displayName
@@ -1047,7 +1093,7 @@ const gameLog = {
             (row) => {
                 userId = row[0];
             },
-            `SELECT user_id FROM gamelog_join_leave WHERE display_name = @displayName AND user_id != "" ORDER BY id DESC LIMIT 1`,
+            `SELECT user_id FROM gamelog_join_leave WHERE display_name = @displayName AND user_id != '' ORDER BY id DESC LIMIT 1`,
             {
                 '@displayName': displayName
             }
@@ -1095,7 +1141,7 @@ const gameLog = {
                      *
                 FROM
                     gamelog_join_leave
-                WHERE type = "OnPlayerLeft"
+                WHERE type = 'OnPlayerLeft'
                     AND (
                         strftime('%Y-%m-%dT%H:%M:%SZ', created_at, '-' || (time * 1.0 / 1000) || ' seconds') BETWEEN @utc_start_date AND @utc_end_date
                         OR created_at BETWEEN @utc_start_date AND @utc_end_date

@@ -1,23 +1,24 @@
+import { computed, ref, watch } from 'vue';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import { defineStore } from 'pinia';
-import { computed, reactive, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { useRouter } from 'vue-router';
+
+import { compareByName, localeIncludes } from '../shared/utils';
 import { instanceRequest, userRequest } from '../api';
 import { groupRequest } from '../api/';
-import { $app } from '../app';
 import removeConfusables, { removeWhitespace } from '../service/confusables';
-import { watchState } from '../service/watchState';
-import { compareByName, localeIncludes } from '../shared/utils';
+import { useAppearanceSettingsStore } from './settings/appearance';
 import { useAvatarStore } from './avatar';
 import { useFriendStore } from './friend';
 import { useGroupStore } from './group';
-import { useAppearanceSettingsStore } from './settings/appearance';
-import { useUiStore } from './ui';
 import { useUserStore } from './user';
 import { useWorldStore } from './world';
-import { useI18n } from 'vue-i18n-bridge';
+import { watchState } from '../service/watchState';
 
 export const useSearchStore = defineStore('Search', () => {
     const userStore = useUserStore();
-    const uiStore = useUiStore();
+    const router = useRouter();
     const appearanceSettingsStore = useAppearanceSettingsStore();
     const friendStore = useFriendStore();
     const worldStore = useWorldStore();
@@ -25,33 +26,10 @@ export const useSearchStore = defineStore('Search', () => {
     const groupStore = useGroupStore();
     const { t } = useI18n();
 
-    const state = reactive({
-        searchText: '',
-        searchUserResults: [],
-        quickSearchItems: [],
-        friendsListSearch: ''
-    });
-
-    const searchText = computed({
-        get: () => state.searchText,
-        set: (value) => {
-            state.searchText = value;
-        }
-    });
-
-    const searchUserResults = computed({
-        get: () => state.searchUserResults,
-        set: (value) => {
-            state.searchUserResults = value;
-        }
-    });
-
-    const quickSearchItems = computed({
-        get: () => state.quickSearchItems,
-        set: (value) => {
-            state.quickSearchItems = value;
-        }
-    });
+    const searchText = ref('');
+    const searchUserResults = ref([]);
+    const quickSearchItems = ref([]);
+    const friendsListSearch = ref('');
 
     const stringComparer = computed(() =>
         Intl.Collator(appearanceSettingsStore.appLanguage.replace('_', '-'), {
@@ -60,25 +38,18 @@ export const useSearchStore = defineStore('Search', () => {
         })
     );
 
-    const friendsListSearch = computed({
-        get: () => state.friendsListSearch,
-        set: (value) => {
-            state.friendsListSearch = value;
-        }
-    });
-
     watch(
         () => watchState.isLoggedIn,
         () => {
-            state.searchText = '';
-            state.searchUserResults = [];
+            searchText.value = '';
+            searchUserResults.value = [];
         },
         { flush: 'sync' }
     );
 
     function clearSearch() {
-        state.searchText = '';
-        state.searchUserResults = [];
+        searchText.value = '';
+        searchUserResults.value = [];
     }
 
     async function searchUserByDisplayName(displayName) {
@@ -114,19 +85,28 @@ export const useSearchStore = defineStore('Search', () => {
                     map.set(ref.id, ref);
                 }
             }
-            state.searchUserResults = Array.from(map.values());
+            searchUserResults.value = Array.from(map.values());
             return args;
         });
     }
 
     function quickSearchRemoteMethod(query) {
         if (!query) {
-            state.quickSearchItems = quickSearchUserHistory();
+            quickSearchItems.value = quickSearchUserHistory();
+            return;
+        }
+
+        if (query.length < 2) {
+            quickSearchItems.value = quickSearchUserHistory();
             return;
         }
 
         const results = [];
         const cleanQuery = removeWhitespace(query);
+        if (!cleanQuery) {
+            quickSearchItems.value = quickSearchUserHistory();
+            return;
+        }
 
         for (const ctx of friendStore.friends.values()) {
             if (typeof ctx.ref === 'undefined') {
@@ -196,24 +176,26 @@ export const useSearchStore = defineStore('Search', () => {
             label: query
         });
 
-        state.quickSearchItems = results;
+        quickSearchItems.value = results;
     }
 
     function quickSearchChange(value) {
-        if (value) {
-            if (value.startsWith('search:')) {
-                const searchText = value.substr(7);
-                if (state.quickSearchItems.length > 1 && searchText.length) {
-                    state.friendsListSearch = searchText;
-                    uiStore.menuActiveIndex = 'friendList';
-                } else {
-                    uiStore.menuActiveIndex = 'search';
-                    state.searchText = searchText;
-                    userStore.lookupUser({ displayName: searchText });
-                }
+        if (!value) {
+            return;
+        }
+
+        if (value.startsWith('search:')) {
+            const searchTerm = value.slice(7);
+            if (quickSearchItems.value.length > 1 && searchTerm.length) {
+                friendsListSearch.value = searchTerm;
+                router.push({ name: 'friendList' });
             } else {
-                userStore.showUserDialog(value);
+                router.push({ name: 'search' });
+                searchText.value = searchTerm;
+                userStore.lookupUser({ displayName: searchTerm });
             }
+        } else {
+            userStore.showUserDialog(value);
         }
     }
 
@@ -347,7 +329,7 @@ export const useSearchStore = defineStore('Search', () => {
     }
 
     function promptOmniDirectDialog() {
-        $app.$prompt(
+        ElMessageBox.prompt(
             t('prompt.direct_access_omni.description'),
             t('prompt.direct_access_omni.header'),
             {
@@ -355,22 +337,23 @@ export const useSearchStore = defineStore('Search', () => {
                 confirmButtonText: t('prompt.direct_access_omni.ok'),
                 cancelButtonText: t('prompt.direct_access_omni.cancel'),
                 inputPattern: /\S+/,
-                inputErrorMessage: t('prompt.direct_access_omni.input_error'),
-                callback: (action, instance) => {
-                    if (action === 'confirm' && instance.inputValue) {
-                        const input = instance.inputValue.trim();
-                        if (!directAccessParse(input)) {
-                            $app.$message({
-                                message: t(
-                                    'prompt.direct_access_omni.message.error'
-                                ),
-                                type: 'error'
-                            });
-                        }
+                inputErrorMessage: t('prompt.direct_access_omni.input_error')
+            }
+        )
+            .then(({ value, action }) => {
+                if (action === 'confirm' && value) {
+                    const input = value.trim();
+                    if (!directAccessParse(input)) {
+                        ElMessage({
+                            message: t(
+                                'prompt.direct_access_omni.message.error'
+                            ),
+                            type: 'error'
+                        });
                     }
                 }
-            }
-        );
+            })
+            .catch(() => {});
     }
 
     function showGroupDialogShortCode(shortCode) {
@@ -403,12 +386,12 @@ export const useSearchStore = defineStore('Search', () => {
     }
 
     return {
-        state,
         searchText,
         searchUserResults,
         stringComparer,
         quickSearchItems,
         friendsListSearch,
+
         clearSearch,
         searchUserByDisplayName,
         moreSearchUser,

@@ -3,26 +3,29 @@
  * Export all API requests from here
  */
 
-import userRequest from './user';
-import worldRequest from './world';
-import instanceRequest from './instance';
-import friendRequest from './friend';
+import { request } from '../service/request';
+
+import authRequest from './auth';
+import avatarModerationRequest from './avatarModeration';
 import avatarRequest from './avatar';
+import favoriteRequest from './favorite';
+import friendRequest from './friend';
+import groupRequest from './group';
+import imageRequest from './image';
+import instanceRequest from './instance';
+import inventoryRequest from './inventory';
+import inviteMessagesRequest from './inviteMessages';
+import miscRequest from './misc';
 import notificationRequest from './notification';
 import playerModerationRequest from './playerModeration';
-import avatarModerationRequest from './avatarModeration';
-import favoriteRequest from './favorite';
+import propRequest from './prop';
+import userRequest from './user';
 import vrcPlusIconRequest from './vrcPlusIcon';
 import vrcPlusImageRequest from './vrcPlusImage';
-import inviteMessagesRequest from './inviteMessages';
-import imageRequest from './image';
-import miscRequest from './misc';
-import groupRequest from './group';
-import authRequest from './auth';
-import inventoryRequest from './inventory';
-import propRequest from './prop';
+import worldRequest from './world';
 
 window.request = {
+    request,
     userRequest,
     worldRequest,
     instanceRequest,
@@ -35,15 +38,16 @@ window.request = {
     vrcPlusIconRequest,
     vrcPlusImageRequest,
     inviteMessagesRequest,
-    imageRequest,
     miscRequest,
     authRequest,
     groupRequest,
     inventoryRequest,
-    propRequest
+    propRequest,
+    imageRequest
 };
 
 export {
+    request,
     userRequest,
     worldRequest,
     instanceRequest,
@@ -56,10 +60,10 @@ export {
     vrcPlusIconRequest,
     vrcPlusImageRequest,
     inviteMessagesRequest,
-    imageRequest,
     miscRequest,
     authRequest,
     groupRequest,
     inventoryRequest,
-    propRequest
+    propRequest,
+    imageRequest
 };

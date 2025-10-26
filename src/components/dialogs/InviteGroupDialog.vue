@@ -1,34 +1,32 @@
 <template>
-    <safe-dialog
-        ref="inviteGroupDialogRef"
-        :visible.sync="inviteGroupDialog.visible"
-        :title="$t('dialog.invite_to_group.header')"
+    <el-dialog
+        :z-index="inviteGroupDialogIndex"
+        v-model="inviteGroupDialog.visible"
+        :title="t('dialog.invite_to_group.header')"
         width="450px"
         append-to-body>
         <div v-if="inviteGroupDialog.visible" v-loading="inviteGroupDialog.loading">
-            <span>{{ $t('dialog.invite_to_group.description') }}</span>
+            <span>{{ t('dialog.invite_to_group.description') }}</span>
             <br />
             <el-select
                 v-model="inviteGroupDialog.groupId"
                 clearable
-                :placeholder="$t('dialog.invite_to_group.choose_group_placeholder')"
+                :placeholder="t('dialog.invite_to_group.choose_group_placeholder')"
                 filterable
                 :disabled="inviteGroupDialog.loading"
-                style="margin-top: 15px"
-                @change="isAllowedToInviteToGroup">
+                style="margin-top: 15px; width: 100%">
                 <el-option-group
-                    v-if="currentUserGroups.size"
-                    :label="$t('dialog.invite_to_group.groups')"
+                    :label="t('dialog.invite_to_group.groups_with_invite_permission')"
                     style="width: 410px">
                     <el-option
-                        v-for="group in currentUserGroups.values()"
+                        v-for="group in groupsWithInvitePermission"
                         :key="group.id"
                         :label="group.name"
                         :value="group.id"
                         style="height: auto"
                         class="x-friend-item">
                         <div class="avatar">
-                            <img v-lazy="group.iconUrl" />
+                            <img :src="group.iconUrl" loading="lazy" />
                         </div>
                         <div class="detail">
                             <span class="name" v-text="group.name"></span>
@@ -40,19 +38,20 @@
                 v-model="inviteGroupDialog.userIds"
                 multiple
                 clearable
-                :placeholder="$t('dialog.invite_to_group.choose_friends_placeholder')"
+                :placeholder="t('dialog.invite_to_group.choose_friends_placeholder')"
                 filterable
                 :disabled="inviteGroupDialog.loading"
                 style="width: 100%; margin-top: 15px">
-                <el-option-group v-if="inviteGroupDialog.userId" :label="$t('dialog.invite_to_group.selected_users')">
+                <el-option-group v-if="inviteGroupDialog.userId" :label="t('dialog.invite_to_group.selected_users')">
                     <el-option
                         :key="inviteGroupDialog.userObject.id"
                         :label="inviteGroupDialog.userObject.displayName"
                         :value="inviteGroupDialog.userObject.id"
+                        style="height: auto"
                         class="x-friend-item">
                         <template v-if="inviteGroupDialog.userObject.id">
                             <div class="avatar" :class="userStatusClass(inviteGroupDialog.userObject)">
-                                <img v-lazy="userImage(inviteGroupDialog.userObject)" />
+                                <img :src="userImage(inviteGroupDialog.userObject)" loading="lazy" />
                             </div>
                             <div class="detail">
                                 <span
@@ -64,7 +63,7 @@
                         <span v-else v-text="inviteGroupDialog.userId"></span>
                     </el-option>
                 </el-option-group>
-                <el-option-group v-if="vipFriends.length" :label="$t('side_panel.favorite')">
+                <el-option-group v-if="vipFriends.length" :label="t('side_panel.favorite')">
                     <el-option
                         v-for="friend in vipFriends"
                         :key="friend.id"
@@ -74,7 +73,7 @@
                         class="x-friend-item">
                         <template v-if="friend.ref">
                             <div class="avatar" :class="userStatusClass(friend.ref)">
-                                <img v-lazy="userImage(friend.ref)" />
+                                <img :src="userImage(friend.ref)" loading="lazy" />
                             </div>
                             <div class="detail">
                                 <span
@@ -86,7 +85,7 @@
                         <span v-else v-text="friend.id"></span>
                     </el-option>
                 </el-option-group>
-                <el-option-group v-if="onlineFriends.length" :label="$t('side_panel.online')">
+                <el-option-group v-if="onlineFriends.length" :label="t('side_panel.online')">
                     <el-option
                         v-for="friend in onlineFriends"
                         :key="friend.id"
@@ -96,7 +95,7 @@
                         class="x-friend-item">
                         <template v-if="friend.ref">
                             <div class="avatar" :class="userStatusClass(friend.ref)">
-                                <img v-lazy="userImage(friend.ref)" />
+                                <img :src="userImage(friend.ref)" loading="lazy" />
                             </div>
                             <div class="detail">
                                 <span
@@ -108,7 +107,7 @@
                         <span v-else v-text="friend.id"></span>
                     </el-option>
                 </el-option-group>
-                <el-option-group v-if="activeFriends.length" :label="$t('side_panel.active')">
+                <el-option-group v-if="activeFriends.length" :label="t('side_panel.active')">
                     <el-option
                         v-for="friend in activeFriends"
                         :key="friend.id"
@@ -118,7 +117,7 @@
                         class="x-friend-item">
                         <template v-if="friend.ref">
                             <div class="avatar">
-                                <img v-lazy="userImage(friend.ref)" />
+                                <img :src="userImage(friend.ref)" loading="lazy" />
                             </div>
                             <div class="detail">
                                 <span
@@ -130,7 +129,7 @@
                         <span v-else v-text="friend.id"></span>
                     </el-option>
                 </el-option-group>
-                <el-option-group v-if="offlineFriends.length" :label="$t('side_panel.offline')">
+                <el-option-group v-if="offlineFriends.length" :label="t('side_panel.offline')">
                     <el-option
                         v-for="friend in offlineFriends"
                         :key="friend.id"
@@ -140,7 +139,7 @@
                         class="x-friend-item">
                         <template v-if="friend.ref">
                             <div class="avatar">
-                                <img v-lazy="userImage(friend.ref)" />
+                                <img :src="userImage(friend.ref)" loading="lazy" />
                             </div>
                             <div class="detail">
                                 <span
@@ -157,43 +156,56 @@
         <template #footer>
             <el-button
                 type="primary"
-                size="small"
-                :disabled="inviteGroupDialog.loading || !inviteGroupDialog.userIds.length"
+                :disabled="inviteGroupDialog.loading || !inviteGroupDialog.userIds.length || !inviteGroupDialog.groupId"
                 @click="sendGroupInvite">
-                Invite
+                {{ t('dialog.invite_to_group.invite') }}
             </el-button>
         </template>
-    </safe-dialog>
+    </el-dialog>
 </template>
 
 <script setup>
-    import { ref, watch, getCurrentInstance, nextTick } from 'vue';
+    import { computed, nextTick, ref, watch } from 'vue';
+    import { ElMessage, ElMessageBox } from 'element-plus';
     import { storeToRefs } from 'pinia';
+    import { useI18n } from 'vue-i18n';
+
+    import { hasGroupPermission, userImage, userStatusClass } from '../../shared/utils';
     import { groupRequest, userRequest } from '../../api';
-    import { adjustDialogZ, hasGroupPermission, userImage, userStatusClass } from '../../shared/utils';
     import { useFriendStore, useGroupStore } from '../../stores';
+    import { getNextDialogIndex } from '../../shared/utils/base/ui';
+
+    import configRepository from '../../service/config';
 
     const { vipFriends, onlineFriends, activeFriends, offlineFriends } = storeToRefs(useFriendStore());
     const { currentUserGroups, inviteGroupDialog } = storeToRefs(useGroupStore());
     const { applyGroup } = useGroupStore();
-
-    const { proxy } = getCurrentInstance();
+    const { t } = useI18n();
 
     watch(
-        () => {
-            return inviteGroupDialog.value.visible;
-        },
-        (value) => {
+        () => inviteGroupDialog.value.visible,
+        async (value) => {
             if (value) {
+                inviteGroupDialog.value.groupId = await configRepository.getString('inviteGroupLastGroup', '');
                 initDialog();
+            } else {
+                await configRepository.setString('inviteGroupLastGroup', inviteGroupDialog.value.groupId);
             }
         }
     );
 
-    const inviteGroupDialogRef = ref(null);
+    const inviteGroupDialogIndex = ref(2000);
+
+    const groupsWithInvitePermission = computed(() => {
+        return Array.from(currentUserGroups.value.values()).filter((group) =>
+            hasGroupPermission(group, 'group-invites-manage')
+        );
+    });
 
     function initDialog() {
-        nextTick(() => adjustDialogZ(inviteGroupDialogRef.value.$el));
+        nextTick(() => {
+            inviteGroupDialogIndex.value = getNextDialogIndex();
+        });
         const D = inviteGroupDialog.value;
         if (D.groupId) {
             groupRequest
@@ -232,7 +244,7 @@
                 }
                 // not allowed to invite
                 inviteGroupDialog.value.groupId = '';
-                proxy.$message({
+                ElMessage({
                     type: 'error',
                     message: 'You are not allowed to invite to this group'
                 });
@@ -243,11 +255,12 @@
             });
     }
     function sendGroupInvite() {
-        proxy.$confirm('Continue? Invite User(s) To Group', 'Confirm', {
+        ElMessageBox.confirm('Continue? Invite User(s) To Group', 'Confirm', {
             confirmButtonText: 'Confirm',
             cancelButtonText: 'Cancel',
-            type: 'info',
-            callback: (action) => {
+            type: 'info'
+        })
+            .then((action) => {
                 const D = inviteGroupDialog.value;
                 if (action !== 'confirm' || D.loading === true) {
                     return;
@@ -270,7 +283,7 @@
                         });
                 };
                 inviteLoop();
-            }
-        });
+            })
+            .catch(() => {});
     }
 </script>

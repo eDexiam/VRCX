@@ -30,11 +30,11 @@ const worldReq = {
             if (typeof ref === 'undefined') {
                 worldReq
                     .getWorld(params)
-                    .catch(reject)
                     .then((args) => {
                         args.ref = worldStore.applyWorld(args.json);
                         resolve(args);
-                    });
+                    })
+                    .catch(reject);
             } else {
                 resolve({
                     cache: true,
@@ -138,6 +138,24 @@ const worldReq = {
                 params
             };
             args.ref = worldStore.applyWorld(json);
+            return args;
+        });
+    },
+
+    uploadWorldImage(imageData) {
+        const params = {
+            tag: 'worldimage'
+        };
+        return request('file/image', {
+            uploadImage: true,
+            matchingDimensions: false,
+            postData: JSON.stringify(params),
+            imageData
+        }).then((json) => {
+            const args = {
+                json,
+                params
+            };
             return args;
         });
     }

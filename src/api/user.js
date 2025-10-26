@@ -24,6 +24,7 @@ const userReq = {
                     `getUser missing user data for: ${params.userId}`
                 );
             }
+            json.$lastFetch = Date.now(); // todo: make this not suck
             const args = {
                 json,
                 params,
@@ -44,11 +45,11 @@ const userReq = {
             if (typeof ref === 'undefined') {
                 userReq
                     .getUser(params)
-                    .catch(reject)
                     .then((args) => {
                         args.ref = userStore.applyUser(args.json);
                         resolve(args);
-                    });
+                    })
+                    .catch(reject);
             } else {
                 resolve({
                     cache: true,

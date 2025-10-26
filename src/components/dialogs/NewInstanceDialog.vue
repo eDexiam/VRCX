@@ -1,15 +1,15 @@
 <template>
-    <safe-dialog
-        ref="newInstanceDialogRef"
-        :visible.sync="newInstanceDialog.visible"
+    <el-dialog
+        :z-index="newInstanceDialogIndex"
+        v-model="newInstanceDialog.visible"
         :title="t('dialog.new_instance.header')"
         width="650px"
         append-to-body>
         <el-tabs v-model="newInstanceDialog.selectedTab" type="card" @tab-click="newInstanceTabClick">
-            <el-tab-pane :label="t('dialog.new_instance.normal')">
+            <el-tab-pane name="Normal" :label="t('dialog.new_instance.normal')">
                 <el-form :model="newInstanceDialog" label-width="150px">
                     <el-form-item :label="t('dialog.new_instance.access_type')">
-                        <el-radio-group v-model="newInstanceDialog.accessType" size="mini" @change="buildInstance">
+                        <el-radio-group v-model="newInstanceDialog.accessType" size="small" @change="buildInstance">
                             <el-radio-button label="public">{{
                                 t('dialog.new_instance.access_type_public')
                             }}</el-radio-button>
@@ -33,7 +33,10 @@
                     <el-form-item
                         v-if="newInstanceDialog.accessType === 'group'"
                         :label="t('dialog.new_instance.group_access_type')">
-                        <el-radio-group v-model="newInstanceDialog.groupAccessType" size="mini" @change="buildInstance">
+                        <el-radio-group
+                            v-model="newInstanceDialog.groupAccessType"
+                            size="small"
+                            @change="buildInstance">
                             <el-radio-button
                                 label="members"
                                 :disabled="
@@ -59,7 +62,7 @@
                         </el-radio-group>
                     </el-form-item>
                     <el-form-item :label="t('dialog.new_instance.region')">
-                        <el-radio-group v-model="newInstanceDialog.region" size="mini" @change="buildInstance">
+                        <el-radio-group v-model="newInstanceDialog.region" size="small" @change="buildInstance">
                             <el-radio-button label="US West">{{ t('dialog.new_instance.region_usw') }}</el-radio-button>
                             <el-radio-button label="US East">{{ t('dialog.new_instance.region_use') }}</el-radio-button>
                             <el-radio-button label="Europe">{{ t('dialog.new_instance.region_eu') }}</el-radio-button>
@@ -81,11 +84,12 @@
                             "
                             @change="buildInstance"></el-checkbox>
                     </el-form-item>
-                    <el-form-item :label="t('dialog.new_instance.world_id')">
+                    <el-form-item :label="t('dialog.new_instance.display_name')">
                         <el-input
-                            v-model="newInstanceDialog.worldId"
-                            size="mini"
-                            @click.native="$event.target.tagName === 'INPUT' && $event.target.select()"
+                            :disabled="!isLocalUserVrcPlusSupporter"
+                            v-model="newInstanceDialog.displayName"
+                            size="small"
+                            @click="$event.target.tagName === 'INPUT' && $event.target.select()"
                             @change="buildInstance"></el-input>
                     </el-form-item>
                     <el-form-item
@@ -114,7 +118,7 @@
                                                 hasGroupPermission(group, 'group-instance-open-create'))
                                         ">
                                         <div class="avatar">
-                                            <img v-lazy="group.iconUrl" />
+                                            <img :src="group.iconUrl" loading="lazy" />
                                         </div>
                                         <div class="detail">
                                             <span class="name" v-text="group.name"></span>
@@ -155,22 +159,22 @@
                         <el-form-item :label="t('dialog.new_instance.location')">
                             <el-input
                                 v-model="newInstanceDialog.location"
-                                size="mini"
+                                size="small"
                                 readonly
-                                @click.native="$event.target.tagName === 'INPUT' && $event.target.select()"></el-input>
+                                @click="$event.target.tagName === 'INPUT' && $event.target.select()"></el-input>
                         </el-form-item>
                         <el-form-item :label="t('dialog.new_instance.url')">
-                            <el-input v-model="newInstanceDialog.url" size="mini" readonly></el-input>
+                            <el-input v-model="newInstanceDialog.url" size="small" readonly></el-input>
                         </el-form-item>
                     </template>
                 </el-form>
             </el-tab-pane>
-            <el-tab-pane :label="t('dialog.new_instance.legacy')">
+            <el-tab-pane name="Legacy" :label="t('dialog.new_instance.legacy')">
                 <el-form :model="newInstanceDialog" label-width="150px">
                     <el-form-item :label="t('dialog.new_instance.access_type')">
                         <el-radio-group
                             v-model="newInstanceDialog.accessType"
-                            size="mini"
+                            size="small"
                             @change="buildLegacyInstance">
                             <el-radio-button label="public">{{
                                 t('dialog.new_instance.access_type_public')
@@ -197,7 +201,7 @@
                         :label="t('dialog.new_instance.group_access_type')">
                         <el-radio-group
                             v-model="newInstanceDialog.groupAccessType"
-                            size="mini"
+                            size="small"
                             @change="buildLegacyInstance">
                             <el-radio-button label="members">{{
                                 t('dialog.new_instance.group_access_type_members')
@@ -211,7 +215,7 @@
                         </el-radio-group>
                     </el-form-item>
                     <el-form-item :label="t('dialog.new_instance.region')">
-                        <el-radio-group v-model="newInstanceDialog.region" size="mini" @change="buildLegacyInstance">
+                        <el-radio-group v-model="newInstanceDialog.region" size="small" @change="buildLegacyInstance">
                             <el-radio-button label="US West">{{ t('dialog.new_instance.region_usw') }}</el-radio-button>
                             <el-radio-button label="US East">{{ t('dialog.new_instance.region_use') }}</el-radio-button>
                             <el-radio-button label="Europe">{{ t('dialog.new_instance.region_eu') }}</el-radio-button>
@@ -226,19 +230,23 @@
                     <el-form-item :label="t('dialog.new_instance.world_id')">
                         <el-input
                             v-model="newInstanceDialog.worldId"
-                            size="mini"
-                            @click.native="$event.target.tagName === 'INPUT' && $event.target.select()"
+                            size="small"
+                            @click="$event.target.tagName === 'INPUT' && $event.target.select()"
                             @change="buildLegacyInstance"></el-input>
                     </el-form-item>
                     <el-form-item :label="t('dialog.new_instance.instance_id')">
                         <el-input
                             v-model="newInstanceDialog.instanceName"
                             :placeholder="t('dialog.new_instance.instance_id_placeholder')"
-                            size="mini"
+                            size="small"
                             @change="buildLegacyInstance"></el-input>
                     </el-form-item>
                     <el-form-item
-                        v-if="newInstanceDialog.accessType !== 'public' && newInstanceDialog.accessType !== 'group'"
+                        v-if="
+                            newInstanceDialog.selectedTab === 'Legacy' &&
+                            newInstanceDialog.accessType !== 'public' &&
+                            newInstanceDialog.accessType !== 'group'
+                        "
                         :label="t('dialog.new_instance.instance_creator')">
                         <el-select
                             v-model="newInstanceDialog.userId"
@@ -254,7 +262,7 @@
                                     :value="currentUser.id"
                                     style="height: auto">
                                     <div class="avatar" :class="userStatusClass(currentUser)">
-                                        <img v-lazy="userImage(currentUser)" />
+                                        <img :src="userImage(currentUser)" loading="lazy" />
                                     </div>
                                     <div class="detail">
                                         <span class="name" v-text="currentUser.displayName"></span>
@@ -271,7 +279,7 @@
                                     style="height: auto">
                                     <template v-if="friend.ref">
                                         <div class="avatar" :class="userStatusClass(friend.ref)">
-                                            <img v-lazy="userImage(friend.ref)" />
+                                            <img :src="userImage(friend.ref)" loading="lazy" />
                                         </div>
                                         <div class="detail">
                                             <span
@@ -293,7 +301,7 @@
                                     style="height: auto">
                                     <template v-if="friend.ref">
                                         <div class="avatar" :class="userStatusClass(friend.ref)">
-                                            <img v-lazy="userImage(friend.ref)" />
+                                            <img :src="userImage(friend.ref)" loading="lazy" />
                                         </div>
                                         <div class="detail">
                                             <span
@@ -315,7 +323,7 @@
                                     style="height: auto">
                                     <template v-if="friend.ref">
                                         <div class="avatar">
-                                            <img v-lazy="userImage(friend.ref)" />
+                                            <img :src="userImage(friend.ref)" loading="lazy" />
                                         </div>
                                         <div class="detail">
                                             <span
@@ -337,7 +345,7 @@
                                     style="height: auto">
                                     <template v-if="friend.ref">
                                         <div class="avatar">
-                                            <img v-lazy="userImage(friend.ref)" />
+                                            <img :src="userImage(friend.ref)" loading="lazy" />
                                         </div>
                                         <div class="detail">
                                             <span
@@ -371,7 +379,7 @@
                                     style="height: auto; width: 478px">
                                     <template v-if="group">
                                         <div class="avatar">
-                                            <img v-lazy="group.iconUrl" />
+                                            <img :src="group.iconUrl" loading="lazy" />
                                         </div>
                                         <div class="detail">
                                             <span class="name" v-text="group.name"></span></div
@@ -383,26 +391,25 @@
                     <el-form-item :label="t('dialog.new_instance.location')">
                         <el-input
                             v-model="newInstanceDialog.location"
-                            size="mini"
+                            size="small"
                             readonly
-                            @click.native="$event.target.tagName === 'INPUT' && $event.target.select()"></el-input>
+                            @click="$event.target.tagName === 'INPUT' && $event.target.select()"></el-input>
                     </el-form-item>
                     <el-form-item :label="t('dialog.new_instance.url')">
-                        <el-input v-model="newInstanceDialog.url" size="mini" readonly></el-input>
+                        <el-input v-model="newInstanceDialog.url" size="small" readonly></el-input>
                     </el-form-item>
                 </el-form>
             </el-tab-pane>
         </el-tabs>
-        <template v-if="newInstanceDialog.selectedTab === '0'" #footer>
+        <template v-if="newInstanceDialog.selectedTab === 'Normal'" #footer>
             <template v-if="newInstanceDialog.instanceCreated">
-                <el-button size="small" @click="copyInstanceUrl(newInstanceDialog.location)">{{
+                <el-button @click="copyInstanceUrl(newInstanceDialog.location)">{{
                     t('dialog.new_instance.copy_url')
                 }}</el-button>
-                <el-button size="small" @click="selfInvite(newInstanceDialog.location)">{{
+                <el-button @click="selfInvite(newInstanceDialog.location)">{{
                     t('dialog.new_instance.self_invite')
                 }}</el-button>
                 <el-button
-                    size="small"
                     :disabled="
                         (newInstanceDialog.accessType === 'friends' || newInstanceDialog.accessType === 'invite') &&
                         newInstanceDialog.userId !== currentUser.id
@@ -410,28 +417,36 @@
                     @click="showInviteDialog(newInstanceDialog.location)"
                     >{{ t('dialog.new_instance.invite') }}</el-button
                 >
-                <el-button
-                    type="primary"
-                    size="small"
-                    @click="showLaunchDialog(newInstanceDialog.location, newInstanceDialog.shortName)"
-                    >{{ t('dialog.new_instance.launch') }}</el-button
-                >
+                <template v-if="canOpenInstanceInGame()">
+                    <el-button @click="showLaunchDialog(newInstanceDialog.location, newInstanceDialog.shortName)">{{
+                        t('dialog.new_instance.launch')
+                    }}</el-button>
+                    <el-button @click="handleAttachGame(newInstanceDialog.location, newInstanceDialog.shortName)">
+                        {{ t('dialog.new_instance.open_ingame') }}
+                    </el-button>
+                </template>
+                <template v-else>
+                    <el-button
+                        type="primary"
+                        @click="showLaunchDialog(newInstanceDialog.location, newInstanceDialog.shortName)"
+                        >{{ t('dialog.new_instance.launch') }}</el-button
+                    >
+                </template>
             </template>
             <template v-else>
-                <el-button type="primary" size="small" @click="handleCreateNewInstance">{{
+                <el-button type="primary" @click="handleCreateNewInstance">{{
                     t('dialog.new_instance.create_instance')
                 }}</el-button>
             </template>
         </template>
-        <template v-else-if="newInstanceDialog.selectedTab === '1'" #footer>
-            <el-button size="small" @click="copyInstanceUrl(newInstanceDialog.location)">{{
+        <template v-else-if="newInstanceDialog.selectedTab === 'Legacy'" #footer>
+            <el-button @click="copyInstanceUrl(newInstanceDialog.location)">{{
                 t('dialog.new_instance.copy_url')
             }}</el-button>
-            <el-button size="small" @click="selfInvite(newInstanceDialog.location)">{{
+            <el-button @click="selfInvite(newInstanceDialog.location)">{{
                 t('dialog.new_instance.self_invite')
             }}</el-button>
             <el-button
-                size="small"
                 :disabled="
                     (newInstanceDialog.accessType === 'friends' || newInstanceDialog.accessType === 'invite') &&
                     newInstanceDialog.userId !== currentUser.id
@@ -439,25 +454,35 @@
                 @click="showInviteDialog(newInstanceDialog.location)"
                 >{{ t('dialog.new_instance.invite') }}</el-button
             >
-            <el-button
-                type="primary"
-                size="small"
-                @click="showLaunchDialog(newInstanceDialog.location, newInstanceDialog.shortName)"
-                >{{ t('dialog.new_instance.launch') }}</el-button
-            >
+            <template v-if="canOpenInstanceInGame()">
+                <el-button @click="showLaunchDialog(newInstanceDialog.location, newInstanceDialog.shortName)">{{
+                    t('dialog.new_instance.launch')
+                }}</el-button>
+                <el-button
+                    type="primary"
+                    @click="handleAttachGame(newInstanceDialog.location, newInstanceDialog.shortName)">
+                    {{ t('dialog.new_instance.open_ingame') }}
+                </el-button>
+            </template>
+            <template v-else>
+                <el-button
+                    type="primary"
+                    @click="showLaunchDialog(newInstanceDialog.location, newInstanceDialog.shortName)"
+                    >{{ t('dialog.new_instance.launch') }}</el-button
+                >
+            </template>
         </template>
         <InviteDialog :invite-dialog="inviteDialog" @closeInviteDialog="closeInviteDialog" />
-    </safe-dialog>
+    </el-dialog>
 </template>
 
 <script setup>
-    import { ref, watch, nextTick, getCurrentInstance } from 'vue';
-    import { useI18n } from 'vue-i18n-bridge';
+    import { computed, nextTick, ref, watch } from 'vue';
+    import { ElMessage } from 'element-plus';
     import { storeToRefs } from 'pinia';
-    import { groupRequest, instanceRequest, worldRequest } from '../../api';
-    import configRepository from '../../service/config';
+    import { useI18n } from 'vue-i18n';
+
     import {
-        adjustDialogZ,
         copyToClipboard,
         getLaunchURL,
         hasGroupPermission,
@@ -470,11 +495,16 @@
         useFriendStore,
         useGroupStore,
         useInstanceStore,
+        useInviteStore,
         useLaunchStore,
         useLocationStore,
         useUserStore
     } from '../../stores';
+    import { groupRequest, instanceRequest, worldRequest } from '../../api';
+    import { getNextDialogIndex } from '../../shared/utils/base/ui';
+
     import InviteDialog from './InviteDialog/InviteDialog.vue';
+    import configRepository from '../../service/config';
 
     const props = defineProps({
         newInstanceDialogLocationTag: {
@@ -485,22 +515,21 @@
 
     const { t } = useI18n();
 
-    const { proxy } = getCurrentInstance();
-
     const { friends, vipFriends, onlineFriends, activeFriends, offlineFriends } = storeToRefs(useFriendStore());
-    const { currentUserGroups, cachedGroups } = storeToRefs(useGroupStore());
-    const { handleGroupPermissions } = useGroupStore();
+    const { currentUserGroups } = storeToRefs(useGroupStore());
+    const { cachedGroups, handleGroupPermissions } = useGroupStore();
     const { lastLocation } = storeToRefs(useLocationStore());
-    const { showLaunchDialog } = useLaunchStore();
+    const { showLaunchDialog, tryOpenInstanceInVrc } = useLaunchStore();
     const { createNewInstance } = useInstanceStore();
-    const { currentUser } = storeToRefs(useUserStore());
+    const { currentUser, isLocalUserVrcPlusSupporter } = storeToRefs(useUserStore());
+    const { canOpenInstanceInGame } = useInviteStore();
 
-    const newInstanceDialogRef = ref(null);
+    const newInstanceDialogIndex = ref(2000);
 
     const newInstanceDialog = ref({
         visible: false,
         // loading: false,
-        selectedTab: '0',
+        selectedTab: 'Normal',
         instanceCreated: false,
         queueEnabled: false,
         worldId: '',
@@ -516,6 +545,7 @@
         strict: false,
         location: '',
         shortName: '',
+        displayName: '',
         url: '',
         secureOrShortName: '',
         lastSelectedGroupId: '',
@@ -564,7 +594,7 @@
                 const friendsInCurrentInstance = lastLocation.value.friendList;
                 for (const friend of friendsInCurrentInstance.values()) {
                     const ctx = friends.value.get(friend.userId);
-                    if (typeof ctx.ref === 'undefined') {
+                    if (typeof ctx?.ref === 'undefined') {
                         continue;
                     }
                     D.friendsInInstance.push(ctx);
@@ -573,11 +603,18 @@
             });
     }
 
+    function handleAttachGame(location, shortName) {
+        tryOpenInstanceInVrc(location, shortName);
+        closeInviteDialog();
+    }
+
     async function initNewInstanceDialog(tag) {
         if (!isRealInstance(tag)) {
             return;
         }
-        nextTick(() => adjustDialogZ(newInstanceDialogRef.value.$el));
+        nextTick(() => {
+            newInstanceDialogIndex.value = getNextDialogIndex();
+        });
         const D = newInstanceDialog.value;
         const L = parseLocation(tag);
         if (D.worldId === L.worldId) {
@@ -594,6 +631,9 @@
         D.strict = false;
         D.shortName = '';
         D.secureOrShortName = '';
+        if (!isLocalUserVrcPlusSupporter.value) {
+            D.displayName = '';
+        }
         const args = await groupRequest.getGroupPermissions({ userId: currentUser.value.id });
         handleGroupPermissions(args);
         buildInstance();
@@ -633,10 +673,23 @@
         configRepository
             .getBool('instanceDialogAgeGate', false)
             .then((value) => (newInstanceDialog.value.ageGate = value));
+
+        configRepository
+            .getString('instanceDialogDisplayName', '')
+            .then((value) => (newInstanceDialog.value.displayName = value));
     }
     function saveNewInstanceDialog() {
-        const { accessType, region, instanceName, userId, groupId, groupAccessType, queueEnabled, ageGate } =
-            newInstanceDialog.value;
+        const {
+            accessType,
+            region,
+            instanceName,
+            userId,
+            groupId,
+            groupAccessType,
+            queueEnabled,
+            ageGate,
+            displayName
+        } = newInstanceDialog.value;
 
         configRepository.setString('instanceDialogAccessType', accessType);
         configRepository.setString('instanceRegion', region);
@@ -646,9 +699,10 @@
         configRepository.setString('instanceDialogGroupAccessType', groupAccessType);
         configRepository.setBool('instanceDialogQueueEnabled', queueEnabled);
         configRepository.setBool('instanceDialogAgeGate', ageGate);
+        configRepository.setString('instanceDialogDisplayName', displayName);
     }
-    function newInstanceTabClick(tab) {
-        if (tab === '1') {
+    function newInstanceTabClick(obj) {
+        if (obj.props.name === 'Normal') {
             buildInstance();
         } else {
             buildLegacyInstance();
@@ -680,7 +734,7 @@
                 worldId: L.worldId
             })
             .then((args) => {
-                proxy.$message({
+                ElMessage({
                     message: 'Self invite sent',
                     type: 'success'
                 });
@@ -709,7 +763,7 @@
         }
         if (D.groupId && D.groupId !== D.lastSelectedGroupId) {
             D.roleIds = [];
-            const ref = cachedGroups.value.get(D.groupId);
+            const ref = cachedGroups.get(D.groupId);
             if (typeof ref !== 'undefined') {
                 D.groupRef = ref;
                 D.selectedGroupRoles = ref.roles;
@@ -784,7 +838,7 @@
         }
         if (D.groupId && D.groupId !== D.lastSelectedGroupId) {
             D.roleIds = [];
-            const ref = cachedGroups.value.get(D.groupId);
+            const ref = cachedGroups.get(D.groupId);
             if (typeof ref !== 'undefined') {
                 D.groupRef = ref;
                 D.selectedGroupRoles = ref.roles;

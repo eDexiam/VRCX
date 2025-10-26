@@ -1,68 +1,71 @@
 <template>
-    <safe-dialog
+    <el-dialog
         class="x-dialog"
-        :visible="changeAvatarImageDialogVisible"
+        :model-value="changeAvatarImageDialogVisible"
         :title="t('dialog.change_content_image.avatar')"
         width="850px"
         append-to-body
         @close="closeDialog">
-        <div v-loading="changeAvatarImageDialogLoading">
+        <div>
             <input
                 id="AvatarImageUploadButton"
                 type="file"
                 accept="image/*"
                 style="display: none"
                 @change="onFileChangeAvatarImage" />
+            <el-progress
+                v-if="changeAvatarImageDialogLoading"
+                :show-text="false"
+                :indeterminate="true"
+                :percentage="100"
+                :stroke-width="3"
+                style="margin-bottom: 12px" />
             <span>{{ t('dialog.change_content_image.description') }}</span>
             <br />
             <el-button-group style="padding-bottom: 10px; padding-top: 10px">
-                <el-button type="default" size="small" icon="el-icon-refresh" @click="refresh">
-                    {{ t('dialog.change_content_image.refresh') }}
-                </el-button>
-                <el-button type="default" size="small" icon="el-icon-upload2" @click="uploadAvatarImage">
+                <el-button
+                    type="default"
+                    size="small"
+                    :icon="Upload"
+                    :loading="changeAvatarImageDialogLoading"
+                    :disabled="changeAvatarImageDialogLoading"
+                    @click="uploadAvatarImage">
                     {{ t('dialog.change_content_image.upload') }}
                 </el-button>
             </el-button-group>
             <br />
-            <div v-for="image in previousImagesTable" :key="image.version" style="display: inline-block">
-                <div
-                    v-if="image.file"
-                    class="x-change-image-item"
-                    style="cursor: pointer"
-                    :class="{ 'current-image': compareCurrentImage(image) }"
-                    @click="setAvatarImage(image)">
-                    <img v-lazy="image.file.url" class="image" />
-                </div>
+            <div class="x-change-image-item">
+                <img :src="previousImageUrl" class="img-size" loading="lazy" />
             </div>
         </div>
-    </safe-dialog>
+    </el-dialog>
 </template>
 
 <script setup>
+    import { ElMessage } from 'element-plus';
+    import { Upload } from '@element-plus/icons-vue';
+    import { ref } from 'vue';
     import { storeToRefs } from 'pinia';
-    import { getCurrentInstance, ref } from 'vue';
-    import { useI18n } from 'vue-i18n-bridge';
-    import { imageRequest } from '../../../api';
-    import { AppGlobal } from '../../../service/appConfig';
+    import { useI18n } from 'vue-i18n';
+
+    import { avatarRequest, imageRequest } from '../../../api';
     import { $throw } from '../../../service/request';
+    import { AppDebug } from '../../../service/appConfig';
     import { extractFileId } from '../../../shared/utils';
-    import { useAvatarStore, useGalleryStore } from '../../../stores';
+    import { handleImageUploadInput } from '../../../shared/utils/imageUpload';
+    import { useAvatarStore } from '../../../stores';
 
     const { t } = useI18n();
 
-    const instance = getCurrentInstance();
-    const $message = instance.proxy.$message;
-
     const { avatarDialog } = storeToRefs(useAvatarStore());
-    const { previousImagesTable } = storeToRefs(useGalleryStore());
     const { applyAvatar } = useAvatarStore();
 
-    const props = defineProps({
+    defineProps({
         changeAvatarImageDialogVisible: {
             type: Boolean,
-            default: false
+            required: true
         },
-        previousImagesFileId: {
+        previousImageUrl: {
             type: String,
             default: ''
         }
@@ -78,11 +81,7 @@
         avatarId: ''
     });
 
-    const emit = defineEmits(['update:changeAvatarImageDialogVisible', 'refresh']);
-
-    function refresh() {
-        emit('refresh', 'Change');
-    }
+    const emit = defineEmits(['update:changeAvatarImageDialogVisible', 'update:previousImageUrl']);
 
     function closeDialog() {
         emit('update:changeAvatarImageDialogVisible', false);
@@ -93,109 +92,77 @@
         return response;
     }
 
-    async function genMd5(file) {
-        const response = await AppApi.MD5File(file);
-        return response;
-    }
-
-    async function genSig(file) {
-        const response = await AppApi.SignFile(file);
-        return response;
-    }
-
-    async function genLength(file) {
-        const response = await AppApi.FileLength(file);
-        return response;
-    }
-
     function onFileChangeAvatarImage(e) {
-        const clearFile = function () {
-            const fileInput = /** @type{HTMLInputElement} */ (document.querySelector('#AvatarImageUploadButton'));
-            if (fileInput) {
-                fileInput.value = '';
-            }
-        };
-        const files = e.target.files || e.dataTransfer.files;
-        if (!files.length || !avatarDialog.value.visible || avatarDialog.value.loading) {
-            clearFile();
+        const { file, clearInput } = handleImageUploadInput(e, {
+            inputSelector: '#AvatarImageUploadButton',
+            tooLargeMessage: () => t('message.file.too_large'),
+            invalidTypeMessage: () => t('message.file.not_image')
+        });
+        if (!file) {
             return;
         }
-
-        // validate file
-        if (files[0].size >= 100000000) {
-            // 100MB
-            $message({
-                message: t('message.file.too_large'),
-                type: 'error'
-            });
-            clearFile();
-            return;
-        }
-        if (!files[0].type.match(/image.*/)) {
-            $message({
-                message: t('message.file.not_image'),
-                type: 'error'
-            });
-            clearFile();
+        if (!avatarDialog.value.visible || avatarDialog.value.loading) {
+            clearInput();
             return;
         }
 
         const r = new FileReader();
-        r.onload = async function (file) {
+        const finalize = () => {
+            changeAvatarImageDialogLoading.value = false;
+            clearInput();
+        };
+        r.onerror = finalize;
+        r.onabort = finalize;
+        r.onload = async function () {
             try {
                 const base64File = await resizeImageToFitLimits(btoa(r.result.toString()));
                 // 10MB
-                const fileMd5 = await genMd5(base64File);
-                const fileSizeInBytes = parseInt(file.total.toString(), 10);
-                const base64SignatureFile = await genSig(base64File);
-                const signatureMd5 = await genMd5(base64SignatureFile);
-                const signatureSizeInBytes = parseInt(await genLength(base64SignatureFile), 10);
-
-                const avatarId = avatarDialog.value.id;
-                const { imageUrl } = avatarDialog.value.ref;
-
-                const fileId = extractFileId(imageUrl);
-                if (!fileId) {
-                    $message({
-                        message: t('message.avatar.image_invalid'),
-                        type: 'error'
-                    });
-                    clearFile();
+                if (LINUX) {
+                    // use new website upload process on Linux, we're missing the needed libraries for Unity method
+                    // website method clears avatar name and is missing world image uploading
+                    await initiateUpload(base64File);
                     return;
                 }
-
-                avatarImage.value = {
-                    base64File,
-                    fileMd5,
-                    base64SignatureFile,
-                    signatureMd5,
-                    fileId,
-                    avatarId
-                };
-                const params = {
-                    fileMd5,
-                    fileSizeInBytes,
-                    signatureMd5,
-                    signatureSizeInBytes
-                };
-
-                // Upload chaining
-                await initiateUpload(params, fileId);
+                await initiateUploadLegacy(base64File, file);
             } catch (error) {
-                console.error('Avatar image upload process failed:', error);
+                console.error('avatar image upload process failed:', error);
             } finally {
-                changeAvatarImageDialogLoading.value = false;
-                clearFile();
+                finalize();
             }
         };
 
         changeAvatarImageDialogLoading.value = true;
-        r.readAsBinaryString(files[0]);
+        try {
+            r.readAsBinaryString(file);
+        } catch (error) {
+            console.error('Failed to read file', error);
+            finalize();
+        }
     }
 
-    // ------------ Upload Process Start ------------
-
-    async function initiateUpload(params, fileId) {
+    async function initiateUploadLegacy(base64File, file) {
+        const fileMd5 = await AppApi.MD5File(base64File);
+        const fileSizeInBytes = parseInt(file.size, 10);
+        const base64SignatureFile = await AppApi.SignFile(base64File);
+        const signatureMd5 = await AppApi.MD5File(base64SignatureFile);
+        const signatureSizeInBytes = parseInt(await AppApi.FileLength(base64SignatureFile), 10);
+        const avatarId = avatarDialog.value.id;
+        const { imageUrl } = avatarDialog.value.ref;
+        const fileId = extractFileId(imageUrl);
+        avatarImage.value = {
+            base64File,
+            fileMd5,
+            base64SignatureFile,
+            signatureMd5,
+            fileId,
+            avatarId
+        };
+        const params = {
+            fileMd5,
+            fileSizeInBytes,
+            signatureMd5,
+            signatureSizeInBytes
+        };
         const res = await imageRequest.uploadAvatarImage(params, fileId);
         return avatarImageInit(res);
     }
@@ -235,7 +202,7 @@
 
         if (json.status !== 200) {
             changeAvatarImageDialogLoading.value = false;
-            $throw(json.status, 'Avatar image upload failed', params.url);
+            $throw(json.status, 'avatar image upload failed', params.url);
         }
         const args = {
             json,
@@ -288,7 +255,7 @@
 
         if (json.status !== 200) {
             changeAvatarImageDialogLoading.value = false;
-            $throw(json.status, 'Avatar image upload failed', params.url);
+            $throw(json.status, 'avatar image upload failed', params.url);
         }
         const args = {
             json,
@@ -306,56 +273,57 @@
         const res = await imageRequest.uploadAvatarImageSigFinish(params);
         return avatarImageSigFinish(res);
     }
-
     async function avatarImageSigFinish(args) {
         const { fileId, fileVersion } = args.params;
-        const parmas = {
+        const params = {
             id: avatarImage.value.avatarId,
-            imageUrl: `${AppGlobal.endpointDomain}/file/${fileId}/${fileVersion}/file`
+            imageUrl: `${AppDebug.endpointDomain}/file/${fileId}/${fileVersion}/file`
         };
-        const res = await imageRequest.setAvatarImage(parmas);
+        const res = await imageRequest.setAvatarImage(params);
         return avatarImageSet(res);
     }
 
-    async function avatarImageSet(args) {
-        applyAvatar(args.json);
+    function avatarImageSet(args) {
         changeAvatarImageDialogLoading.value = false;
         if (args.json.imageUrl === args.params.imageUrl) {
-            $message({
+            ElMessage({
                 message: t('message.avatar.image_changed'),
                 type: 'success'
             });
-            refresh();
+            emit('update:previousImageUrl', args.json.imageUrl);
         } else {
-            $throw(0, 'Avatar image change failed', args.params.imageUrl);
+            $throw(0, 'avatar image change failed', args.params.imageUrl);
         }
     }
 
     // ------------ Upload Process End ------------
 
+    async function initiateUpload(base64File) {
+        const args = await avatarRequest.uploadAvatarImage(base64File);
+        const fileUrl = args.json.versions[args.json.versions.length - 1].file.url;
+        const avatarArgs = await avatarRequest.saveAvatar({
+            id: avatarDialog.value.id,
+            imageUrl: fileUrl
+        });
+        const ref = applyAvatar(avatarArgs.json);
+        changeAvatarImageDialogLoading.value = false;
+        emit('update:previousImageUrl', ref.imageUrl);
+        ElMessage({
+            message: t('message.avatar.image_changed'),
+            type: 'success'
+        });
+
+        // closeDialog();
+    }
+
     function uploadAvatarImage() {
         document.getElementById('AvatarImageUploadButton').click();
     }
-
-    function setAvatarImage(image) {
-        changeAvatarImageDialogLoading.value = true;
-        const parmas = {
-            id: avatarDialog.value.id,
-            imageUrl: `${AppGlobal.endpointDomain}/file/${props.previousImagesFileId}/${image.version}/file`
-        };
-        imageRequest
-            .setAvatarImage(parmas)
-            .then((args) => applyAvatar(args.json))
-            .finally(() => {
-                changeAvatarImageDialogLoading.value = false;
-                closeDialog();
-            });
-    }
-
-    function compareCurrentImage(image) {
-        return (
-            `${AppGlobal.endpointDomain}/file/${props.previousImagesFileId}/${image.version}/file` ===
-            avatarDialog.value.ref.imageUrl
-        );
-    }
 </script>
+
+<style lang="scss" scoped>
+    .img-size {
+        width: 500px;
+        height: 375px;
+    }
+</style>

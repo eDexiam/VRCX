@@ -33,9 +33,9 @@ const avatarReq = {
             return args;
         });
     },
+
     /**
-     * @param {{ id: string, releaseStatus?: 'public' | 'private', name?: string, description?: string,tags?: string[] }} params
-     * @returns {Promise<{json: any, params}>}
+     * @type {import('../types/api/avatar').SaveAvatar}
      */
     saveAvatar(params) {
         return request(`avatars/${params.id}`, {
@@ -122,7 +122,7 @@ const avatarReq = {
 
     /**
      * @param {{ avatarId: string }} params
-     * @returns {Promise<{json: T, params}>}
+     * @returns {Promise<{json: any, params}>}
      */
     deleteImposter(params) {
         return request(`avatars/${params.avatarId}/impostor`, {
@@ -151,7 +151,7 @@ const avatarReq = {
     },
 
     /**
-     * @param {{ avatarId: string }} avatarId
+     * @param {string} avatarId
      * @returns {Promise<{json: any, params}>}
      */
     getAvatarGallery(avatarId) {
@@ -173,8 +173,26 @@ const avatarReq = {
         });
     },
 
+    uploadAvatarImage(imageData) {
+        const params = {
+            tag: 'avatarimage'
+        };
+        return request('file/image', {
+            uploadImage: true,
+            matchingDimensions: false,
+            postData: JSON.stringify(params),
+            imageData
+        }).then((json) => {
+            const args = {
+                json,
+                params
+            };
+            return args;
+        });
+    },
+
     /**
-     * @param {{ imageData: string, avatarId: string }} params
+     * @param {{ imageData: string, avatarId: string }}
      * @returns {Promise<{json: any, params}>}
      */
     uploadAvatarGalleryImage(imageData, avatarId) {

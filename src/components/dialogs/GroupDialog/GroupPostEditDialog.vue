@@ -1,6 +1,6 @@
 <template>
-    <safe-dialog
-        :visible.sync="groupPostEditDialog.visible"
+    <el-dialog
+        v-model="groupPostEditDialog.visible"
         :title="t('dialog.group_post_edit.header')"
         width="650px"
         append-to-body>
@@ -8,7 +8,7 @@
             <h3 v-text="groupPostEditDialog.groupRef.name"></h3>
             <el-form :model="groupPostEditDialog" label-width="150px">
                 <el-form-item :label="t('dialog.group_post_edit.title')">
-                    <el-input v-model="groupPostEditDialog.title" size="mini"></el-input>
+                    <el-input v-model="groupPostEditDialog.title" size="small"></el-input>
                 </el-form-item>
                 <el-form-item :label="t('dialog.group_post_edit.message')">
                     <el-input
@@ -61,29 +61,18 @@
                 <el-form-item :label="t('dialog.group_post_edit.image')">
                     <template v-if="gallerySelectDialog.selectedFileId">
                         <div style="display: inline-block; flex: none; margin-right: 5px">
-                            <el-popover placement="right" width="500px" trigger="click">
-                                <img
-                                    slot="reference"
-                                    v-lazy="gallerySelectDialog.selectedImageUrl"
-                                    style="
-                                        flex: none;
-                                        width: 60px;
-                                        height: 60px;
-                                        border-radius: 4px;
-                                        object-fit: cover;
-                                    " />
-                                <img
-                                    v-lazy="gallerySelectDialog.selectedImageUrl"
-                                    style="height: 500px"
-                                    @click="showFullscreenImageDialog(gallerySelectDialog.selectedImageUrl)" />
-                            </el-popover>
-                            <el-button size="mini" style="vertical-align: top" @click="clearImageGallerySelect">
+                            <img
+                                :src="gallerySelectDialog.selectedImageUrl"
+                                style="flex: none; width: 60px; height: 60px; border-radius: 4px; object-fit: cover"
+                                @click="showFullscreenImageDialog(gallerySelectDialog.selectedImageUrl)"
+                                loading="lazy" />
+                            <el-button size="small" style="vertical-align: top" @click="clearImageGallerySelect">
                                 {{ t('dialog.invite_message.clear_selected_image') }}
                             </el-button>
                         </div>
                     </template>
                     <template v-else>
-                        <el-button size="mini" style="margin-right: 5px" @click="showGallerySelectDialog">
+                        <el-button size="small" style="margin-right: 5px" @click="showGallerySelectDialog">
                             {{ t('dialog.invite_message.select_image') }}
                         </el-button>
                     </template>
@@ -91,13 +80,13 @@
             </el-form>
         </div>
         <template #footer>
-            <el-button size="small" @click="groupPostEditDialog.visible = false">
+            <el-button @click="groupPostEditDialog.visible = false">
                 {{ t('dialog.group_post_edit.cancel') }}
             </el-button>
-            <el-button v-if="groupPostEditDialog.postId" size="small" @click="editGroupPost">
+            <el-button v-if="groupPostEditDialog.postId" @click="editGroupPost">
                 {{ t('dialog.group_post_edit.edit_post') }}
             </el-button>
-            <el-button v-else size="small" @click="createGroupPost">
+            <el-button v-else @click="createGroupPost">
                 {{ t('dialog.group_post_edit.create_post') }}
             </el-button>
         </template>
@@ -105,14 +94,17 @@
             :gallery-select-dialog="gallerySelectDialog"
             :gallery-table="galleryTable"
             @refresh-gallery-table="refreshGalleryTable" />
-    </safe-dialog>
+    </el-dialog>
 </template>
 
 <script setup>
-    import { ref, computed, getCurrentInstance } from 'vue';
-    import { useI18n } from 'vue-i18n-bridge';
+    import { computed, ref } from 'vue';
+    import { ElMessage } from 'element-plus';
+    import { useI18n } from 'vue-i18n';
+
     import { groupRequest, vrcPlusIconRequest } from '../../../api';
     import { useGalleryStore, useGroupStore } from '../../../stores';
+
     import GallerySelectDialog from './GallerySelectDialog.vue';
 
     const props = defineProps({
@@ -125,7 +117,6 @@
 
     const emit = defineEmits(['update:dialogData']);
 
-    const { proxy } = getCurrentInstance();
     const { t } = useI18n();
 
     const { showFullscreenImageDialog, handleFilesList } = useGalleryStore();
@@ -168,6 +159,13 @@
         if (!D.groupId || !D.postId) {
             return;
         }
+        if (!D.title || !D.text) {
+            ElMessage({
+                message: 'Title and text are required',
+                type: 'warning'
+            });
+            return;
+        }
         const params = {
             groupId: D.groupId,
             postId: D.postId,
@@ -181,17 +179,23 @@
             params.imageId = gallerySelectDialog.value.selectedFileId;
         }
         groupRequest.editGroupPost(params).then((args) => {
-            handleGroupPost();
-            proxy.$message({
+            handleGroupPost(args);
+            ElMessage({
                 message: 'Group post edited',
                 type: 'success'
             });
-            return args;
         });
         D.visible = false;
     }
     function createGroupPost() {
         const D = groupPostEditDialog.value;
+        if (!D.title || !D.text) {
+            ElMessage({
+                message: 'Title and text are required',
+                type: 'warning'
+            });
+            return;
+        }
         const params = {
             groupId: D.groupId,
             title: D.title,
@@ -205,12 +209,11 @@
             params.imageId = gallerySelectDialog.value.selectedFileId;
         }
         groupRequest.createGroupPost(params).then((args) => {
-            handleGroupPost();
-            proxy.$message({
+            handleGroupPost(args);
+            ElMessage({
                 message: 'Group post created',
                 type: 'success'
             });
-            return args;
         });
         D.visible = false;
     }

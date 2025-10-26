@@ -1,7 +1,7 @@
 <template>
-    <safe-dialog
+    <el-dialog
         class="x-dialog"
-        :visible="visible"
+        :model-value="isSendInviteConfirmDialogVisible"
         :title="t('dialog.invite_message.header')"
         width="400px"
         append-to-body
@@ -11,35 +11,33 @@
         </div>
 
         <template #footer>
-            <el-button type="small" @click="cancelInviteConfirm">
+            <el-button type="default" @click="cancelInviteConfirm">
                 {{ t('dialog.invite_message.cancel') }}
             </el-button>
-            <el-button type="primary" size="small" @click="sendInviteConfirm">
+            <el-button type="primary" @click="sendInviteConfirm">
                 {{ t('dialog.invite_message.confirm') }}
             </el-button>
         </template>
-    </safe-dialog>
+    </el-dialog>
 </template>
 
 <script setup>
+    import { ElMessage } from 'element-plus';
     import { storeToRefs } from 'pinia';
-    import { getCurrentInstance } from 'vue';
-    import { useI18n } from 'vue-i18n-bridge';
+    import { useI18n } from 'vue-i18n';
+
     import { instanceRequest, notificationRequest } from '../../../api';
-    import { parseLocation } from '../../../shared/utils';
     import { useGalleryStore, useUserStore } from '../../../stores';
+    import { parseLocation } from '../../../shared/utils';
 
     const { t } = useI18n();
-
-    const instance = getCurrentInstance();
-    const $message = instance.proxy.$message;
 
     const { uploadImage } = storeToRefs(useGalleryStore());
     const { clearInviteImageUpload } = useGalleryStore();
     const { currentUser } = storeToRefs(useUserStore());
 
     const props = defineProps({
-        visible: {
+        isSendInviteConfirmDialogVisible: {
             type: Boolean,
             required: true
         },
@@ -54,10 +52,10 @@
         }
     });
 
-    const emit = defineEmits(['update:visible', 'closeInviteDialog']);
+    const emit = defineEmits(['update:isSendInviteConfirmDialogVisible', 'closeInviteDialog']);
 
     function cancelInviteConfirm() {
-        emit('update:visible', false);
+        emit('update:isSendInviteConfirmDialogVisible', false);
     }
 
     function sendInviteConfirm() {
@@ -106,14 +104,15 @@
                 } else {
                     J.loading = false;
                     J.visible = false;
-                    $message({
+                    ElMessage({
                         message: 'Invite message sent',
                         type: 'success'
                     });
                 }
             };
             inviteLoop();
-        } else if (messageType === 'invite') {
+        } else if (messageType === 'message') {
+            // invite message
             D.params.messageSlot = slot;
             if (uploadImage.value) {
                 notificationRequest
@@ -122,7 +121,7 @@
                         throw err;
                     })
                     .then((args) => {
-                        $message({
+                        ElMessage({
                             message: 'Invite photo message sent',
                             type: 'success'
                         });
@@ -135,7 +134,7 @@
                         throw err;
                     })
                     .then((args) => {
-                        $message({
+                        ElMessage({
                             message: 'Invite message sent',
                             type: 'success'
                         });
@@ -152,7 +151,7 @@
                         throw err;
                     })
                     .then((args) => {
-                        $message({
+                        ElMessage({
                             message: 'Request invite photo message sent',
                             type: 'success'
                         });
@@ -165,7 +164,7 @@
                         throw err;
                     })
                     .then((args) => {
-                        $message({
+                        ElMessage({
                             message: 'Request invite message sent',
                             type: 'success'
                         });

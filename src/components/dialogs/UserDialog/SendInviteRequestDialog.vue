@@ -1,29 +1,29 @@
 <template>
-    <safe-dialog
+    <el-dialog
         class="x-dialog"
-        :visible.sync="sendInviteRequestDialogVisible"
+        :model-value="sendInviteRequestDialogVisible"
         :title="t('dialog.invite_request_message.header')"
         width="800px"
         append-to-body
         @close="cancelSendInviteRequest">
-        <template v-if="currentUser.$isVRCPlus">
+        <template v-if="isLocalUserVrcPlusSupporter">
             <input class="inviteImageUploadButton" type="file" accept="image/*" @change="inviteImageUpload" />
         </template>
 
-        <data-tables
+        <DataTable
             v-bind="inviteRequestMessageTable"
             style="margin-top: 10px; cursor: pointer"
             @row-click="showSendInviteConfirmDialog">
             <el-table-column
                 :label="t('table.profile.invite_messages.slot')"
                 prop="slot"
-                sortable="custom"
+                :sortable="true"
                 width="70"></el-table-column>
             <el-table-column :label="t('table.profile.invite_messages.message')" prop="message"></el-table-column>
             <el-table-column
                 :label="t('table.profile.invite_messages.cool_down')"
                 prop="updatedAt"
-                sortable="custom"
+                :sortable="true"
                 width="110"
                 align="right">
                 <template #default="scope">
@@ -34,39 +34,42 @@
                 <template #default="scope">
                     <el-button
                         type="text"
-                        icon="el-icon-edit"
-                        size="mini"
+                        :icon="Edit"
+                        size="small"
                         @click.stop="showEditAndSendInviteDialog(scope.row)"></el-button>
                 </template>
             </el-table-column>
-        </data-tables>
+        </DataTable>
 
         <template #footer>
-            <el-button type="small" @click="cancelSendInviteRequest">{{
-                t('dialog.invite_request_message.cancel')
-            }}</el-button>
-            <el-button type="small" @click="refreshInviteMessageTableData('request')">{{
+            <el-button @click="cancelSendInviteRequest">{{ t('dialog.invite_request_message.cancel') }}</el-button>
+            <el-button @click="refreshInviteMessageTableData('request')">{{
                 t('dialog.invite_request_message.refresh')
             }}</el-button>
         </template>
         <SendInviteConfirmDialog
-            :visible.sync="isSendInviteConfirmDialogVisible"
-            :send-invite-dialog="sendInviteDialog"
+            v-model:isSendInviteConfirmDialogVisible="isSendInviteConfirmDialogVisible"
+            :sendInviteDialog="sendInviteDialog"
+            @update:sendInviteDialog="emit('update:sendInviteDialog', $event)"
             :invite-dialog="inviteDialog"
             @closeInviteDialog="closeInviteDialog" />
         <EditAndSendInviteDialog
-            :edit-and-send-invite-dialog.sync="editAndSendInviteDialog"
-            :send-invite-dialog="sendInviteDialog"
+            :edit-and-send-invite-dialog="editAndSendInviteDialog"
+            :sendInviteDialog="sendInviteDialog"
+            @update:sendInviteDialog="emit('update:sendInviteDialog', $event)"
             :invite-dialog="inviteDialog"
             @closeInviteDialog="closeInviteDialog" />
-    </safe-dialog>
+    </el-dialog>
 </template>
 
 <script setup>
-    import { storeToRefs } from 'pinia';
+    import { Edit } from '@element-plus/icons-vue';
     import { ref } from 'vue';
-    import { useI18n } from 'vue-i18n-bridge';
+    import { storeToRefs } from 'pinia';
+    import { useI18n } from 'vue-i18n';
+
     import { useGalleryStore, useInviteStore, useUserStore } from '../../../stores';
+
     import EditAndSendInviteDialog from '../InviteDialog/EditAndSendInviteDialog.vue';
     import SendInviteConfirmDialog from '../InviteDialog/SendInviteConfirmDialog.vue';
 
@@ -77,7 +80,7 @@
     const { inviteRequestMessageTable } = storeToRefs(inviteStore);
     const galleryStore = useGalleryStore();
     const { inviteImageUpload } = galleryStore;
-    const { currentUser } = storeToRefs(useUserStore());
+    const { isLocalUserVrcPlusSupporter } = storeToRefs(useUserStore());
 
     const props = defineProps({
         sendInviteRequestDialogVisible: {
@@ -95,7 +98,7 @@
         }
     });
 
-    const emit = defineEmits(['update:sendInviteRequestDialogVisible', 'closeInviteDialog']);
+    const emit = defineEmits(['update:sendInviteRequestDialogVisible', 'closeInviteDialog', 'update:sendInviteDialog']);
 
     const isSendInviteConfirmDialogVisible = ref(false);
 
@@ -105,12 +108,12 @@
     });
 
     function showSendInviteConfirmDialog(row) {
-        props.sendInviteDialog.messageSlot = row;
+        emit('update:sendInviteDialog', { ...props.sendInviteDialog, messageSlot: row });
         isSendInviteConfirmDialogVisible.value = true;
     }
 
     function showEditAndSendInviteDialog(row) {
-        props.sendInviteDialog.messageSlot = row;
+        emit('update:sendInviteDialog', { ...props.sendInviteDialog, messageSlot: row });
         editAndSendInviteDialog.value = {
             newMessage: row.message,
             visible: true

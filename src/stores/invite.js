@@ -1,116 +1,91 @@
+import { ref, watch } from 'vue';
+import { ElMessage } from 'element-plus';
 import { defineStore } from 'pinia';
-import { computed, reactive, watch } from 'vue';
+
 import { instanceRequest, inviteMessagesRequest } from '../api';
-import { $app } from '../app';
-import { watchState } from '../service/watchState';
 import { parseLocation } from '../shared/utils';
+import { useAdvancedSettingsStore } from './settings/advanced';
+import { useGameStore } from './game';
 import { useInstanceStore } from './instance';
+import { useLaunchStore } from './launch';
+import { watchState } from '../service/watchState';
 
 export const useInviteStore = defineStore('Invite', () => {
     const instanceStore = useInstanceStore();
-    const state = reactive({
-        editInviteMessageDialog: {
-            visible: false,
-            inviteMessage: {},
-            messageType: '',
-            newMessage: ''
+    const gameStore = useGameStore();
+    const launchStore = useLaunchStore();
+    const advancedSettingsStore = useAdvancedSettingsStore();
+
+    const editInviteMessageDialog = ref({
+        visible: false,
+        inviteMessage: {},
+        messageType: '',
+        newMessage: ''
+    });
+
+    const inviteMessageTable = ref({
+        data: [],
+        tableProps: {
+            stripe: true,
+            size: 'small'
         },
-        inviteMessageTable: {
-            data: [],
-            tableProps: {
-                stripe: true,
-                size: 'mini'
-            },
-            layout: 'table',
-            visible: false
+        layout: 'table',
+        visible: false
+    });
+
+    const inviteResponseMessageTable = ref({
+        data: [],
+        tableProps: {
+            stripe: true,
+            size: 'small'
         },
-        inviteResponseMessageTable: {
-            data: [],
-            tableProps: {
-                stripe: true,
-                size: 'mini'
-            },
-            layout: 'table',
-            visible: false
+        layout: 'table',
+        visible: false
+    });
+
+    const inviteRequestMessageTable = ref({
+        data: [],
+        tableProps: {
+            stripe: true,
+            size: 'small'
         },
-        inviteRequestMessageTable: {
-            data: [],
-            tableProps: {
-                stripe: true,
-                size: 'mini'
-            },
-            layout: 'table',
-            visible: false
+        layout: 'table',
+        visible: false
+    });
+
+    const inviteRequestResponseMessageTable = ref({
+        data: [],
+        tableProps: {
+            stripe: true,
+            size: 'small'
         },
-        inviteRequestResponseMessageTable: {
-            data: [],
-            tableProps: {
-                stripe: true,
-                size: 'mini'
-            },
-            layout: 'table',
-            visible: false
-        }
+        layout: 'table',
+        visible: false
     });
 
     watch(
         () => watchState.isLoggedIn,
         () => {
-            state.inviteMessageTable.data = [];
-            state.inviteResponseMessageTable.data = [];
-            state.inviteRequestMessageTable.data = [];
-            state.inviteRequestResponseMessageTable.data = [];
-            state.editInviteMessageDialog.visible = false;
-            state.inviteMessageTable.visible = false;
-            state.inviteResponseMessageTable.visible = false;
-            state.inviteRequestMessageTable.visible = false;
-            state.inviteRequestResponseMessageTable.visible = false;
+            inviteMessageTable.value.data = [];
+            inviteResponseMessageTable.value.data = [];
+            inviteRequestMessageTable.value.data = [];
+            inviteRequestResponseMessageTable.value.data = [];
+            editInviteMessageDialog.value.visible = false;
+            inviteMessageTable.value.visible = false;
+            inviteResponseMessageTable.value.visible = false;
+            inviteRequestMessageTable.value.visible = false;
+            inviteRequestResponseMessageTable.value.visible = false;
         },
         { flush: 'sync' }
     );
 
-    const editInviteMessageDialog = computed({
-        get: () => state.editInviteMessageDialog,
-        set: (value) => {
-            state.editInviteMessageDialog = value;
-        }
-    });
-
-    const inviteMessageTable = computed({
-        get: () => state.inviteMessageTable,
-        set: (value) => {
-            state.inviteMessageTable = value;
-        }
-    });
-
-    const inviteResponseMessageTable = computed({
-        get: () => state.inviteResponseMessageTable,
-        set: (value) => {
-            state.inviteResponseMessageTable = value;
-        }
-    });
-
-    const inviteRequestMessageTable = computed({
-        get: () => state.inviteRequestMessageTable,
-        set: (value) => {
-            state.inviteRequestMessageTable = value;
-        }
-    });
-
-    const inviteRequestResponseMessageTable = computed({
-        get: () => state.inviteRequestResponseMessageTable,
-        set: (value) => {
-            state.inviteRequestResponseMessageTable = value;
-        }
-    });
-
     /**
      *
      * @param {string} messageType
-     * @param {string} inviteMessage
+     * @param {any} inviteMessage
      */
     function showEditInviteMessageDialog(messageType, inviteMessage) {
-        const D = state.editInviteMessageDialog;
+        const D = editInviteMessageDialog.value;
         D.newMessage = inviteMessage.message;
         D.visible = true;
         D.inviteMessage = inviteMessage;
@@ -127,16 +102,16 @@ export const useInviteStore = defineStore('Invite', () => {
             .then(({ json }) => {
                 switch (mode) {
                     case 'message':
-                        state.inviteMessageTable.data = json;
+                        inviteMessageTable.value.data = json;
                         break;
                     case 'response':
-                        state.inviteResponseMessageTable.data = json;
+                        inviteResponseMessageTable.value.data = json;
                         break;
                     case 'request':
-                        state.inviteRequestMessageTable.data = json;
+                        inviteRequestMessageTable.value.data = json;
                         break;
                     case 'requestResponse':
-                        state.inviteRequestResponseMessageTable.data = json;
+                        inviteRequestResponseMessageTable.value.data = json;
                         break;
                 }
             })
@@ -145,11 +120,19 @@ export const useInviteStore = defineStore('Invite', () => {
             });
     }
 
+    function canOpenInstanceInGame() {
+        return (
+            !LINUX &&
+            gameStore.isGameRunning &&
+            !advancedSettingsStore.selfInviteOverride
+        );
+    }
+
     function newInstanceSelfInvite(worldId) {
         instanceStore.createNewInstance(worldId).then((args) => {
             const location = args?.json?.location;
             if (!location) {
-                $app.$message({
+                ElMessage({
                     message: 'Failed to create instance',
                     type: 'error'
                 });
@@ -160,13 +143,19 @@ export const useInviteStore = defineStore('Invite', () => {
             if (!L.isRealInstance) {
                 return;
             }
+            if (canOpenInstanceInGame()) {
+                const secureOrShortName =
+                    args.json.shortName || args.json.secureName;
+                launchStore.tryOpenInstanceInVrc(location, secureOrShortName);
+                return;
+            }
             instanceRequest
                 .selfInvite({
                     instanceId: L.instanceId,
                     worldId: L.worldId
                 })
                 .then((args) => {
-                    $app.$message({
+                    ElMessage({
                         message: 'Self invite sent',
                         type: 'success'
                     });
@@ -176,7 +165,6 @@ export const useInviteStore = defineStore('Invite', () => {
     }
 
     return {
-        state,
         editInviteMessageDialog,
         inviteMessageTable,
         inviteResponseMessageTable,
@@ -184,6 +172,7 @@ export const useInviteStore = defineStore('Invite', () => {
         inviteRequestResponseMessageTable,
         showEditInviteMessageDialog,
         refreshInviteMessageTableData,
-        newInstanceSelfInvite
+        newInstanceSelfInvite,
+        canOpenInstanceInGame
     };
 });

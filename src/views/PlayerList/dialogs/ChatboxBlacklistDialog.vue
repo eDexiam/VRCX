@@ -1,7 +1,7 @@
 <template>
-    <safe-dialog
+    <el-dialog
         class="x-dialog"
-        :visible.sync="chatboxBlacklistDialog.visible"
+        v-model="chatboxBlacklistDialog.visible"
         :title="t('dialog.chatbox_blacklist.header')"
         width="600px">
         <div v-if="chatboxBlacklistDialog.visible" v-loading="chatboxBlacklistDialog.loading">
@@ -15,7 +15,7 @@
                 @change="saveChatboxBlacklist">
                 <template #append>
                     <el-button
-                        icon="el-icon-delete"
+                        :icon="Delete"
                         @click="
                             chatboxBlacklist.splice(index, 1);
                             saveChatboxBlacklist();
@@ -23,7 +23,7 @@
                     </el-button>
                 </template>
             </el-input>
-            <el-button size="mini" style="margin-top: 5px" @click="chatboxBlacklist.push('')">
+            <el-button size="small" style="margin-top: 5px" @click="chatboxBlacklist.push('')">
                 {{ t('dialog.chatbox_blacklist.add_item') }}
             </el-button>
             <br />
@@ -39,19 +39,21 @@
                 <span>{{ user[1] }}</span>
             </el-tag>
         </div>
-    </safe-dialog>
+    </el-dialog>
 </template>
 
 <script setup>
+    import { Delete } from '@element-plus/icons-vue';
     import { storeToRefs } from 'pinia';
-    import { ref } from 'vue';
-    import { useI18n } from 'vue-i18n-bridge';
-    import configRepository from '../../../service/config';
+    import { useI18n } from 'vue-i18n';
+
     import { usePhotonStore } from '../../../stores';
 
     const { t } = useI18n();
 
-    const { chatboxUserBlacklist } = storeToRefs(usePhotonStore());
+    const photonStore = usePhotonStore();
+    const { chatboxUserBlacklist, chatboxBlacklist } = storeToRefs(photonStore);
+    const { saveChatboxBlacklist } = photonStore;
 
     defineProps({
         chatboxBlacklistDialog: {
@@ -60,30 +62,8 @@
         }
     });
 
-    const chatboxBlacklist = ref([
-        'NP: ',
-        'Now Playing',
-        'Now playing',
-        "▶️ '",
-        '( ▶️ ',
-        "' - '",
-        "' by '",
-        '[Spotify] '
-    ]);
-
     const emit = defineEmits(['deleteChatboxUserBlacklist']);
 
-    initChatboxBlacklist();
-
-    async function initChatboxBlacklist() {
-        if (await configRepository.getString('VRCX_chatboxBlacklist')) {
-            chatboxBlacklist.value = JSON.parse(await configRepository.getString('VRCX_chatboxBlacklist'));
-        }
-    }
-
-    async function saveChatboxBlacklist() {
-        await configRepository.setString('VRCX_chatboxBlacklist', JSON.stringify(chatboxBlacklist.value));
-    }
 
     function deleteChatboxUserBlacklist(userId) {
         emit('deleteChatboxUserBlacklist', userId);

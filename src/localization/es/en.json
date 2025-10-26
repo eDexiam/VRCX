@@ -255,9 +255,6 @@
                 "refresh": "Haz clic para actualizar",
                 "logout": "Cerrar Sesión",
                 "manage_gallery_inventory_icon": "Gestionar Imágenes de VRC+",
-                "export_friend_list": "Exportar Lista de Amigos",
-                "export_own_avatars": "Exportar Avatares Propios",
-                "discord_names": "Nombres de Discord",
                 "export_notes": "Exportar Notas"
             },
             "game_info": {
@@ -654,6 +651,13 @@
                     }
                 }
             }
+        },
+        "tools": {
+            "export": {
+                "discord_names": "Nombres de Discord",
+                "export_friend_list": "Exportar Lista de Amigos",
+                "export_own_avatars": "Exportar Avatares Propios"
+            }
         }
     },
     "side_panel": {
@@ -1035,7 +1039,8 @@
                 "role_description": "Descripción:",
                 "role_updated_at": "Actualizado el:",
                 "role_created_at": "Creado el:",
-                "role_permissions": "Permisos:"
+                "role_permissions": "Permisos:",
+                "last_visited": "Última visita"
             },
             "posts": {
                 "header": "Publicaciones",
@@ -1243,7 +1248,6 @@
             "location": "Ubicación",
             "copy_tooltip": "Copiar al portapapeles",
             "start_as_desktop": "Iniciar como Escritorio (Sin VR)",
-            "info": "Info",
             "invite": "Invitar",
             "launch": "Lanzar"
         },

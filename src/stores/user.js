@@ -1,18 +1,9 @@
-import Noty from 'noty';
+import { computed, reactive, ref, watch } from 'vue';
+import { ElMessage } from 'element-plus';
 import { defineStore } from 'pinia';
-import Vue, { computed, reactive, watch } from 'vue';
-import * as workerTimers from 'worker-timers';
-import {
-    avatarRequest,
-    groupRequest,
-    instanceRequest,
-    userRequest
-} from '../api';
-import { $app } from '../app';
-import { database } from '../service/database';
-import { AppGlobal } from '../service/appConfig';
-import { processBulk, request } from '../service/request';
-import { watchState } from '../service/watchState';
+
+import Noty from 'noty';
+
 import {
     arraysMatch,
     buildTreeData,
@@ -30,12 +21,23 @@ import {
     removeEmojis,
     replaceBioSymbols
 } from '../shared/utils';
+import {
+    avatarRequest,
+    groupRequest,
+    instanceRequest,
+    userRequest
+} from '../api';
+import { processBulk, request } from '../service/request';
+import { AppDebug } from '../service/appConfig';
+import { database } from '../service/database';
+import { useAppearanceSettingsStore } from './settings/appearance';
 import { useAuthStore } from './auth';
 import { useAvatarStore } from './avatar';
 import { useFavoriteStore } from './favorite';
 import { useFeedStore } from './feed';
 import { useFriendStore } from './friend';
 import { useGameStore } from './game';
+import { useGeneralSettingsStore } from './settings/general';
 import { useGroupStore } from './group';
 import { useInstanceStore } from './instance';
 import { useLocationStore } from './location';
@@ -43,10 +45,11 @@ import { useModerationStore } from './moderation';
 import { useNotificationStore } from './notification';
 import { usePhotonStore } from './photon';
 import { useSearchStore } from './search';
-import { useAppearanceSettingsStore } from './settings/appearance';
-import { useGeneralSettingsStore } from './settings/general';
 import { useSharedFeedStore } from './sharedFeed';
 import { useWorldStore } from './world';
+import { watchState } from '../service/watchState';
+
+import * as workerTimers from 'worker-timers';
 
 export const useUserStore = defineStore('User', () => {
     const appearanceSettingsStore = useAppearanceSettingsStore();
@@ -67,282 +70,248 @@ export const useUserStore = defineStore('User', () => {
     const photonStore = usePhotonStore();
     const sharedFeedStore = useSharedFeedStore();
 
-    const state = reactive({
-        currentUser: {
-            acceptedPrivacyVersion: 0,
-            acceptedTOSVersion: 0,
-            accountDeletionDate: null,
-            accountDeletionLog: null,
-            activeFriends: [],
-            ageVerificationStatus: '',
-            ageVerified: false,
-            allowAvatarCopying: false,
-            badges: [],
-            bio: '',
-            bioLinks: [],
-            currentAvatar: '',
-            currentAvatarImageUrl: '',
-            currentAvatarTags: [],
-            currentAvatarThumbnailImageUrl: '',
-            date_joined: '',
-            developerType: '',
+    const currentUser = ref({
+        acceptedPrivacyVersion: 0,
+        acceptedTOSVersion: 0,
+        accountDeletionDate: null,
+        accountDeletionLog: null,
+        activeFriends: [],
+        ageVerificationStatus: '',
+        ageVerified: false,
+        allowAvatarCopying: false,
+        badges: [],
+        bio: '',
+        bioLinks: [],
+        currentAvatar: '',
+        currentAvatarImageUrl: '',
+        currentAvatarTags: [],
+        currentAvatarThumbnailImageUrl: '',
+        date_joined: '',
+        developerType: '',
+        displayName: '',
+        emailVerified: false,
+        fallbackAvatar: '',
+        friendGroupNames: [],
+        friendKey: '',
+        friends: [],
+        googleId: '',
+        hasBirthday: false,
+        hasEmail: false,
+        hasLoggedInFromClient: false,
+        hasPendingEmail: false,
+        hideContentFilterSettings: false,
+        homeLocation: '',
+        id: '',
+        isAdult: true,
+        isBoopingEnabled: false,
+        isFriend: false,
+        last_activity: '',
+        last_login: '',
+        last_mobile: null,
+        last_platform: '',
+        obfuscatedEmail: '',
+        obfuscatedPendingEmail: '',
+        oculusId: '',
+        offlineFriends: [],
+        onlineFriends: [],
+        pastDisplayNames: [],
+        picoId: '',
+        presence: {
+            avatarThumbnail: '',
+            currentAvatarTags: '',
+            debugflag: '',
             displayName: '',
-            emailVerified: false,
-            fallbackAvatar: '',
-            friendGroupNames: [],
-            friendKey: '',
-            friends: [],
-            googleId: '',
-            hasBirthday: false,
-            hasEmail: false,
-            hasLoggedInFromClient: false,
-            hasPendingEmail: false,
-            hideContentFilterSettings: false,
-            homeLocation: '',
+            groups: [],
             id: '',
-            isAdult: true,
-            isBoopingEnabled: false,
-            isFriend: false,
-            last_activity: '',
-            last_login: '',
-            last_mobile: null,
-            last_platform: '',
-            obfuscatedEmail: '',
-            obfuscatedPendingEmail: '',
-            oculusId: '',
-            offlineFriends: [],
-            onlineFriends: [],
-            pastDisplayNames: [],
-            picoId: '',
-            presence: {
-                avatarThumbnail: '',
-                currentAvatarTags: '',
-                debugflag: '',
-                displayName: '',
-                groups: [],
-                id: '',
-                instance: '',
-                instanceType: '',
-                platform: '',
-                profilePicOverride: '',
-                status: '',
-                travelingToInstance: '',
-                travelingToWorld: '',
-                userIcon: '',
-                world: ''
-            },
+            instance: '',
+            instanceType: '',
+            platform: '',
             profilePicOverride: '',
-            profilePicOverrideThumbnail: '',
-            pronouns: '',
-            queuedInstance: '',
-            state: '',
             status: '',
-            statusDescription: '',
-            statusFirstTime: false,
-            statusHistory: [],
-            steamDetails: {},
-            steamId: '',
-            tags: [],
-            twoFactorAuthEnabled: false,
-            twoFactorAuthEnabledDate: null,
-            unsubscribe: false,
-            updated_at: '',
+            travelingToInstance: '',
+            travelingToWorld: '',
             userIcon: '',
-            userLanguage: '',
-            userLanguageCode: '',
-            username: '',
-            viveId: '',
-            // VRCX
-            $online_for: Date.now(),
-            $offline_for: null,
-            $location_at: Date.now(),
-            $travelingToTime: Date.now(),
-            $previousAvatarSwapTime: null,
-            $homeLocation: {},
-            $isVRCPlus: false,
-            $isModerator: false,
-            $isTroll: false,
-            $isProbableTroll: false,
-            $trustLevel: 'Visitor',
-            $trustClass: 'x-tag-untrusted',
-            $userColour: '',
-            $trustSortNum: 1,
-            $languages: [],
-            $locationTag: '',
-            $travelingToLocation: ''
+            world: ''
         },
-        currentTravelers: new Map(),
-        cachedUsers: new Map(),
-        userDialog: {
-            visible: false,
-            loading: false,
-            id: '',
-            ref: {},
-            friend: {},
-            isFriend: false,
-            note: '',
-            noteSaving: false,
-            incomingRequest: false,
-            outgoingRequest: false,
-            isBlock: false,
-            isMute: false,
-            isHideAvatar: false,
-            isShowAvatar: false,
-            isInteractOff: false,
-            isMuteChat: false,
-            isFavorite: false,
-            $location: {},
-            $homeLocationName: '',
-            users: [],
-            instance: {},
-            worlds: [],
-            avatars: [],
-            isWorldsLoading: false,
-            isFavoriteWorldsLoading: false,
-            isAvatarsLoading: false,
-            isGroupsLoading: false,
+        profilePicOverride: '',
+        profilePicOverrideThumbnail: '',
+        pronouns: '',
+        queuedInstance: '',
+        state: '',
+        status: '',
+        statusDescription: '',
+        statusFirstTime: false,
+        statusHistory: [],
+        steamDetails: {},
+        steamId: '',
+        tags: [],
+        twoFactorAuthEnabled: false,
+        twoFactorAuthEnabledDate: null,
+        unsubscribe: false,
+        updated_at: '',
+        userIcon: '',
+        userLanguage: '',
+        userLanguageCode: '',
+        username: '',
+        viveId: '',
+        // VRCX
+        $online_for: Date.now(),
+        $offline_for: null,
+        $location_at: Date.now(),
+        $travelingToTime: Date.now(),
+        $previousAvatarSwapTime: null,
+        $homeLocation: {},
+        $isVRCPlus: false,
+        $isModerator: false,
+        $isTroll: false,
+        $isProbableTroll: false,
+        $trustLevel: 'Visitor',
+        $trustClass: 'x-tag-untrusted',
+        $userColour: '',
+        $trustSortNum: 1,
+        $languages: [],
+        $locationTag: '',
+        $travelingToLocation: ''
+    });
 
-            worldSorting: {
-                name: 'dialog.user.worlds.sorting.updated',
-                value: 'updated'
-            },
-            worldOrder: {
-                name: 'dialog.user.worlds.order.descending',
-                value: 'descending'
-            },
-            groupSorting: {
-                name: 'dialog.user.groups.sorting.alphabetical',
-                value: 'alphabetical'
-            },
-            avatarSorting: 'update',
-            avatarReleaseStatus: 'all',
-            treeData: [],
-            memo: '',
-            $avatarInfo: {
-                ownerId: '',
-                avatarName: '',
-                fileCreatedAt: ''
-            },
-            representedGroup: {
-                bannerUrl: '',
-                description: '',
-                discriminator: '',
-                groupId: '',
-                iconUrl: '',
-                isRepresenting: false,
-                memberCount: 0,
-                memberVisibility: '',
-                name: '',
-                ownerId: '',
-                privacy: '',
-                shortCode: '',
-                $thumbnailUrl: ''
-            },
-            isRepresentedGroupLoading: false,
-            joinCount: 0,
-            timeSpent: 0,
-            lastSeen: '',
-            avatarModeration: 0,
-            previousDisplayNames: [],
-            dateFriended: '',
-            unFriended: false,
-            dateFriendedInfo: []
+    const userDialog = ref({
+        visible: false,
+        loading: false,
+        id: '',
+        ref: {},
+        friend: {},
+        isFriend: false,
+        note: '',
+        noteSaving: false,
+        incomingRequest: false,
+        outgoingRequest: false,
+        isBlock: false,
+        isMute: false,
+        isHideAvatar: false,
+        isShowAvatar: false,
+        isInteractOff: false,
+        isMuteChat: false,
+        isFavorite: false,
+        $location: {},
+        $homeLocationName: '',
+        users: [],
+        instance: {
+            id: '',
+            tag: '',
+            $location: {},
+            friendCount: 0,
+            users: [],
+            shortName: '',
+            ref: {}
         },
-        showUserDialogHistory: new Set(),
-        subsetOfLanguages: [],
-        languageDialog: {
-            visible: false,
-            loading: false,
-            languageChoice: false,
-            languages: []
+        worlds: [],
+        avatars: [],
+        isWorldsLoading: false,
+        isFavoriteWorldsLoading: false,
+        isAvatarsLoading: false,
+        isGroupsLoading: false,
+
+        worldSorting: {
+            name: 'dialog.user.worlds.sorting.updated',
+            value: 'updated'
         },
-        pastDisplayNameTable: {
-            data: [],
-            tableProps: {
-                stripe: true,
-                size: 'mini',
-                defaultSort: {
-                    prop: 'updated_at',
-                    order: 'descending'
-                }
-            },
-            layout: 'table'
+        worldOrder: {
+            name: 'dialog.user.worlds.order.descending',
+            value: 'descending'
         },
+        groupSorting: {
+            name: 'dialog.user.groups.sorting.alphabetical',
+            value: 'alphabetical'
+        },
+        avatarSorting: 'update',
+        avatarReleaseStatus: 'all',
+        treeData: [],
+        memo: '',
+        $avatarInfo: {
+            ownerId: '',
+            avatarName: '',
+            fileCreatedAt: ''
+        },
+        representedGroup: {
+            bannerId: '',
+            bannerUrl: '',
+            description: '',
+            discriminator: '',
+            groupId: '',
+            iconUrl: '',
+            id: '',
+            isRepresenting: false,
+            memberCount: 0,
+            memberVisibility: '',
+            name: '',
+            ownerId: '',
+            privacy: '',
+            shortCode: '',
+            $thumbnailUrl: '',
+            $memberId: ''
+        },
+        isRepresentedGroupLoading: false,
+        joinCount: 0,
+        timeSpent: 0,
+        lastSeen: '',
+        avatarModeration: 0,
+        previousDisplayNames: [],
+        dateFriended: '',
+        unFriended: false,
+        dateFriendedInfo: []
+    });
+
+    const currentTravelers = ref(new Map());
+    const subsetOfLanguages = ref([]);
+    const languageDialog = ref({
+        visible: false,
+        loading: false,
+        languageChoice: false,
+        languages: []
+    });
+    const sendBoopDialog = ref({
+        visible: false,
+        userId: ''
+    });
+    const pastDisplayNameTable = ref({
+        data: [],
+        tableProps: {
+            stripe: true,
+            size: 'small',
+            defaultSort: {
+                prop: 'updated_at',
+                order: 'descending'
+            }
+        }
+    });
+    const showUserDialogHistory = ref(new Set());
+    const customUserTags = ref(new Map());
+
+    const state = reactive({
         instancePlayerCount: new Map(),
-        customUserTags: new Map(),
         lastNoteCheck: null,
         lastDbNoteDate: null,
         notes: new Map()
     });
 
-    const currentUser = computed({
-        get: () => state.currentUser,
-        set: (value) => {
-            state.currentUser = value;
-        }
-    });
+    const cachedUsers = new Map();
 
-    const currentTravelers = computed({
-        get: () => state.currentTravelers,
-        set: (value) => {
-            state.currentTravelers = value;
-        }
-    });
-
-    const cachedUsers = computed({
-        get: () => state.cachedUsers,
-        set: (value) => {
-            state.cachedUsers = value;
-        }
-    });
-
-    const userDialog = computed({
-        get: () => state.userDialog,
-        set: (value) => {
-            state.userDialog = value;
-        }
-    });
-
-    const subsetOfLanguages = computed({
-        get: () => state.subsetOfLanguages,
-        set: (value) => {
-            state.subsetOfLanguages = value;
-        }
-    });
-
-    const languageDialog = computed({
-        get: () => state.languageDialog,
-        set: (value) => {
-            state.languageDialog = value;
-        }
-    });
-
-    const pastDisplayNameTable = computed({
-        get: () => state.pastDisplayNameTable,
-        set: (value) => {
-            state.pastDisplayNameTable = value;
-        }
-    });
-
-    const showUserDialogHistory = computed({
-        get: () => state.showUserDialogHistory,
-        set: (value) => {
-            state.showUserDialogHistory = value;
-        }
-    });
-
-    const customUserTags = computed({
-        get: () => state.customUserTags,
-        set: (value) => {
-            state.customUserTags = value;
-        }
-    });
+    const isLocalUserVrcPlusSupporter = computed(
+        () => currentUser.value.$isVRCPlus || AppDebug.debugVrcPlus
+    );
 
     watch(
         () => watchState.isLoggedIn,
-        () => {
-            state.userDialog.visible = false;
-            state.languageDialog.visible = false;
+        (isLoggedIn) => {
+            if (!isLoggedIn) {
+                currentTravelers.value.clear();
+                showUserDialogHistory.value.clear();
+                state.instancePlayerCount.clear();
+                customUserTags.value.clear();
+                state.notes.clear();
+                pastDisplayNameTable.value.data = [];
+                subsetOfLanguages.value = [];
+            }
         },
         { flush: 'sync' }
     );
@@ -376,7 +345,7 @@ export const useUserStore = defineStore('User', () => {
         if (!languages) {
             return;
         }
-        state.subsetOfLanguages = languages;
+        subsetOfLanguages.value = languages;
         const data = [];
         for (const key in languages) {
             const value = languages[key];
@@ -385,7 +354,7 @@ export const useUserStore = defineStore('User', () => {
                 value
             });
         }
-        state.languageDialog.languages = data;
+        languageDialog.value.languages = data;
     }
 
     /**
@@ -393,7 +362,7 @@ export const useUserStore = defineStore('User', () => {
      * @param {object} ref
      */
     function applyUserLanguage(ref) {
-        if (!ref || !ref.tags || !state.subsetOfLanguages) {
+        if (!ref || !ref.tags || !subsetOfLanguages.value) {
             return;
         }
 
@@ -404,7 +373,7 @@ export const useUserStore = defineStore('User', () => {
         for (const tag of ref.tags) {
             if (tag.startsWith(languagePrefix)) {
                 const key = tag.substring(prefixLength);
-                const value = state.subsetOfLanguages[key];
+                const value = subsetOfLanguages.value[key];
 
                 if (value !== undefined) {
                     ref.$languages.push({ key, value });
@@ -432,7 +401,7 @@ export const useUserStore = defineStore('User', () => {
         locationStore.updateCurrentUserLocation();
     }
 
-    const robotUrl = `${AppGlobal.endpointDomain}/file/file_0e8c4e32-7444-44ea-ade4-313c010d4bae/1/file`;
+    const robotUrl = `${AppDebug.endpointDomain}/file/file_0e8c4e32-7444-44ea-ade4-313c010d4bae/1/file`;
     /**
      *
      * @param {import('../types/api/user').GetUserResponse} json
@@ -441,7 +410,7 @@ export const useUserStore = defineStore('User', () => {
     function applyUser(json) {
         let hasPropChanged = false;
         const changedProps = {};
-        let ref = state.cachedUsers.get(json.id);
+        let ref = cachedUsers.get(json.id);
         if (json.statusDescription) {
             json.statusDescription = replaceBioSymbols(json.statusDescription);
             json.statusDescription = removeEmojis(json.statusDescription);
@@ -457,7 +426,7 @@ export const useUserStore = defineStore('User', () => {
             delete json.currentAvatarThumbnailImageUrl;
         }
         if (typeof ref === 'undefined') {
-            ref = {
+            ref = reactive({
                 ageVerificationStatus: '',
                 ageVerified: false,
                 allowAvatarCopying: false,
@@ -520,11 +489,11 @@ export const useUserStore = defineStore('User', () => {
                 $customTag: '',
                 $customTagColour: '',
                 $friendNumber: 0,
-                $lastFetch: Date.now(),
                 $platform: '',
+                $moderations: {},
                 //
                 ...json
-            };
+            });
             if (locationStore.lastLocation.playerList.has(json.id)) {
                 // update $location_at from instance join time
                 const player = locationStore.lastLocation.playerList.get(
@@ -533,7 +502,7 @@ export const useUserStore = defineStore('User', () => {
                 ref.$location_at = player.joinTime;
                 ref.$online_for = player.joinTime;
             }
-            if (ref.isFriend || ref.id === state.currentUser.id) {
+            if (ref.isFriend || ref.id === currentUser.value.id) {
                 // update instancePlayerCount
                 let newCount = state.instancePlayerCount.get(ref.location);
                 if (typeof newCount === 'undefined') {
@@ -542,7 +511,7 @@ export const useUserStore = defineStore('User', () => {
                 newCount++;
                 state.instancePlayerCount.set(ref.location, newCount);
             }
-            const tag = state.customUserTags.get(json.id);
+            const tag = customUserTags.value.get(json.id);
             if (tag) {
                 ref.$customTag = tag.tag;
                 ref.$customTagColour = tag.colour;
@@ -550,9 +519,9 @@ export const useUserStore = defineStore('User', () => {
                 ref.$customTag = '';
                 ref.$customTagColour = '';
             }
-            state.cachedUsers.set(ref.id, ref);
+            cachedUsers.set(ref.id, ref);
+            friendStore.updateFriend(ref.id);
         } else {
-            json.$lastFetch = Date.now(); // todo: make this not suck
             if (json.state !== 'online') {
                 // offline event before GPS to offline location
                 friendStore.updateFriend(ref.id, json.state);
@@ -591,8 +560,13 @@ export const useUserStore = defineStore('User', () => {
                     changedProps[prop] = [toBe, asIs];
                 }
             }
-            Object.assign(ref, json);
+            for (const prop in json) {
+                if (typeof json[prop] !== 'undefined') {
+                    ref[prop] = json[prop];
+                }
+            }
         }
+        ref.$moderations = moderationStore.getUserModerations(ref.id);
         ref.$isVRCPlus = ref.tags.includes('system_supporter');
         appearanceSettingsStore.applyUserTrustLevel(ref);
         applyUserLanguage(ref);
@@ -609,25 +583,34 @@ export const useUserStore = defineStore('User', () => {
         if (ref.location === 'traveling') {
             ref.$location = parseLocation(ref.travelingToLocation);
             if (
-                !state.currentTravelers.has(ref.id) &&
+                !currentTravelers.value.has(ref.id) &&
                 ref.travelingToLocation
             ) {
-                const travelRef = {
+                const travelRef = reactive({
                     created_at: new Date().toJSON(),
                     ...ref
-                };
-                state.currentTravelers.set(ref.id, travelRef);
+                });
+                currentTravelers.value.set(ref.id, travelRef);
                 sharedFeedStore.sharedFeed.pendingUpdate = true;
                 sharedFeedStore.updateSharedFeed(false);
                 onPlayerTraveling(travelRef);
             }
         } else {
             ref.$location = parseLocation(ref.location);
-            if (state.currentTravelers.has(ref.id)) {
-                state.currentTravelers.delete(ref.id);
+            if (currentTravelers.value.has(ref.id)) {
+                currentTravelers.value.delete(ref.id);
                 sharedFeedStore.sharedFeed.pendingUpdate = true;
                 sharedFeedStore.updateSharedFeed(false);
             }
+        }
+        if (
+            !instanceStore.cachedInstances.has(ref.$location.tag) &&
+            isRealInstance(ref.location)
+        ) {
+            instanceRequest.getInstance({
+                worldId: ref.$location.worldId,
+                instanceId: ref.$location.instanceId
+            });
         }
         if (
             ref.$isVRCPlus &&
@@ -652,9 +635,9 @@ export const useUserStore = defineStore('User', () => {
             friendCtx.ref = ref;
             friendCtx.name = ref.displayName;
         }
-        if (ref.id === state.currentUser.id) {
+        if (ref.id === currentUser.value.id) {
             if (ref.status) {
-                state.currentUser.status = ref.status;
+                currentUser.value.status = ref.status;
             }
             locationStore.updateCurrentUserLocation();
         }
@@ -698,7 +681,7 @@ export const useUserStore = defineStore('User', () => {
         }
         favoriteStore.applyFavorite('friend', ref.id);
         friendStore.userOnFriend(ref);
-        const D = state.userDialog;
+        const D = userDialog.value;
         if (D.visible && D.id === ref.id) {
             D.ref = ref;
             D.note = String(ref.note || '');
@@ -723,7 +706,7 @@ export const useUserStore = defineStore('User', () => {
                 ref.$location_at = ts;
             }
             handleUserUpdate(ref, changedProps);
-            if (AppGlobal.debugUserDiff) {
+            if (AppDebug.debugUserDiff) {
                 delete changedProps.last_login;
                 delete changedProps.last_activity;
                 if (Object.keys(changedProps).length !== 0) {
@@ -742,7 +725,7 @@ export const useUserStore = defineStore('User', () => {
         if (!userId) {
             return;
         }
-        const D = state.userDialog;
+        const D = userDialog.value;
         D.id = userId;
         D.treeData = [];
         D.memo = '';
@@ -777,10 +760,12 @@ export const useUserStore = defineStore('User', () => {
         };
         D.isRepresentedGroupLoading = true;
         D.representedGroup = {
+            bannerId: '',
             bannerUrl: '',
             description: '',
             discriminator: '',
             groupId: '',
+            id: '',
             iconUrl: '',
             isRepresenting: false,
             memberCount: 0,
@@ -789,7 +774,8 @@ export const useUserStore = defineStore('User', () => {
             ownerId: '',
             privacy: '',
             shortCode: '',
-            $thumbnailUrl: ''
+            $thumbnailUrl: '',
+            $memberId: ''
         };
         D.lastSeen = '';
         D.joinCount = 0;
@@ -801,8 +787,8 @@ export const useUserStore = defineStore('User', () => {
         D.dateFriended = '';
         D.unFriended = false;
         D.dateFriendedInfo = [];
-        if (userId === state.currentUser.id) {
-            getWorldName(state.currentUser.homeLocation).then((worldName) => {
+        if (userId === currentUser.value.id) {
+            getWorldName(currentUser.value.homeLocation).then((worldName) => {
                 D.$homeLocationName = worldName;
             });
         }
@@ -814,7 +800,7 @@ export const useUserStore = defineStore('User', () => {
             .catch((err) => {
                 D.loading = false;
                 D.visible = false;
-                $app.$message({
+                ElMessage({
                     message: 'Failed to load user',
                     type: 'error'
                 });
@@ -836,14 +822,12 @@ export const useUserStore = defineStore('User', () => {
                         for (const ref of moderationStore.cachedPlayerModerations.values()) {
                             if (
                                 ref.targetUserId === D.id &&
-                                ref.sourceUserId === state.currentUser.id
+                                ref.sourceUserId === currentUser.value.id
                             ) {
                                 if (ref.type === 'block') {
                                     D.isBlock = true;
                                 } else if (ref.type === 'mute') {
                                     D.isMute = true;
-                                } else if (ref.type === 'hideAvatar') {
-                                    D.isHideAvatar = true;
                                 } else if (ref.type === 'interactOff') {
                                     D.isInteractOff = true;
                                 } else if (ref.type === 'muteChat') {
@@ -867,7 +851,7 @@ export const useUserStore = defineStore('User', () => {
                         ) {
                             inCurrentWorld = true;
                         }
-                        if (userId !== state.currentUser.id) {
+                        if (userId !== currentUser.value.id) {
                             database
                                 .getUserStats(D.ref, inCurrentWorld)
                                 .then((ref1) => {
@@ -931,7 +915,7 @@ export const useUserStore = defineStore('User', () => {
                                     );
                                 });
                             AppApi.GetVRChatUserModeration(
-                                state.currentUser.id,
+                                currentUser.value.id,
                                 userId
                             ).then((result) => {
                                 D.avatarModeration = result;
@@ -961,8 +945,8 @@ export const useUserStore = defineStore('User', () => {
                     });
                 }
             });
-        state.showUserDialogHistory.delete(userId);
-        state.showUserDialogHistory.add(userId);
+        showUserDialogHistory.value.delete(userId);
+        showUserDialogHistory.value.add(userId);
         searchStore.quickSearchItems = searchStore.quickSearchUserHistory();
     }
 
@@ -975,7 +959,7 @@ export const useUserStore = defineStore('User', () => {
             !gameStore.isGameRunning ||
             !locationStore.lastLocation.location ||
             locationStore.lastLocation.location !== ref.travelingToLocation ||
-            ref.id === state.currentUser.id ||
+            ref.id === currentUser.value.id ||
             locationStore.lastLocation.playerList.has(ref.id)
         ) {
             return;
@@ -998,11 +982,11 @@ export const useUserStore = defineStore('User', () => {
         let addUser;
         let friend;
         let ref;
-        const D = state.userDialog;
+        const D = userDialog.value;
         if (!D.visible) {
             return;
         }
-        const L = parseLocation(D.ref.$location.tag);
+        const L = parseLocation(D.ref.$location?.tag);
         if (updateInstanceOccupants && L.isRealInstance) {
             instanceRequest.getInstance({
                 worldId: L.worldId,
@@ -1010,15 +994,20 @@ export const useUserStore = defineStore('User', () => {
             });
         }
         D.$location = L;
+        L.user = {};
         if (L.userId) {
-            ref = state.cachedUsers.get(L.userId);
+            ref = cachedUsers.get(L.userId);
             if (typeof ref === 'undefined') {
                 userRequest
                     .getUser({
                         userId: L.userId
                     })
                     .then((args) => {
-                        Vue.set(L, 'user', args.ref);
+                        if (args.ref.id === L.userId) {
+                            Object.assign(L.user, args.ref);
+                            D.$location = L;
+                            applyUserDialogLocation();
+                        }
                     });
             } else {
                 L.user = ref;
@@ -1027,10 +1016,10 @@ export const useUserStore = defineStore('User', () => {
         const users = [];
         let friendCount = 0;
         const playersInInstance = locationStore.lastLocation.playerList;
-        const cachedCurrentUser = state.cachedUsers.get(state.currentUser.id);
+        const cachedCurrentUser = cachedUsers.get(currentUser.value.id);
         const currentLocation = cachedCurrentUser.$location.tag;
         if (!L.isOffline && currentLocation === L.tag) {
-            ref = state.cachedUsers.get(state.currentUser.id);
+            ref = cachedUsers.get(currentUser.value.id);
             if (typeof ref !== 'undefined') {
                 users.push(ref); // add self
             }
@@ -1047,7 +1036,7 @@ export const useUserStore = defineStore('User', () => {
                     return friend.userId === user.id;
                 });
                 if (addUser) {
-                    ref = state.cachedUsers.get(friend.userId);
+                    ref = cachedUsers.get(friend.userId);
                     if (typeof ref !== 'undefined') {
                         users.push(ref);
                     }
@@ -1092,9 +1081,10 @@ export const useUserStore = defineStore('User', () => {
         }
         D.users = users;
         if (
-            L.worldId &&
-            currentLocation === L.tag &&
-            playersInInstance.size > 0
+            (L.worldId &&
+                currentLocation === L.tag &&
+                playersInInstance.size > 0) ||
+            !L.isRealInstance
         ) {
             D.instance = {
                 id: L.instanceId,
@@ -1106,26 +1096,13 @@ export const useUserStore = defineStore('User', () => {
                 ref: {}
             };
         }
-        if (!L.isRealInstance) {
-            D.instance = {
-                id: L.instanceId,
-                tag: L.tag,
-                $location: L,
-                friendCount: 0,
-                users: [],
-                shortName: '',
-                ref: {}
-            };
-        }
-        const instanceRef = instanceStore.cachedInstances.get(L.tag);
-        if (typeof instanceRef !== 'undefined') {
-            D.instance.ref = instanceRef;
-        }
+        const instanceRef = instanceStore.cachedInstances.get(L.tag) || {};
+        Object.assign(D.instance.ref, instanceRef);
         D.instance.friendCount = friendCount;
     }
 
     function sortUserDialogAvatars(array) {
-        const D = state.userDialog;
+        const D = userDialog.value;
         if (D.avatarSorting === 'update') {
             array.sort(compareByUpdatedAt);
         } else {
@@ -1135,7 +1112,7 @@ export const useUserStore = defineStore('User', () => {
     }
 
     function refreshUserDialogAvatars(fileId) {
-        const D = state.userDialog;
+        const D = userDialog.value;
         if (D.isAvatarsLoading) {
             return;
         }
@@ -1181,7 +1158,7 @@ export const useUserStore = defineStore('User', () => {
                             return;
                         }
                     }
-                    $app.$message({
+                    ElMessage({
                         message: 'Own avatar not found',
                         type: 'error'
                     });
@@ -1191,10 +1168,10 @@ export const useUserStore = defineStore('User', () => {
     }
 
     function refreshUserDialogTreeData() {
-        const D = state.userDialog;
-        if (D.id === state.currentUser.id) {
+        const D = userDialog.value;
+        if (D.id === currentUser.value.id) {
             const treeData = {
-                ...state.currentUser,
+                ...currentUser.value,
                 ...D.ref
             };
             D.treeData = buildTreeData(treeData);
@@ -1212,7 +1189,7 @@ export const useUserStore = defineStore('User', () => {
         if (!ref.displayName || ref.displayName.substring(0, 3) === 'ID:') {
             return;
         }
-        for (ctx of state.cachedUsers.values()) {
+        for (ctx of cachedUsers.values()) {
             if (ctx.displayName === ref.displayName) {
                 showUserDialog(ctx.id);
                 return;
@@ -1262,22 +1239,28 @@ export const useUserStore = defineStore('User', () => {
             }
             newCount++;
             state.instancePlayerCount.set(newLocation, newCount);
-        }
-        if (props.location && ref.id === state.userDialog.id) {
-            // update user dialog instance occupants
-            applyUserDialogLocation(true);
-        }
-        if (
-            props.location &&
-            ref.$location.worldId === worldStore.worldDialog.id
-        ) {
-            instanceStore.applyWorldDialogInstances();
-        }
-        if (
-            props.location &&
-            ref.$location.groupId === groupStore.groupDialog.id
-        ) {
-            instanceStore.applyGroupDialogInstances();
+
+            const previousLocationL = parseLocation(previousLocation);
+            const newLocationL = parseLocation(newLocation);
+            if (
+                previousLocationL.tag === userDialog.value.$location.tag ||
+                newLocationL.tag === userDialog.value.$location.tag
+            ) {
+                // update user dialog instance occupants
+                applyUserDialogLocation(true);
+            }
+            if (
+                previousLocationL.worldId === worldStore.worldDialog.id ||
+                newLocationL.worldId === worldStore.worldDialog.id
+            ) {
+                instanceStore.applyWorldDialogInstances();
+            }
+            if (
+                previousLocationL.groupId === groupStore.groupDialog.id ||
+                newLocationL.groupId === groupStore.groupDialog.id
+            ) {
+                instanceStore.applyGroupDialogInstances();
+            }
         }
         if (
             !props.state &&
@@ -1300,7 +1283,7 @@ export const useUserStore = defineStore('User', () => {
                     time = 0;
                 }
             }
-            if (AppGlobal.debugFriendState && previousLocation) {
+            if (AppDebug.debugFriendState && previousLocation) {
                 console.log(
                     `${ref.displayName} GPS ${previousLocation} -> ${newLocation}`
                 );
@@ -1310,7 +1293,7 @@ export const useUserStore = defineStore('User', () => {
             }
             if (!previousLocation) {
                 // no previous location
-                if (AppGlobal.debugFriendState) {
+                if (AppDebug.debugFriendState) {
                     console.log(
                         ref.displayName,
                         'Ignoring GPS, no previous location',
@@ -1336,7 +1319,6 @@ export const useUserStore = defineStore('User', () => {
                 };
                 feedStore.addFeed(feed);
                 database.addGPSToDatabase(feed);
-                friendStore.updateFriendGPS(ref.id);
                 // clear previousLocation after GPS
                 ref.$previousLocation = '';
                 ref.$travelingToTime = Date.now();
@@ -1350,7 +1332,6 @@ export const useUserStore = defineStore('User', () => {
             // store previous location when user is traveling
             ref.$previousLocation = props.location[1];
             ref.$travelingToTime = Date.now();
-            friendStore.updateFriendGPS(ref.id);
         }
         let imageMatches = false;
         if (
@@ -1565,7 +1546,7 @@ export const useUserStore = defineStore('User', () => {
             withCompany = locationStore.lastLocation.friendList.size >= 1;
         }
 
-        const currentStatus = state.currentUser.status;
+        const currentStatus = currentUser.value.status;
         const newStatus = withCompany
             ? generalSettingsStore.autoStateChangeCompanyStatus
             : generalSettingsStore.autoStateChangeAloneStatus;
@@ -1579,27 +1560,27 @@ export const useUserStore = defineStore('User', () => {
                 status: newStatus
             })
             .then(() => {
-                const text = `Status automaticly changed to ${newStatus}`;
-                if (AppGlobal.errorNoty) {
-                    AppGlobal.errorNoty.close();
+                const text = `Status automatically changed to ${newStatus}`;
+                if (AppDebug.errorNoty) {
+                    AppDebug.errorNoty.close();
                 }
-                AppGlobal.errorNoty = new Noty({
+                AppDebug.errorNoty = new Noty({
                     type: 'info',
                     text
                 });
-                AppGlobal.errorNoty.show();
+                AppDebug.errorNoty.show();
                 console.log(text);
             });
     }
 
     function addCustomTag(data) {
         if (data.Tag) {
-            state.customUserTags.set(data.UserId, {
+            customUserTags.value.set(data.UserId, {
                 tag: data.Tag,
                 colour: data.TagColour
             });
         } else {
-            state.customUserTags.delete(data.UserId);
+            customUserTags.value.delete(data.UserId);
         }
         const feedUpdate = {
             userId: data.UserId,
@@ -1609,7 +1590,7 @@ export const useUserStore = defineStore('User', () => {
             'updateHudFeedTag',
             JSON.stringify(feedUpdate)
         );
-        const ref = state.cachedUsers.get(data.UserId);
+        const ref = cachedUsers.get(data.UserId);
         if (typeof ref !== 'undefined') {
             ref.$customTag = data.Tag;
             ref.$customTagColour = data.TagColour;
@@ -1623,7 +1604,7 @@ export const useUserStore = defineStore('User', () => {
         state.notes.clear();
         try {
             // todo: get users from store
-            const users = state.cachedUsers;
+            const users = cachedUsers;
             const dbNotes = await database.getAllUserNotes();
             for (const note of dbNotes) {
                 state.notes.set(note.userId, note.note);
@@ -1684,7 +1665,7 @@ export const useUserStore = defineStore('User', () => {
             console.error('Error fetching user notes:', error);
         }
         // todo: get users from store
-        const users = state.cachedUsers;
+        const users = cachedUsers;
 
         for (const note of newNotes.values()) {
             const newNote = {
@@ -1741,7 +1722,7 @@ export const useUserStore = defineStore('User', () => {
      */
     function applyCurrentUser(json) {
         authStore.attemptingAutoLogin = false;
-        let ref = state.currentUser;
+        let ref = currentUser.value;
         if (watchState.isLoggedIn) {
             if (json.currentAvatar !== ref.currentAvatar) {
                 avatarStore.addAvatarToHistory(json.currentAvatar);
@@ -1750,7 +1731,11 @@ export const useUserStore = defineStore('User', () => {
                     ref.$previousAvatarSwapTime = Date.now();
                 }
             }
-            Object.assign(ref, json);
+            for (const prop in json) {
+                if (typeof json[prop] !== 'undefined') {
+                    ref[prop] = json[prop];
+                }
+            }
         } else {
             ref = {
                 acceptedPrivacyVersion: 0,
@@ -1838,7 +1823,7 @@ export const useUserStore = defineStore('User', () => {
                 username: '',
                 viveId: '',
                 // VRCX
-                $online_for: Date.now(),
+                $online_for: null,
                 $offline_for: null,
                 $location_at: Date.now(),
                 $travelingToTime: Date.now(),
@@ -1860,8 +1845,8 @@ export const useUserStore = defineStore('User', () => {
             if (gameStore.isGameRunning) {
                 ref.$previousAvatarSwapTime = Date.now();
             }
-            state.cachedUsers.clear(); // clear before running applyUser
-            state.currentUser = ref;
+            cachedUsers.clear(); // clear before running applyUser
+            currentUser.value = ref;
             authStore.loginComplete();
         }
 
@@ -1876,16 +1861,16 @@ export const useUserStore = defineStore('User', () => {
         if (ref.homeLocation !== ref.$homeLocation?.tag) {
             ref.$homeLocation = parseLocation(ref.homeLocation);
             // apply home location name to user dialog
-            if (state.userDialog.visible && state.userDialog.id === ref.id) {
-                getWorldName(state.currentUser.homeLocation).then(
+            if (userDialog.value.visible && userDialog.value.id === ref.id) {
+                getWorldName(currentUser.value.homeLocation).then(
                     (worldName) => {
-                        state.userDialog.$homeLocationName = worldName;
+                        userDialog.value.$homeLocationName = worldName;
                     }
                 );
             }
         }
         if (ref.pastDisplayNames) {
-            state.pastDisplayNameTable.data = ref.pastDisplayNames;
+            pastDisplayNameTable.value.data = ref.pastDisplayNames;
         }
 
         // when isGameRunning use gameLog instead of API
@@ -1962,21 +1947,26 @@ export const useUserStore = defineStore('User', () => {
             travelingToInstance,
             travelingToWorld
 
-            // $online_for: state.currentUser.$online_for,
-            // $offline_for: state.currentUser.$offline_for,
-            // $location_at: state.currentUser.$location_at,
-            // $travelingToTime: state.currentUser.$travelingToTime
+            // $online_for: currentUser.value.$online_for,
+            // $offline_for: currentUser.value.$offline_for,
+            // $location_at: currentUser.value.$location_at,
+            // $travelingToTime: currentUser.value.$travelingToTime
         });
         // set VRCX online/offline timers
-        userRef.$online_for = state.currentUser.$online_for;
-        userRef.$offline_for = state.currentUser.$offline_for;
-        userRef.$location_at = state.currentUser.$location_at;
-        userRef.$travelingToTime = state.currentUser.$travelingToTime;
+        userRef.$online_for = currentUser.value.$online_for;
+        userRef.$offline_for = currentUser.value.$offline_for;
+        userRef.$location_at = currentUser.value.$location_at;
+        userRef.$travelingToTime = currentUser.value.$travelingToTime;
         if (json.presence?.platform) {
             userRef.platform = json.presence.platform;
         }
 
         return ref;
+    }
+
+    function showSendBoopDialog(userId) {
+        sendBoopDialog.value.userId = userId;
+        sendBoopDialog.value.visible = true;
     }
 
     return {
@@ -1987,10 +1977,12 @@ export const useUserStore = defineStore('User', () => {
         userDialog,
         subsetOfLanguages,
         languageDialog,
+        sendBoopDialog,
         pastDisplayNameTable,
         showUserDialogHistory,
         customUserTags,
         cachedUsers,
+        isLocalUserVrcPlusSupporter,
         applyCurrentUser,
         applyUser,
         showUserDialog,
@@ -2004,7 +1996,7 @@ export const useUserStore = defineStore('User', () => {
         initUserNotes,
         getCurrentUser,
         handleConfig,
-
+        showSendBoopDialog,
         checkNote
     };
 });

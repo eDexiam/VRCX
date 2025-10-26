@@ -1,6 +1,6 @@
 <template>
-    <safe-dialog
-        :visible.sync="isVisible"
+    <el-dialog
+        v-model="isVisible"
         :title="t('dialog.set_world_tags.header')"
         width="400px"
         destroy-on-close
@@ -20,7 +20,7 @@
         <el-input
             v-model="setWorldTagsDialog.authorTags"
             type="textarea"
-            size="mini"
+            size="small"
             show-word-limit
             :autosize="{ minRows: 2, maxRows: 5 }"
             placeholder=""
@@ -73,22 +73,24 @@
         </el-checkbox>
         <template #footer>
             <div style="display: flex">
-                <el-button size="small" @click="isVisible = false">
+                <el-button @click="isVisible = false">
                     {{ t('dialog.set_world_tags.cancel') }}
                 </el-button>
-                <el-button type="primary" size="small" @click="saveSetWorldTagsDialog">
+                <el-button type="primary" @click="saveSetWorldTagsDialog">
                     {{ t('dialog.set_world_tags.save') }}
                 </el-button>
             </div>
         </template>
-    </safe-dialog>
+    </el-dialog>
 </template>
 
 <script setup>
-    import { ref, computed, watch, getCurrentInstance } from 'vue';
-    import { useI18n } from 'vue-i18n-bridge';
-    import { worldRequest } from '../../../api';
+    import { computed, ref, watch } from 'vue';
+    import { ElMessage } from 'element-plus';
+    import { useI18n } from 'vue-i18n';
+
     import { useWorldStore } from '../../../stores';
+    import { worldRequest } from '../../../api';
 
     const props = defineProps({
         oldTags: {
@@ -114,8 +116,6 @@
     const { showWorldDialog } = useWorldStore();
 
     const { t } = useI18n();
-
-    const { proxy } = getCurrentInstance();
 
     const setWorldTagsDialog = ref({
         authorTags: '',
@@ -296,7 +296,7 @@
                 tags
             })
             .then((args) => {
-                proxy.$message({
+                ElMessage({
                     message: 'Tags updated',
                     type: 'success'
                 });

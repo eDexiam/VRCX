@@ -1,14 +1,14 @@
 <template>
-    <safe-dialog
+    <el-dialog
         class="x-dialog"
-        :visible="isLaunchOptionsDialogVisible"
+        :model-value="isLaunchOptionsDialogVisible"
         :title="t('dialog.launch_options.header')"
         width="600px"
         @close="closeDialog">
         <div style="font-size: 12px">
             {{ t('dialog.launch_options.description') }} <br />
             {{ t('dialog.launch_options.example') }}
-            <el-tag size="mini"
+            <el-tag size="small"
                 >--fps=144 --enable-debug-gui --enable-sdk-log-levels --enable-udon-debug-logging
             </el-tag>
         </div>
@@ -16,7 +16,7 @@
         <el-input
             v-model="launchOptionsDialog.launchArguments"
             type="textarea"
-            size="mini"
+            size="small"
             show-word-limit
             :autosize="{ minRows: 2, maxRows: 5 }"
             placeholder=""
@@ -39,34 +39,32 @@
 
         <template #footer>
             <div style="display: flex">
-                <el-button size="small" @click="openExternalLink('https://docs.vrchat.com/docs/launch-options')">
+                <el-button @click="openExternalLink('https://docs.vrchat.com/docs/launch-options')">
                     {{ t('dialog.launch_options.vrchat_docs') }}
                 </el-button>
-                <el-button
-                    size="small"
-                    @click="openExternalLink('https://docs.unity3d.com/Manual/CommandLineArguments.html')">
+                <el-button @click="openExternalLink('https://docs.unity3d.com/Manual/CommandLineArguments.html')">
                     {{ t('dialog.launch_options.unity_manual') }}
                 </el-button>
-                <el-button type="primary" size="small" style="margin-left: auto" @click="updateLaunchOptions">
+                <el-button type="primary" style="margin-left: auto" @click="updateLaunchOptions">
                     {{ t('dialog.launch_options.save') }}
                 </el-button>
             </div>
         </template>
-    </safe-dialog>
+    </el-dialog>
 </template>
 
 <script setup>
+    import { computed, ref } from 'vue';
+    import { ElMessage } from 'element-plus';
     import { storeToRefs } from 'pinia';
-    import { computed, getCurrentInstance, ref } from 'vue';
-    import { useI18n } from 'vue-i18n-bridge';
-    import configRepository from '../../../service/config';
+    import { useI18n } from 'vue-i18n';
+
     import { openExternalLink } from '../../../shared/utils';
     import { useLaunchStore } from '../../../stores';
 
-    const { t } = useI18n();
+    import configRepository from '../../../service/config';
 
-    const instance = getCurrentInstance();
-    const $message = instance.proxy.$message;
+    const { t } = useI18n();
 
     const launchStore = useLaunchStore();
     const { isLaunchOptionsDialogVisible } = storeToRefs(launchStore);
@@ -105,14 +103,14 @@
             D.vrcLaunchPathOverride.endsWith('.exe') &&
             !D.vrcLaunchPathOverride.endsWith('launch.exe')
         ) {
-            $message({
+            ElMessage({
                 message: 'Invalid path, you must enter VRChat folder or launch.exe',
                 type: 'error'
             });
             return;
         }
         configRepository.setString('vrcLaunchPathOverride', D.vrcLaunchPathOverride);
-        $message({
+        ElMessage({
             message: 'Updated launch options',
             type: 'success'
         });

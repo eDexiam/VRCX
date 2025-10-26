@@ -1,13 +1,20 @@
-import sqliteService from '../sqlite.js';
 import { dbVars } from '../database';
+
+import sqliteService from '../sqlite.js';
 
 const tableFixes = {
     async cleanLegendFromFriendLog() {
-        await sqliteService.executeNonQuery(
-            `DELETE FROM ${dbVars.userPrefix}_friend_log_history
-            WHERE type = 'TrustLevel' AND created_at > '2022-05-04T01:00:00.000Z'
-            AND ((trust_level = 'Veteran User' AND previous_trust_level = 'Trusted User') OR (trust_level = 'Trusted User' AND previous_trust_level = 'Veteran User'))`
-        );
+        var tables = [];
+        await sqliteService.execute((dbRow) => {
+            tables.push(dbRow[0]);
+        }, `SELECT name FROM sqlite_schema WHERE type='table' AND name LIKE '%_friend_log_history'`);
+        for (var tableName of tables) {
+            await sqliteService.executeNonQuery(
+                `DELETE FROM ${tableName}
+                WHERE type = 'TrustLevel' AND created_at > '2022-05-04T01:00:00.000Z'
+                AND ((trust_level = 'Veteran User' AND previous_trust_level = 'Trusted User') OR (trust_level = 'Trusted User' AND previous_trust_level = 'Veteran User'))`
+            );
+        }
     },
 
     async fixGameLogTraveling() {
@@ -23,7 +30,7 @@ const tableFixes = {
                 time: dbRow[6]
             };
             travelingList.unshift(row);
-        }, 'SELECT * FROM gamelog_join_leave WHERE type = "OnPlayerLeft" AND location = "traveling"');
+        }, "SELECT * FROM gamelog_join_leave WHERE type = 'OnPlayerLeft' AND location = 'traveling'");
         travelingList.forEach(async (travelingEntry) => {
             await sqliteService.execute(
                 (dbRow) => {
@@ -44,7 +51,7 @@ const tableFixes = {
                         }
                     );
                 },
-                'SELECT * FROM gamelog_join_leave WHERE type = "OnPlayerJoined" AND display_name = @displayName AND created_at <= @created_at ORDER BY created_at DESC LIMIT 1',
+                "SELECT * FROM gamelog_join_leave WHERE type = 'OnPlayerJoined' AND display_name = @displayName AND created_at <= @created_at ORDER BY created_at DESC LIMIT 1",
                 {
                     '@displayName': travelingEntry.displayName,
                     '@created_at': travelingEntry.created_at
@@ -110,21 +117,39 @@ const tableFixes = {
     },
 
     async fixBrokenNotifications() {
-        await sqliteService.executeNonQuery(
-            `DELETE FROM ${dbVars.userPrefix}_notifications WHERE (created_at is null or created_at = '')`
-        );
+        var tables = [];
+        await sqliteService.execute((dbRow) => {
+            tables.push(dbRow[0]);
+        }, `SELECT name FROM sqlite_schema WHERE type='table' AND name LIKE '%_notifications'`);
+        for (var tableName of tables) {
+            await sqliteService.executeNonQuery(
+                `DELETE FROM ${tableName} WHERE (created_at is null or created_at = '')`
+            );
+        }
     },
 
     async fixBrokenGroupChange() {
-        await sqliteService.executeNonQuery(
-            `DELETE FROM ${dbVars.userPrefix}_notifications WHERE type = 'groupChange' AND created_at < '2024-04-23T03:00:00.000Z'`
-        );
+        var tables = [];
+        await sqliteService.execute((dbRow) => {
+            tables.push(dbRow[0]);
+        }, `SELECT name FROM sqlite_schema WHERE type='table' AND name LIKE '%_notifications'`);
+        for (var tableName of tables) {
+            await sqliteService.executeNonQuery(
+                `DELETE FROM ${tableName} WHERE type = 'groupChange' AND created_at < '2024-04-23T03:00:00.000Z'`
+            );
+        }
     },
 
     async fixCancelFriendRequestTypo() {
-        await sqliteService.executeNonQuery(
-            `UPDATE ${dbVars.userPrefix}_friend_log_history SET type = 'CancelFriendRequest' WHERE type = 'CancelFriendRequst'`
-        );
+        var tables = [];
+        await sqliteService.execute((dbRow) => {
+            tables.push(dbRow[0]);
+        }, `SELECT name FROM sqlite_schema WHERE type='table' AND name LIKE '%_friend_log_history'`);
+        for (var tableName of tables) {
+            await sqliteService.executeNonQuery(
+                `UPDATE ${tableName} SET type = 'CancelFriendRequest' WHERE type = 'CancelFriendRequst'`
+            );
+        }
     },
 
     async getBrokenGameLogDisplayNames() {
@@ -134,7 +159,7 @@ const tableFixes = {
                 id: dbRow[0],
                 displayName: dbRow[1]
             });
-        }, 'SELECT id, display_name FROM gamelog_join_leave WHERE display_name LIKE "% (%"');
+        }, "SELECT id, display_name FROM gamelog_join_leave WHERE display_name LIKE '% (%'");
         return badEntries;
     },
 

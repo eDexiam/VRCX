@@ -1,7 +1,7 @@
 <template>
-    <safe-dialog
+    <el-dialog
         class="x-dialog"
-        :visible="isRegistryBackupDialogVisible"
+        :model-value="isRegistryBackupDialogVisible"
         :title="t('dialog.registry_backup.header')"
         width="600px"
         @close="closeDialog"
@@ -11,7 +11,18 @@
                 <span class="name" style="margin-right: 24px">{{ t('dialog.registry_backup.auto_backup') }}</span>
                 <el-switch v-model="vrcRegistryAutoBackup" @change="setVrcRegistryAutoBackup"></el-switch>
             </div>
-            <data-tables v-bind="registryBackupTable" style="margin-top: 10px">
+            <div
+                style="
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    font-size: 12px;
+                    margin-top: 5px;
+                ">
+                <span class="name" style="margin-right: 24px">{{ t('dialog.registry_backup.ask_to_restore') }}</span>
+                <el-switch v-model="vrcRegistryAskRestore" @change="setVrcRegistryAskRestore"></el-switch>
+            </div>
+            <DataTable v-bind="registryBackupTable" style="margin-top: 10px">
                 <el-table-column :label="t('dialog.registry_backup.name')" prop="name"></el-table-column>
                 <el-table-column :label="t('dialog.registry_backup.date')" prop="date">
                     <template #default="scope">
@@ -20,39 +31,33 @@
                 </el-table-column>
                 <el-table-column :label="t('dialog.registry_backup.action')" width="90" align="right">
                     <template #default="scope">
-                        <el-tooltip
-                            placement="top"
-                            :content="t('dialog.registry_backup.restore')"
-                            :disabled="hideTooltips">
+                        <el-tooltip placement="top" :content="t('dialog.registry_backup.restore')">
                             <el-button
                                 type="text"
-                                icon="el-icon-upload2"
-                                size="mini"
+                                :icon="Upload"
+                                size="small"
+                                class="button-pd-0"
                                 @click="restoreVrcRegistryBackup(scope.row)"></el-button>
                         </el-tooltip>
-                        <el-tooltip
-                            placement="top"
-                            :content="t('dialog.registry_backup.save_to_file')"
-                            :disabled="hideTooltips">
+                        <el-tooltip placement="top" :content="t('dialog.registry_backup.save_to_file')">
                             <el-button
                                 type="text"
-                                icon="el-icon-download"
-                                size="mini"
+                                :icon="Download"
+                                size="small"
+                                class="button-pd-0"
                                 @click="saveVrcRegistryBackupToFile(scope.row)"></el-button>
                         </el-tooltip>
-                        <el-tooltip
-                            placement="top"
-                            :content="t('dialog.registry_backup.delete')"
-                            :disabled="hideTooltips">
+                        <el-tooltip placement="top" :content="t('dialog.registry_backup.delete')">
                             <el-button
                                 type="text"
-                                icon="el-icon-delete"
-                                size="mini"
+                                :icon="Delete"
+                                size="small"
+                                class="button-pd-0"
                                 @click="deleteVrcRegistryBackup(scope.row)"></el-button>
                         </el-tooltip>
                     </template>
                 </el-table-column>
-            </data-tables>
+            </DataTable>
             <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 10px">
                 <el-button type="danger" size="small" @click="deleteVrcRegistry">{{
                     t('dialog.registry_backup.reset')
@@ -67,34 +72,33 @@
                 </div>
             </div>
         </div>
-    </safe-dialog>
+    </el-dialog>
 </template>
 
 <script setup>
+    import { Delete, Download, Upload } from '@element-plus/icons-vue';
+    import { ElMessage, ElMessageBox } from 'element-plus';
+    import { ref, watch } from 'vue';
     import { storeToRefs } from 'pinia';
-    import { getCurrentInstance, ref, watch } from 'vue';
-    import { useI18n } from 'vue-i18n-bridge';
+    import { useI18n } from 'vue-i18n';
+
+    import { downloadAndSaveJson, formatDateFilter, removeFromArray } from '../../../shared/utils';
+    import { useAdvancedSettingsStore, useVrcxStore } from '../../../stores';
+
     import configRepository from '../../../service/config';
-    import { downloadAndSaveJson, removeFromArray, formatDateFilter } from '../../../shared/utils';
 
-    import { useAppearanceSettingsStore, useVrcxStore, useAdvancedSettingsStore } from '../../../stores';
-
-    const { hideTooltips } = storeToRefs(useAppearanceSettingsStore());
     const { backupVrcRegistry } = useVrcxStore();
     const { isRegistryBackupDialogVisible } = storeToRefs(useVrcxStore());
-    const { vrcRegistryAutoBackup } = storeToRefs(useAdvancedSettingsStore());
-    const { setVrcRegistryAutoBackup } = useAdvancedSettingsStore();
+    const { vrcRegistryAutoBackup, vrcRegistryAskRestore } = storeToRefs(useAdvancedSettingsStore());
+    const { setVrcRegistryAutoBackup, setVrcRegistryAskRestore } = useAdvancedSettingsStore();
 
     const { t } = useI18n();
-
-    const instance = getCurrentInstance();
-    const { $confirm, $message, $prompt } = instance.proxy;
 
     const registryBackupTable = ref({
         data: [],
         tableProps: {
             stripe: true,
-            size: 'mini',
+            size: 'small',
             defaultSort: {
                 prop: 'date',
                 order: 'descending'
@@ -118,31 +122,32 @@
     }
 
     function restoreVrcRegistryBackup(row) {
-        $confirm('Continue? Restore Backup', 'Confirm', {
+        ElMessageBox.confirm('Continue? Restore Backup', 'Confirm', {
             confirmButtonText: 'Confirm',
             cancelButtonText: 'Cancel',
-            type: 'warning',
-            callback: (action) => {
+            type: 'warning'
+        })
+            .then((action) => {
                 if (action !== 'confirm') {
                     return;
                 }
                 const data = JSON.stringify(row.data);
                 AppApi.SetVRChatRegistry(data)
                     .then(() => {
-                        $message({
+                        ElMessage({
                             message: 'VRC registry settings restored',
                             type: 'success'
                         });
                     })
                     .catch((e) => {
                         console.error(e);
-                        $message({
+                        ElMessage({
                             message: `Failed to restore VRC registry settings, check console for full error: ${e}`,
                             type: 'error'
                         });
                     });
-            }
-        });
+            })
+            .catch(() => {});
     }
 
     function saveVrcRegistryBackupToFile(row) {
@@ -157,22 +162,23 @@
     }
 
     function deleteVrcRegistry() {
-        $confirm('Continue? Delete VRC Registry Settings', 'Confirm', {
+        ElMessageBox.confirm('Continue? Delete VRC Registry Settings', 'Confirm', {
             confirmButtonText: 'Confirm',
             cancelButtonText: 'Cancel',
-            type: 'warning',
-            callback: (action) => {
+            type: 'warning'
+        })
+            .then((action) => {
                 if (action !== 'confirm') {
                     return;
                 }
                 AppApi.DeleteVRChatRegistryFolder().then(() => {
-                    $message({
+                    ElMessage({
                         message: 'VRC registry settings deleted',
                         type: 'success'
                     });
                 });
-            }
-        });
+            })
+            .catch(() => {});
     }
 
     async function handleBackupVrcRegistry(name) {
@@ -180,17 +186,18 @@
         await updateRegistryBackupDialog();
     }
 
-    async function promptVrcRegistryBackupName() {
-        const name = await $prompt('Enter a name for the backup', 'Backup Name', {
+    function promptVrcRegistryBackupName() {
+        ElMessageBox.prompt('Enter a name for the backup', 'Backup Name', {
             confirmButtonText: 'Confirm',
             cancelButtonText: 'Cancel',
             inputPattern: /\S+/,
             inputErrorMessage: 'Name is required',
             inputValue: 'Backup'
-        });
-        if (name.action === 'confirm') {
-            await handleBackupVrcRegistry(name.value);
-        }
+        })
+            .then(({ value }) => {
+                handleBackupVrcRegistry(value);
+            })
+            .catch(() => {});
     }
 
     async function openJsonFileSelectorDialogElectron() {
@@ -249,20 +256,20 @@
             }
             AppApi.SetVRChatRegistry(json)
                 .then(() => {
-                    $message({
+                    ElMessage({
                         message: 'VRC registry settings restored',
                         type: 'success'
                     });
                 })
                 .catch((e) => {
                     console.error(e);
-                    $message({
+                    ElMessage({
                         message: `Failed to restore VRC registry settings, check console for full error: ${e}`,
                         type: 'error'
                     });
                 });
         } catch {
-            $message({
+            ElMessage({
                 message: 'Invalid JSON',
                 type: 'error'
             });
@@ -277,3 +284,9 @@
         isRegistryBackupDialogVisible.value = false;
     }
 </script>
+
+<style scoped>
+    .button-pd-0 {
+        padding: 0;
+    }
+</style>

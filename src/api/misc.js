@@ -6,12 +6,13 @@ function getCurrentUserId() {
 }
 
 const miscReq = {
-    getBundles(fileId) {
-        return request(`file/${fileId}`, {
+    getFile(params) {
+        return request(`file/${params.fileId}`, {
             method: 'GET'
         }).then((json) => {
             const args = {
-                json
+                json,
+                params
             };
             return args;
         });
@@ -193,28 +194,29 @@ const miscReq = {
             };
             return args;
         });
-    }
+    },
 
-    // /**
-    //  * @params {{
-    //  userId: string,
-    //  emojiId: string
-    //  }} params
-    //  * @returns {Promise<{json: any, params}>}
-    //  */
-    // sendBoop(params) {
-    //     return request(`users/${params.userId}/boop`, {
-    //         method: 'POST',
-    //         params
-    //     }).then((json) => {
-    //         const args = {
-    //             json,
-    //             params
-    //         };
-    //         this.$emit('BOOP:SEND', args);
-    //         return args;
-    //     });
-    // }
+    /**
+     * @params {{
+        userId: string,
+        emojiId: string
+     }} params
+     * @returns {Promise<{json: any, params}>}
+     */
+    sendBoop(params) {
+        return request(`users/${params.userId}/boop`, {
+            method: 'POST',
+            params: {
+                emojiId: params.emojiId
+            }
+        }).then((json) => {
+            const args = {
+                json,
+                params
+            };
+            return args;
+        });
+    }
 };
 
 export default miscReq;

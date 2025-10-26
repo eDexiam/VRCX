@@ -1,6 +1,6 @@
 <template>
-    <safe-dialog
-        :visible.sync="isVisible"
+    <el-dialog
+        v-model="isVisible"
         :title="t('dialog.allowed_video_player_domains.header')"
         width="600px"
         destroy-on-close
@@ -12,27 +12,26 @@
                 v-model="urlList[index]"
                 size="small"
                 style="margin-top: 5px">
-                <el-button slot="append" icon="el-icon-delete" @click="urlList.splice(index, 1)"></el-button>
+                <el-button :icon="Delete" @click="urlList.splice(index, 1)"></el-button>
             </el-input>
-            <el-button size="mini" style="margin-top: 5px" @click="urlList.push('')">
+            <el-button size="small" style="margin-top: 5px" @click="urlList.push('')">
                 {{ t('dialog.allowed_video_player_domains.add_domain') }}
             </el-button>
         </div>
         <template #footer>
-            <el-button
-                type="primary"
-                size="small"
-                :disabled="!worldAllowedDomainsDialog.worldId"
-                @click="saveWorldAllowedDomains">
+            <el-button type="primary" :disabled="!worldAllowedDomainsDialog.worldId" @click="saveWorldAllowedDomains">
                 {{ t('dialog.allowed_video_player_domains.save') }}
             </el-button>
         </template>
-    </safe-dialog>
+    </el-dialog>
 </template>
 
 <script setup>
-    import { ref, computed, watch, getCurrentInstance } from 'vue';
-    import { useI18n } from 'vue-i18n-bridge';
+    import { computed, ref, watch } from 'vue';
+    import { Delete } from '@element-plus/icons-vue';
+    import { ElMessage } from 'element-plus';
+    import { useI18n } from 'vue-i18n';
+
     import { worldRequest } from '../../../api';
 
     const props = defineProps({
@@ -43,8 +42,6 @@
     });
 
     const emit = defineEmits(['update:worldAllowedDomainsDialog']);
-
-    const { proxy } = getCurrentInstance();
 
     const { t } = useI18n();
 
@@ -79,7 +76,7 @@
                 urlList: urlList.value
             })
             .then((args) => {
-                proxy.$message({
+                ElMessage({
                     message: 'Allowed Video Player Domains updated',
                     type: 'success'
                 });

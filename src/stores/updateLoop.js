@@ -1,24 +1,36 @@
 import { defineStore } from 'pinia';
-import { computed, reactive, watch } from 'vue';
-import * as workerTimers from 'worker-timers';
-import { groupRequest } from '../api';
+import { watch } from 'vue';
+
 import { database } from '../service/database';
-import { watchState } from '../service/watchState';
+import { groupRequest } from '../api';
 import { useAuthStore } from './auth';
-import { useFriendStore } from './friend';
-import { useGameStore } from './game';
-import { useGameLogStore } from './gameLog';
-import { useModerationStore } from './moderation';
 import { useDiscordPresenceSettingsStore } from './settings/discordPresence';
-import { useUiStore } from './ui';
-import { useUserStore } from './user';
-import { useVrcxStore } from './vrcx';
-import { useVRCXUpdaterStore } from './vrcxUpdater';
+import { useFriendStore } from './friend';
+import { useGameLogStore } from './gameLog';
+import { useGameStore } from './game';
 import { useGroupStore } from './group';
+import { useModerationStore } from './moderation';
+import { useUserStore } from './user';
+import { useVRCXUpdaterStore } from './vrcxUpdater';
 import { useVrStore } from './vr';
+import { useVrcxStore } from './vrcx';
+import { watchState } from '../service/watchState';
+
+import * as workerTimers from 'worker-timers';
 
 export const useUpdateLoopStore = defineStore('UpdateLoop', () => {
-    const state = reactive({
+    const authStore = useAuthStore();
+    const userStore = useUserStore();
+    const friendStore = useFriendStore();
+    const gameStore = useGameStore();
+    const moderationStore = useModerationStore();
+    const vrcxStore = useVrcxStore();
+    const discordPresenceSettingsStore = useDiscordPresenceSettingsStore();
+    const gameLogStore = useGameLogStore();
+    const vrcxUpdaterStore = useVRCXUpdaterStore();
+    const groupStore = useGroupStore();
+    const vrStore = useVrStore();
+    const state = {
         nextCurrentUserRefresh: 300,
         nextFriendsRefresh: 3600,
         nextGroupInstanceRefresh: 0,
@@ -30,7 +42,7 @@ export const useUpdateLoopStore = defineStore('UpdateLoop', () => {
         nextGetLogCheck: 0,
         nextGameRunningCheck: 0,
         nextDatabaseOptimize: 3600
-    });
+    };
 
     watch(
         () => watchState.isLoggedIn,
@@ -42,40 +54,15 @@ export const useUpdateLoopStore = defineStore('UpdateLoop', () => {
         { flush: 'sync' }
     );
 
-    const nextGroupInstanceRefresh = computed({
-        get: () => state.nextGroupInstanceRefresh,
-        set: (value) => {
-            state.nextGroupInstanceRefresh = value;
-        }
-    });
+    const nextGroupInstanceRefresh = state.nextGroupInstanceRefresh;
 
-    const nextCurrentUserRefresh = computed({
-        get: () => state.nextCurrentUserRefresh,
-        set: (value) => {
-            state.nextCurrentUserRefresh = value;
-        }
-    });
+    const nextCurrentUserRefresh = state.nextCurrentUserRefresh;
 
-    const nextDiscordUpdate = computed({
-        get: () => state.nextDiscordUpdate,
-        set: (value) => {
-            state.nextDiscordUpdate = value;
-        }
-    });
+    const nextDiscordUpdate = state.nextDiscordUpdate;
+
+    const ipcTimeout = state.ipcTimeout;
 
     async function updateLoop() {
-        const authStore = useAuthStore();
-        const userStore = useUserStore();
-        const friendStore = useFriendStore();
-        const gameStore = useGameStore();
-        const moderationStore = useModerationStore();
-        const vrcxStore = useVrcxStore();
-        const discordPresenceSettingsStore = useDiscordPresenceSettingsStore();
-        const gameLogStore = useGameLogStore();
-        const vrcxUpdaterStore = useVRCXUpdaterStore();
-        const uiStore = useUiStore();
-        const groupStore = useGroupStore();
-        const vrStore = useVrStore();
         try {
             if (watchState.isLoggedIn) {
                 if (--state.nextCurrentUserRefresh <= 0) {
@@ -102,8 +89,9 @@ export const useUpdateLoopStore = defineStore('UpdateLoop', () => {
                 if (--state.nextAppUpdateCheck <= 0) {
                     state.nextAppUpdateCheck = 3600; // 1hour
                     if (vrcxUpdaterStore.autoUpdateVRCX !== 'Off') {
-                        vrcxUpdaterStore.checkForVRCXUpdate(uiStore.notifyMenu);
+                        vrcxUpdaterStore.checkForVRCXUpdate();
                     }
+                    vrcxStore.tryAutoBackupVrcRegistry();
                 }
                 if (--state.ipcTimeout <= 0) {
                     vrcxStore.ipcEnabled = false;
@@ -136,18 +124,13 @@ export const useUpdateLoopStore = defineStore('UpdateLoop', () => {
                     }
                 }
                 if (LINUX && --state.nextGameRunningCheck <= 0) {
-                    if (WINDOWS) {
-                        state.nextGameRunningCheck = 3;
-                        AppApi.CheckGameRunning();
-                    } else {
-                        state.nextGameRunningCheck = 1;
-                        gameStore.updateIsGameRunning(
-                            await AppApi.IsGameRunning(),
-                            await AppApi.IsSteamVRRunning(),
-                            false
-                        );
-                        vrStore.vrInit(); // TODO: make this event based
-                    }
+                    state.nextGameRunningCheck = 1;
+                    gameStore.updateIsGameRunning(
+                        await AppApi.IsGameRunning(),
+                        await AppApi.IsSteamVRRunning(),
+                        false
+                    );
+                    vrStore.vrInit(); // TODO: make this event based
                 }
                 if (--state.nextDatabaseOptimize <= 0) {
                     state.nextDatabaseOptimize = 86400; // 1 day
@@ -162,10 +145,12 @@ export const useUpdateLoopStore = defineStore('UpdateLoop', () => {
     }
 
     return {
-        state,
+        // state,
+
         nextGroupInstanceRefresh,
         nextCurrentUserRefresh,
         nextDiscordUpdate,
+        ipcTimeout,
         updateLoop
     };
 });

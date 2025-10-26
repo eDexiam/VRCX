@@ -6,6 +6,7 @@ export type GetInstance = (params: {
     instanceId: string;
 }) => Promise<{
     json: GetInstanceResponse;
+    ref: GetInstanceResponse;
     params: { worldId: string; instanceId: string };
 }>;
 
@@ -14,9 +15,9 @@ export type CreateInstance = (params: {
     type: string;
     region: string;
     ownerId: string;
-    roleIds: string[];
-    groupAccessType: string;
-    queueEnabled: boolean;
+    roleIds?: string[];
+    groupAccessType?: string;
+    queueEnabled?: boolean;
 }) => Promise<{
     json: any;
     params: any;

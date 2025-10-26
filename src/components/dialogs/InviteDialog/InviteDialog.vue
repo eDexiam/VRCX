@@ -1,25 +1,26 @@
 <template>
-    <safe-dialog
+    <el-dialog
         class="x-dialog"
-        :visible.sync="inviteDialog.visible"
+        :model-value="inviteDialog.visible"
+        @close="closeInviteDialog"
         :title="t('dialog.invite.header')"
         width="500px"
         append-to-body>
         <div v-if="inviteDialog.visible" v-loading="inviteDialog.loading">
             <Location :location="inviteDialog.worldId" :link="false" />
             <br />
-            <el-button size="mini" style="margin-top: 10px" @click="addSelfToInvite">{{
+            <el-button size="small" style="margin-top: 10px" @click="addSelfToInvite">{{
                 t('dialog.invite.add_self')
             }}</el-button>
             <el-button
-                size="mini"
+                size="small"
                 :disabled="inviteDialog.friendsInInstance.length === 0"
                 style="margin-top: 10px"
                 @click="addFriendsInInstanceToInvite"
                 >{{ t('dialog.invite.add_friends_in_instance') }}</el-button
             >
             <el-button
-                size="mini"
+                size="small"
                 :disabled="vipFriends.length === 0"
                 style="margin-top: 10px"
                 @click="addFavoriteFriendsToInvite"
@@ -34,141 +35,148 @@
                 filterable
                 :disabled="inviteDialog.loading"
                 style="width: 100%; margin-top: 15px">
-                <el-option-group v-if="currentUser" :label="t('side_panel.me')">
-                    <el-option
-                        class="x-friend-item"
-                        :label="currentUser.displayName"
-                        :value="currentUser.id"
-                        style="height: auto">
-                        <div :class="['avatar', userStatusClass(currentUser)]">
-                            <img v-lazy="userImage(currentUser)" />
-                        </div>
-                        <div class="detail">
-                            <span class="name">{{ currentUser.displayName }}</span>
-                        </div>
-                    </el-option>
-                </el-option-group>
-
-                <el-option-group
-                    v-if="inviteDialog.friendsInInstance.length"
-                    :label="t('dialog.invite.friends_in_instance')">
-                    <el-option
-                        v-for="friend in inviteDialog.friendsInInstance"
-                        :key="friend.id"
-                        class="x-friend-item"
-                        :label="friend.name"
-                        :value="friend.id"
-                        style="height: auto">
-                        <template v-if="friend.ref">
-                            <div :class="['avatar', userStatusClass(friend.ref)]">
-                                <img v-lazy="userImage(friend.ref)" />
+                <template v-if="currentUser">
+                    <el-option-group :label="t('side_panel.me')">
+                        <el-option
+                            class="x-friend-item"
+                            :label="currentUser.displayName"
+                            :value="currentUser.id"
+                            style="height: auto">
+                            <div :class="['avatar', userStatusClass(currentUser)]">
+                                <img :src="userImage(currentUser)" loading="lazy" />
                             </div>
                             <div class="detail">
-                                <span class="name" :style="{ color: friend.ref.$userColour }">{{
-                                    friend.ref.displayName
-                                }}</span>
+                                <span class="name">{{ currentUser.displayName }}</span>
                             </div>
-                        </template>
-                        <span v-else>{{ friend.id }}</span>
-                    </el-option>
-                </el-option-group>
+                        </el-option>
+                    </el-option-group>
+                </template>
 
-                <el-option-group v-if="vipFriends.length" :label="t('side_panel.favorite')">
-                    <el-option
-                        v-for="friend in vipFriends"
-                        :key="friend.id"
-                        class="x-friend-item"
-                        :label="friend.name"
-                        :value="friend.id"
-                        style="height: auto">
-                        <template v-if="friend.ref">
-                            <div :class="['avatar', userStatusClass(friend.ref)]">
-                                <img v-lazy="userImage(friend.ref)" />
-                            </div>
-                            <div class="detail">
-                                <span class="name" :style="{ color: friend.ref.$userColour }">{{
-                                    friend.ref.displayName
-                                }}</span>
-                            </div>
-                        </template>
-                        <span v-else>{{ friend.id }}</span>
-                    </el-option>
-                </el-option-group>
+                <template v-if="inviteDialog.friendsInInstance.length">
+                    <el-option-group :label="t('dialog.invite.friends_in_instance')">
+                        <el-option
+                            v-for="friend in inviteDialog.friendsInInstance"
+                            :key="friend.id"
+                            class="x-friend-item"
+                            :label="friend.name"
+                            :value="friend.id"
+                            style="height: auto">
+                            <template v-if="friend.ref">
+                                <div :class="['avatar', userStatusClass(friend.ref)]">
+                                    <img :src="userImage(friend.ref)" loading="lazy" />
+                                </div>
+                                <div class="detail">
+                                    <span class="name" :style="{ color: friend.ref.$userColour }">{{
+                                        friend.ref.displayName
+                                    }}</span>
+                                </div>
+                            </template>
+                            <span v-else>{{ friend.id }}</span>
+                        </el-option>
+                    </el-option-group>
+                </template>
 
-                <el-option-group v-if="onlineFriends.length" :label="t('side_panel.online')">
-                    <el-option
-                        v-for="friend in onlineFriends"
-                        :key="friend.id"
-                        class="x-friend-item"
-                        :label="friend.name"
-                        :value="friend.id"
-                        style="height: auto">
-                        <template v-if="friend.ref">
-                            <div :class="['avatar', userStatusClass(friend.ref)]">
-                                <img v-lazy="userImage(friend.ref)" />
-                            </div>
-                            <div class="detail">
-                                <span class="name" :style="{ color: friend.ref.$userColour }">{{
-                                    friend.ref.displayName
-                                }}</span>
-                            </div>
-                        </template>
-                        <span v-else>{{ friend.id }}</span>
-                    </el-option>
-                </el-option-group>
+                <template v-if="vipFriends.length">
+                    <el-option-group :label="t('side_panel.favorite')">
+                        <el-option
+                            v-for="friend in vipFriends"
+                            :key="friend.id"
+                            class="x-friend-item"
+                            :label="friend.name"
+                            :value="friend.id"
+                            style="height: auto">
+                            <template v-if="friend.ref">
+                                <div :class="['avatar', userStatusClass(friend.ref)]">
+                                    <img :src="userImage(friend.ref)" loading="lazy" />
+                                </div>
+                                <div class="detail">
+                                    <span class="name" :style="{ color: friend.ref.$userColour }">{{
+                                        friend.ref.displayName
+                                    }}</span>
+                                </div>
+                            </template>
+                            <span v-else>{{ friend.id }}</span>
+                        </el-option>
+                    </el-option-group>
+                </template>
 
-                <el-option-group v-if="activeFriends.length" :label="t('side_panel.active')">
-                    <el-option
-                        v-for="friend in activeFriends"
-                        :key="friend.id"
-                        class="x-friend-item"
-                        :label="friend.name"
-                        :value="friend.id"
-                        style="height: auto">
-                        <template v-if="friend.ref">
-                            <div class="avatar"><img v-lazy="userImage(friend.ref)" /></div>
-                            <div class="detail">
-                                <span class="name" :style="{ color: friend.ref.$userColour }">{{
-                                    friend.ref.displayName
-                                }}</span>
-                            </div>
-                        </template>
-                        <span v-else>{{ friend.id }}</span>
-                    </el-option>
-                </el-option-group>
+                <template v-if="onlineFriends.length">
+                    <el-option-group :label="t('side_panel.online')">
+                        <el-option
+                            v-for="friend in onlineFriends"
+                            :key="friend.id"
+                            class="x-friend-item"
+                            :label="friend.name"
+                            :value="friend.id"
+                            style="height: auto">
+                            <template v-if="friend.ref">
+                                <div :class="['avatar', userStatusClass(friend.ref)]">
+                                    <img :src="userImage(friend.ref)" loading="lazy" />
+                                </div>
+                                <div class="detail">
+                                    <span class="name" :style="{ color: friend.ref.$userColour }">{{
+                                        friend.ref.displayName
+                                    }}</span>
+                                </div>
+                            </template>
+                            <span v-else>{{ friend.id }}</span>
+                        </el-option>
+                    </el-option-group>
+                </template>
+
+                <template v-if="activeFriends.length">
+                    <el-option-group :label="t('side_panel.active')">
+                        <el-option
+                            v-for="friend in activeFriends"
+                            :key="friend.id"
+                            class="x-friend-item"
+                            :label="friend.name"
+                            :value="friend.id"
+                            style="height: auto">
+                            <template v-if="friend.ref">
+                                <div class="avatar"><img :src="userImage(friend.ref)" loading="lazy" /></div>
+                                <div class="detail">
+                                    <span class="name" :style="{ color: friend.ref.$userColour }">{{
+                                        friend.ref.displayName
+                                    }}</span>
+                                </div>
+                            </template>
+                            <span v-else>{{ friend.id }}</span>
+                        </el-option>
+                    </el-option-group>
+                </template>
             </el-select>
         </div>
 
         <template #footer>
-            <el-button
-                size="small"
-                :disabled="inviteDialog.loading || !inviteDialog.userIds.length"
-                @click="showSendInviteDialog"
-                >{{ t('dialog.invite.invite_with_message') }}</el-button
-            >
+            <el-button :disabled="inviteDialog.loading || !inviteDialog.userIds.length" @click="showSendInviteDialog">{{
+                t('dialog.invite.invite_with_message')
+            }}</el-button>
             <el-button
                 type="primary"
-                size="small"
                 :disabled="inviteDialog.loading || !inviteDialog.userIds.length"
                 @click="sendInvite"
                 >{{ t('dialog.invite.invite') }}</el-button
             >
         </template>
         <SendInviteDialog
-            :send-invite-dialog-visible.sync="sendInviteDialogVisible"
-            :send-invite-dialog="sendInviteDialog"
+            v-model:sendInviteDialogVisible="sendInviteDialogVisible"
+            v-model:sendInviteDialog="sendInviteDialog"
             :invite-dialog="inviteDialog"
             @closeInviteDialog="closeInviteDialog" />
-    </safe-dialog>
+    </el-dialog>
 </template>
 
 <script setup>
+    import { ElMessage, ElMessageBox } from 'element-plus';
+    import { ref } from 'vue';
     import { storeToRefs } from 'pinia';
-    import { getCurrentInstance, ref } from 'vue';
-    import { useI18n } from 'vue-i18n-bridge';
-    import { instanceRequest, notificationRequest } from '../../../api';
-    import { parseLocation, userImage, userStatusClass } from '../../../shared/utils';
+    import { useI18n } from 'vue-i18n';
+
     import { useFriendStore, useGalleryStore, useInviteStore, useUserStore } from '../../../stores';
+    import { parseLocation, userImage, userStatusClass } from '../../../shared/utils';
+    import { instanceRequest, notificationRequest } from '../../../api';
+
     import SendInviteDialog from './SendInviteDialog.vue';
 
     const { vipFriends, onlineFriends, activeFriends } = storeToRefs(useFriendStore());
@@ -177,10 +185,6 @@
     const { clearInviteImageUpload } = useGalleryStore();
 
     const { t } = useI18n();
-    const instance = getCurrentInstance();
-    const $message = instance.proxy.$message;
-    const $confirm = instance.proxy.$confirm;
-
     const props = defineProps({
         inviteDialog: {
             type: Object,
@@ -238,11 +242,12 @@
     }
 
     function sendInvite() {
-        $confirm('Continue? Invite', 'Confirm', {
+        ElMessageBox.confirm('Continue? Invite', 'Confirm', {
             confirmButtonText: 'Confirm',
             cancelButtonText: 'Cancel',
-            type: 'info',
-            callback: (action) => {
+            type: 'info'
+        })
+            .then((action) => {
                 const D = props.inviteDialog;
                 if (action !== 'confirm' || D.loading === true) {
                     return;
@@ -275,14 +280,14 @@
                     } else {
                         D.loading = false;
                         D.visible = false;
-                        $message({
+                        ElMessage({
                             message: 'Invite sent',
                             type: 'success'
                         });
                     }
                 };
                 inviteLoop();
-            }
-        });
+            })
+            .catch(() => {});
     }
 </script>

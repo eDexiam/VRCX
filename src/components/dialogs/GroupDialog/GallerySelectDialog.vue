@@ -1,7 +1,7 @@
 <template>
-    <safe-dialog
+    <el-dialog
         class="x-dialog"
-        :visible.sync="gallerySelectDialog.visible"
+        v-model="gallerySelectDialog.visible"
         :title="t('dialog.gallery_select.header')"
         width="100%"
         append-to-body>
@@ -16,17 +16,17 @@
                 style="display: none"
                 @change="onFileChangeGallery" />
             <el-button-group>
-                <el-button type="default" size="small" icon="el-icon-close" @click="selectImageGallerySelect('', '')">{{
+                <el-button type="default" size="small" :icon="Close" @click="selectImageGallerySelect('', '')">{{
                     t('dialog.gallery_select.none')
                 }}</el-button>
-                <el-button type="default" size="small" icon="el-icon-refresh" @click="refreshGalleryTable">{{
+                <el-button type="default" size="small" :icon="Refresh" @click="refreshGalleryTable">{{
                     t('dialog.gallery_select.refresh')
                 }}</el-button>
                 <el-button
                     type="default"
                     size="small"
-                    icon="el-icon-upload2"
-                    :disabled="!currentUser.$isVRCPlus"
+                    :icon="Upload"
+                    :disabled="!isLocalUserVrcPlusSupporter"
                     @click="displayGalleryUpload"
                     >{{ t('dialog.gallery_select.upload') }}</el-button
                 >
@@ -42,27 +42,30 @@
                         v-if="image.versions[image.versions.length - 1].file.url"
                         class="vrcplus-icon"
                         @click="selectImageGallerySelect(image.versions[image.versions.length - 1].file.url, image.id)">
-                        <img v-lazy="image.versions[image.versions.length - 1].file.url" class="avatar" /></div
+                        <img
+                            :src="image.versions[image.versions.length - 1].file.url"
+                            class="avatar"
+                            loading="lazy" /></div
                 ></template>
             </div>
         </div>
-    </safe-dialog>
+    </el-dialog>
 </template>
 
 <script setup>
+    import { Close, Refresh, Upload } from '@element-plus/icons-vue';
+    import { ElMessage } from 'element-plus';
     import { storeToRefs } from 'pinia';
-    import { getCurrentInstance } from 'vue';
-    import { useI18n } from 'vue-i18n-bridge';
-    import { vrcPlusImageRequest } from '../../../api';
+    import { useI18n } from 'vue-i18n';
+
     import { useGalleryStore, useUserStore } from '../../../stores';
+    import { vrcPlusImageRequest } from '../../../api';
 
     const { t } = useI18n();
 
-    const { proxy } = getCurrentInstance();
-    const { $message } = proxy;
     const { galleryTable } = storeToRefs(useGalleryStore());
     const { refreshGalleryTable, handleGalleryImageAdd } = useGalleryStore();
-    const { currentUser } = storeToRefs(useUserStore());
+    const { isLocalUserVrcPlusSupporter } = storeToRefs(useUserStore());
 
     const props = defineProps({
         gallerySelectDialog: {
@@ -95,7 +98,7 @@
         }
         if (files[0].size >= 100000000) {
             // 100MB
-            $message({
+            ElMessage({
                 message: t('message.file.too_large'),
                 type: 'error'
             });
@@ -103,7 +106,7 @@
             return;
         }
         if (!files[0].type.match(/image.*/)) {
-            $message({
+            ElMessage({
                 message: t('message.file.not_image'),
                 type: 'error'
             });
@@ -115,7 +118,7 @@
             const base64Body = btoa(r.result.toString());
             vrcPlusImageRequest.uploadGalleryImage(base64Body).then((args) => {
                 handleGalleryImageAdd(args);
-                $message({
+                ElMessage({
                     message: t('message.gallery.uploaded'),
                     type: 'success'
                 });

@@ -1,5 +1,5 @@
+import { useGroupStore, useUserStore } from '../stores';
 import { request } from '../service/request';
-import { useUserStore, useGroupStore } from '../stores';
 
 function getCurrentUserId() {
     return useUserStore().currentUser.id;
@@ -84,11 +84,11 @@ const groupReq = {
             if (typeof ref === 'undefined') {
                 groupReq
                     .getGroup(params)
-                    .catch(reject)
                     .then((args) => {
                         args.ref = groupStore.applyGroup(args.json);
                         resolve(args);
-                    });
+                    })
+                    .catch(reject);
             } else {
                 resolve({
                     cache: true,
@@ -696,6 +696,36 @@ const groupReq = {
                 params
             };
             return args;
+        });
+    },
+
+    getGroupCalendar(groupId) {
+        return request(`calendar/${groupId}`, {
+            method: 'GET'
+        });
+    },
+
+    /**
+     * @type {import('../types/api/group').GetCalendars}
+     */
+    getGroupCalendars(date) {
+        return request(`calendar?date=${date}`, {
+            method: 'GET'
+        });
+    },
+
+    /**
+     * @type {import('../types/api/group').GetFollowingCalendars}
+     */
+    getFollowingGroupCalendars(date) {
+        return request(`calendar/following?date=${date}`, {
+            method: 'GET'
+        });
+    },
+
+    getFeaturedGroupCalendars(date) {
+        return request(`calendar/featured?date=${date}`, {
+            method: 'GET'
         });
     }
 

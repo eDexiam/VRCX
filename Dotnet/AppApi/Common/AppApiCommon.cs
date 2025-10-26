@@ -5,7 +5,7 @@ using System.Globalization;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
-using librsync.net;
+using System.Threading.Tasks;
 using Newtonsoft.Json;
 using NLog;
 
@@ -14,48 +14,24 @@ namespace VRCX
     public partial class AppApi
     {
         private static readonly Logger logger = LogManager.GetCurrentClassLogger();
-        private static readonly MD5 _hasher = MD5.Create();
 
         public void Init()
         {
         }
-        
+
         public JsonSerializerSettings JsonSerializerSettings = new JsonSerializerSettings
         {
-            Error = delegate(object _, Newtonsoft.Json.Serialization.ErrorEventArgs args)
+            Error = delegate (object _, Newtonsoft.Json.Serialization.ErrorEventArgs args)
             {
                 args.ErrorContext.Handled = true;
             }
         };
 
-        public string MD5File(string blob)
-        {
-            var fileData = Convert.FromBase64CharArray(blob.ToCharArray(), 0, blob.Length);
-            using var md5 = MD5.Create();
-            var md5Hash = md5.ComputeHash(fileData);
-            return Convert.ToBase64String(md5Hash);
-        }
-
         public int GetColourFromUserID(string userId)
         {
-            var hash = _hasher.ComputeHash(Encoding.UTF8.GetBytes(userId));
+            using var hasher = MD5.Create();
+            var hash = hasher.ComputeHash(Encoding.UTF8.GetBytes(userId));
             return (hash[3] << 8) | hash[4];
-        }
-
-        public string SignFile(string blob)
-        {
-            var fileData = Convert.FromBase64String(blob);
-            using var sig = Librsync.ComputeSignature(new MemoryStream(fileData));
-            using var memoryStream = new MemoryStream();
-            sig.CopyTo(memoryStream);
-            var sigBytes = memoryStream.ToArray();
-            return Convert.ToBase64String(sigBytes);
-        }
-
-        public string FileLength(string blob)
-        {
-            var fileData = Convert.FromBase64String(blob);
-            return fileData.Length.ToString();
         }
 
         public void OpenLink(string url)
@@ -69,7 +45,7 @@ namespace VRCX
                 });
             }
         }
-        
+
         public string GetLaunchCommand()
         {
             var command = StartupArgs.LaunchArguments.LaunchCommand;
@@ -101,7 +77,7 @@ namespace VRCX
             var filePath = Path.Join(Program.AppDataDirectory, "custom.css");
             if (File.Exists(filePath))
                 return File.ReadAllText(filePath);
-            
+
             return string.Empty;
         }
 
@@ -110,7 +86,7 @@ namespace VRCX
             var filePath = Path.Join(Program.AppDataDirectory, "custom.js");
             if (File.Exists(filePath))
                 return File.ReadAllText(filePath);
-            
+
             return string.Empty;
         }
 
@@ -149,10 +125,11 @@ namespace VRCX
             return output;
         }
 
-        public void SetAppLauncherSettings(bool enabled, bool killOnExit)
+        public void SetAppLauncherSettings(bool enabled, bool killOnExit, bool runProcessOnce)
         {
             AutoAppLaunchManager.Instance.Enabled = enabled;
             AutoAppLaunchManager.Instance.KillChildrenOnExit = killOnExit;
+            AutoAppLaunchManager.Instance.RunProcessOnce = runProcessOnce;
         }
 
         public string GetFileBase64(string path)
@@ -163,6 +140,11 @@ namespace VRCX
             }
 
             return null;
+        }
+
+        public Task<bool> TryOpenInstanceInVrc(string launchUrl)
+        {
+            return VRCIPC.Send(launchUrl);
         }
     }
 }

@@ -2,38 +2,38 @@
     <div @click="$emit('click')">
         <div class="x-friend-item">
             <div class="avatar">
-                <img v-lazy="smallThumbnail" />
+                <img :src="smallThumbnail" loading="lazy" />
             </div>
             <div class="detail">
                 <span class="name" v-text="favorite.name"></span>
                 <span class="extra" v-text="favorite.authorName"></span>
             </div>
-            <el-tooltip placement="left" :content="t('view.favorite.select_avatar_tooltip')" :disabled="hideTooltips">
+            <el-tooltip placement="left" :content="t('view.favorite.select_avatar_tooltip')" :teleported="false">
                 <el-button
                     :disabled="currentUser.currentAvatar === favorite.id"
-                    size="mini"
-                    icon="el-icon-check"
+                    size="small"
+                    :icon="Check"
                     circle
                     style="margin-left: 5px"
                     @click.stop="selectAvatarWithConfirmation(favorite.id)"></el-button>
             </el-tooltip>
             <template v-if="cachedFavoritesByObjectId.has(favorite.id)">
-                <el-tooltip placement="right" content="Unfavorite" :disabled="hideTooltips">
+                <el-tooltip placement="right" content="Favorite" :teleported="false">
                     <el-button
                         type="default"
-                        icon="el-icon-star-on"
-                        size="mini"
+                        :icon="Star"
+                        size="small"
                         circle
                         style="margin-left: 5px"
                         @click.stop="showFavoriteDialog('avatar', favorite.id)"></el-button>
                 </el-tooltip>
             </template>
             <template v-else>
-                <el-tooltip placement="right" content="Favorite" :disabled="hideTooltips">
+                <el-tooltip placement="right" content="Favorite" :teleported="false">
                     <el-button
                         type="default"
-                        icon="el-icon-star-off"
-                        size="mini"
+                        :icon="StarFilled"
+                        size="small"
                         circle
                         style="margin-left: 5px"
                         @click.stop="showFavoriteDialog('avatar', favorite.id)"></el-button>
@@ -44,14 +44,15 @@
 </template>
 
 <script setup>
-    import { storeToRefs } from 'pinia';
+    import { Check, Star, StarFilled } from '@element-plus/icons-vue';
     import { computed } from 'vue';
-    import { useI18n } from 'vue-i18n-bridge';
-    import { useAppearanceSettingsStore, useAvatarStore, useFavoriteStore, useUserStore } from '../../../stores';
+    import { storeToRefs } from 'pinia';
+    import { useI18n } from 'vue-i18n';
+
+    import { useAvatarStore, useFavoriteStore, useUserStore } from '../../../stores';
 
     const { t } = useI18n();
 
-    const { hideTooltips } = storeToRefs(useAppearanceSettingsStore());
     const { cachedFavoritesByObjectId } = storeToRefs(useFavoriteStore());
     const { showFavoriteDialog } = useFavoriteStore();
     const { selectAvatarWithConfirmation } = useAvatarStore();
@@ -64,7 +65,9 @@
         }
     });
 
+    defineEmits(['click']);
+
     const smallThumbnail = computed(() => {
-        return props.favorite.thumbnailImageUrl.replace('256', '128') || props.favorite.thumbnailImageUrl;
+        return props.favorite.thumbnailImageUrl?.replace('256', '128') || props.favorite.thumbnailImageUrl;
     });
 </script>

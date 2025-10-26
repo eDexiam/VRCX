@@ -1,8 +1,8 @@
 <template>
-    <safe-dialog
-        ref="VRCXUpdateDialogRef"
+    <el-dialog
+        :z-index="VRCXUpdateDialogIndex"
         class="x-dialog"
-        :visible.sync="VRCXUpdateDialog.visible"
+        v-model="VRCXUpdateDialog.visible"
         :title="t('dialog.vrcx_updater.header')"
         append-to-body
         width="400px">
@@ -40,34 +40,30 @@
         </div>
 
         <template #footer>
-            <el-button v-if="updateInProgress" type="primary" size="small" @click="cancelUpdate">
+            <el-button v-if="updateInProgress" type="primary" @click="cancelUpdate">
                 {{ t('dialog.vrcx_updater.cancel') }}
             </el-button>
             <el-button
                 v-if="VRCXUpdateDialog.release !== pendingVRCXInstall"
                 :disabled="updateInProgress"
                 type="primary"
-                size="small"
                 @click="installVRCXUpdate">
                 {{ t('dialog.vrcx_updater.download') }}
             </el-button>
-            <el-button
-                v-if="!updateInProgress && pendingVRCXInstall"
-                type="primary"
-                size="small"
-                @click="restartVRCX(true)">
+            <el-button v-if="!updateInProgress && pendingVRCXInstall" type="primary" @click="restartVRCX(true)">
                 {{ t('dialog.vrcx_updater.install') }}
             </el-button>
         </template>
-    </safe-dialog>
+    </el-dialog>
 </template>
 
 <script setup>
-    import { storeToRefs } from 'pinia';
     import { nextTick, ref, watch } from 'vue';
-    import { useI18n } from 'vue-i18n-bridge';
+    import { storeToRefs } from 'pinia';
+    import { useI18n } from 'vue-i18n';
+
     import { branches } from '../../shared/constants';
-    import { adjustDialogZ } from '../../shared/utils';
+    import { getNextDialogIndex } from '../../shared/utils/base/ui';
     import { useVRCXUpdaterStore } from '../../stores';
 
     const VRCXUpdaterStore = useVRCXUpdaterStore();
@@ -85,14 +81,14 @@
 
     const { t } = useI18n();
 
-    const VRCXUpdateDialogRef = ref(null);
+    const VRCXUpdateDialogIndex = ref(2000);
 
     watch(
         () => VRCXUpdateDialog,
         (newVal) => {
             if (newVal.value.visible) {
                 nextTick(() => {
-                    adjustDialogZ(VRCXUpdateDialogRef.value.$el);
+                    VRCXUpdateDialogIndex.value = getNextDialogIndex();
                 });
             }
         }

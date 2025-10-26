@@ -1,9 +1,8 @@
 <template>
-    <safe-dialog
-        :visible="!!feedFiltersDialogMode"
+    <el-dialog
+        :model-value="!!feedFiltersDialogMode"
         :title="dialogTitle"
         width="550px"
-        top="5vh"
         destroy-on-close
         @close="handleDialogClose">
         <div class="toggle-list" style="height: 75vh; overflow-y: auto">
@@ -15,12 +14,14 @@
                         placement="top"
                         style="margin-left: 5px"
                         :content="setting.tooltip">
-                        <i :class="setting.tooltipIcon || 'el-icon-info'"></i> </el-tooltip
-                ></span>
+                        <el-icon v-if="setting.tooltipWarning"><Warning /></el-icon>
+                        <el-icon v-else><InfoFilled /></el-icon>
+                    </el-tooltip>
+                </span>
 
                 <el-radio-group
                     v-model="currentSharedFeedFilters[setting.key]"
-                    size="mini"
+                    size="small"
                     @change="saveSharedFeedFilters">
                     <el-radio-button v-for="option in setting.options" :key="option.label" :label="option.label">
                         {{ t(option.textKey) }}
@@ -37,7 +38,7 @@
                     <span class="toggle-name">{{ setting.name }}</span>
                     <el-radio-group
                         v-model="currentSharedFeedFilters[setting.key]"
-                        size="mini"
+                        size="small"
                         @change="saveSharedFeedFilters">
                         <el-radio-button v-for="option in setting.options" :key="option.label" :label="option.label">
                             {{ t(option.textKey) }}
@@ -48,23 +49,24 @@
         </div>
 
         <template #footer>
-            <el-button size="small" @click="currentResetFunction">{{
-                t('dialog.shared_feed_filters.reset')
-            }}</el-button>
-            <el-button size="small" type="primary" style="margin-left: 10px" @click="handleDialogClose">{{
+            <el-button @click="currentResetFunction">{{ t('dialog.shared_feed_filters.reset') }}</el-button>
+            <el-button type="primary" style="margin-left: 10px" @click="handleDialogClose">{{
                 t('dialog.shared_feed_filters.close')
             }}</el-button>
         </template>
-    </safe-dialog>
+    </el-dialog>
 </template>
 
 <script setup>
-    import { storeToRefs } from 'pinia';
+    import { InfoFilled, Warning } from '@element-plus/icons-vue';
     import { computed } from 'vue';
-    import { useI18n } from 'vue-i18n-bridge';
-    import configRepository from '../../../service/config';
-    import { feedFiltersOptions, sharedFeedFiltersDefaults } from '../../../shared/constants';
+    import { storeToRefs } from 'pinia';
+    import { useI18n } from 'vue-i18n';
+
     import { useNotificationsSettingsStore, usePhotonStore, useSharedFeedStore } from '../../../stores';
+    import { feedFiltersOptions, sharedFeedFiltersDefaults } from '../../../shared/constants';
+
+    import configRepository from '../../../service/config';
 
     const { t } = useI18n();
 

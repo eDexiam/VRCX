@@ -1,44 +1,47 @@
+import amoled from '../../assets/scss/themes/theme.amoled.scss?url';
+import dark from '../../assets/scss/themes/theme.dark.scss?url';
+import darkblue from '../../assets/scss/themes/theme.darkblue.scss?url';
+import material3 from '../../assets/scss/themes/theme.material3.scss?url';
+
 export const THEME_CONFIG = {
     system: {
         cssFile: '',
-        requiresDarkBase: false,
         isDark: 'system',
         name: 'System'
     },
     light: {
         cssFile: '',
-        requiresDarkBase: false,
         isDark: false,
         name: 'Light'
     },
-    dark: { cssFile: '', requiresDarkBase: true, isDark: true, name: 'Dark' },
+    dark: { cssFile: dark, isDark: true, name: 'Dark' },
     darkblue: {
-        cssFile: 'theme.darkblue.css',
-        requiresDarkBase: true,
+        cssFile: darkblue,
         isDark: true,
         name: 'Dark Blue'
     },
-    darkvanillaold: {
-        cssFile: 'theme.darkvanillaold.css',
-        requiresDarkBase: true,
+    amoled: {
+        cssFile: amoled,
         isDark: true,
-        name: 'Dark Vanilla Old'
+        name: 'Amoled'
     },
-    darkvanilla: {
-        cssFile: 'theme.darkvanilla.css',
-        requiresDarkBase: true,
-        isDark: true,
-        name: 'Dark Vanilla'
-    },
-    pink: {
-        cssFile: 'theme.pink.css',
-        requiresDarkBase: true,
-        isDark: true,
-        name: 'Pink'
-    },
+    // darkvanillaold: {
+    //     cssFile: darkvanillaold,
+    //     isDark: true,
+    //     name: 'Dark Vanilla Old'
+    // },
+    // darkvanilla: {
+    //     cssFile: darkvanilla,
+    //     isDark: true,
+    //     name: 'Dark Vanilla'
+    // },
+    // pink: {
+    //     cssFile: pink,
+    //     isDark: true,
+    //     name: 'Pink'
+    // },
     material3: {
-        cssFile: 'theme.material3.css',
-        requiresDarkBase: true,
+        cssFile: material3,
         isDark: true,
         name: 'Material 3'
     }

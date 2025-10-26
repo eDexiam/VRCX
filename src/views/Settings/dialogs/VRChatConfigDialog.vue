@@ -1,10 +1,9 @@
 <template>
-    <safe-dialog
+    <el-dialog
         class="x-dialog"
-        :visible="isVRChatConfigDialogVisible"
+        :model-value="isVRChatConfigDialogVisible"
         :title="t('dialog.config_json.header')"
         width="420px"
-        top="10vh"
         @close="closeDialog">
         <div v-loading="loading">
             <div style="font-size: 12px; word-break: keep-all">
@@ -17,12 +16,12 @@
             <span>/</span>
             <span v-text="totalCacheSize"></span>
             <span>GB</span>
-            <el-tooltip placement="top" :content="t('dialog.config_json.refresh')" :disabled="hideTooltips">
+            <el-tooltip placement="top" :content="t('dialog.config_json.refresh')">
                 <el-button
                     type="default"
                     :loading="VRChatCacheSizeLoading"
                     size="small"
-                    icon="el-icon-refresh"
+                    :icon="Refresh"
                     circle
                     style="margin-left: 5px"
                     @click="getVRChatCacheSize"></el-button>
@@ -33,7 +32,7 @@
                 <el-button
                     size="small"
                     style="margin-left: 5px"
-                    icon="el-icon-delete"
+                    :icon="Delete"
                     @click="showDeleteAllVRChatCacheConfirm"
                     >{{ t('dialog.config_json.delete_cache') }}</el-button
                 >
@@ -41,13 +40,9 @@
 
             <div style="margin-top: 10px">
                 <span style="margin-right: 5px">{{ t('dialog.config_json.delete_old_cache') }}</span>
-                <el-button
-                    size="small"
-                    style="margin-left: 5px"
-                    icon="el-icon-folder-delete"
-                    @click="sweepVRChatCache"
-                    >{{ t('dialog.config_json.sweep_cache') }}</el-button
-                >
+                <el-button size="small" style="margin-left: 5px" :icon="FolderDelete" @click="sweepVRChatCache">{{
+                    t('dialog.config_json.sweep_cache')
+                }}</el-button>
             </div>
 
             <div v-for="(item, value) in VRChatConfigList" :key="value" style="display: block; margin-top: 10px">
@@ -56,19 +51,20 @@
                     <el-input
                         v-model="VRChatConfigFile[value]"
                         :placeholder="item.default"
-                        size="mini"
+                        size="small"
                         :type="item.type ? item.type : 'text'"
                         :min="item.min"
                         :max="item.max"
                         @input="refreshDialogValues"
-                        style="flex: 1; margin-top: 5px"
-                        ><el-button
-                            v-if="item.folderBrowser"
-                            slot="append"
-                            size="mini"
-                            icon="el-icon-folder-opened"
-                            @click="openConfigFolderBrowser(value)"></el-button
-                    ></el-input>
+                        style="flex: 1; margin-top: 5px">
+                        <template #append>
+                            <el-button
+                                v-if="item.folderBrowser"
+                                size="small"
+                                :icon="FolderOpened"
+                                @click="openConfigFolderBrowser(value)"></el-button>
+                        </template>
+                    </el-input>
                 </div>
             </div>
 
@@ -83,7 +79,7 @@
                     <el-button size="small">
                         <span>
                             <span v-text="getVRChatCameraResolution()"></span>
-                            <i class="el-icon-arrow-down el-icon--right"></i>
+                            <el-icon class="el-icon--right"><ArrowDown /></el-icon>
                         </span>
                     </el-button>
                     <template #dropdown>
@@ -108,7 +104,7 @@
                     <el-button size="small">
                         <span>
                             <span v-text="getVRChatSpoutResolution()"></span>
-                            <i class="el-icon-arrow-down el-icon--right"></i>
+                            <el-icon class="el-icon--right"><ArrowDown /></el-icon>
                         </span>
                     </el-button>
                     <template #dropdown>
@@ -136,7 +132,7 @@
                     <el-button size="small">
                         <span>
                             <span v-text="getVRChatScreenshotResolution()"></span>
-                            <i class="el-icon-arrow-down el-icon--right"></i>
+                            <el-icon class="el-icon--right"><ArrowDown /></el-icon>
                         </span>
                     </el-button>
                     <template #dropdown>
@@ -169,42 +165,38 @@
         <template #footer>
             <div style="display: flex; align-items: center; justify-content: space-between">
                 <div>
-                    <el-button
-                        size="small"
-                        @click="openExternalLink('https://docs.vrchat.com/docs/configuration-file')"
-                        >{{ t('dialog.config_json.vrchat_docs') }}</el-button
-                    >
+                    <el-button @click="openExternalLink('https://docs.vrchat.com/docs/configuration-file')">{{
+                        t('dialog.config_json.vrchat_docs')
+                    }}</el-button>
                 </div>
                 <div>
-                    <el-button size="small" @click="closeDialog">{{ t('dialog.config_json.cancel') }}</el-button>
-                    <el-button size="small" type="primary" :disabled="loading" @click="saveVRChatConfigFile">{{
+                    <el-button @click="closeDialog">{{ t('dialog.config_json.cancel') }}</el-button>
+                    <el-button type="primary" :disabled="loading" @click="saveVRChatConfigFile">{{
                         t('dialog.config_json.save')
                     }}</el-button>
                 </div>
             </div>
         </template>
-    </safe-dialog>
+    </el-dialog>
 </template>
 
 <script setup>
+    import { ArrowDown, Delete, FolderDelete, FolderOpened, Refresh } from '@element-plus/icons-vue';
+    import { computed, ref, watch } from 'vue';
+    import { ElMessage, ElMessageBox } from 'element-plus';
     import { storeToRefs } from 'pinia';
-    import { computed, getCurrentInstance, ref, watch } from 'vue';
-    import { useI18n } from 'vue-i18n-bridge';
+    import { useI18n } from 'vue-i18n';
+
     import { VRChatCameraResolutions, VRChatScreenshotResolutions } from '../../../shared/constants';
     import { getVRChatResolution, openExternalLink } from '../../../shared/utils';
-    import { useAdvancedSettingsStore, useAppearanceSettingsStore, useGameStore } from '../../../stores';
+    import { useAdvancedSettingsStore, useGameStore } from '../../../stores';
 
-    const { hideTooltips } = storeToRefs(useAppearanceSettingsStore());
     const { VRChatUsedCacheSize, VRChatTotalCacheSize, VRChatCacheSizeLoading } = storeToRefs(useGameStore());
     const { sweepVRChatCache, getVRChatCacheSize } = useGameStore();
     const { folderSelectorDialog } = useAdvancedSettingsStore();
     const { isVRChatConfigDialogVisible } = storeToRefs(useAdvancedSettingsStore());
 
     const { t } = useI18n();
-
-    const instance = getCurrentInstance();
-    const $confirm = instance.proxy.$confirm;
-    const $message = instance.proxy.$message;
 
     const VRChatConfigFile = ref({});
     // it's a object
@@ -271,16 +263,17 @@
     });
 
     function showDeleteAllVRChatCacheConfirm() {
-        $confirm(`Continue? Delete all VRChat cache`, 'Confirm', {
+        ElMessageBox.confirm(`Continue? Delete all VRChat cache`, 'Confirm', {
             confirmButtonText: 'Confirm',
             cancelButtonText: 'Cancel',
-            type: 'info',
-            callback: (action) => {
+            type: 'info'
+        })
+            .then((action) => {
                 if (action === 'confirm') {
                     deleteAllVRChatCache();
                 }
-            }
-        });
+            })
+            .catch(() => {});
     }
 
     async function deleteAllVRChatCache() {
@@ -375,7 +368,7 @@
                 const parsedConfig = JSON.parse(config);
                 VRChatConfigFile.value = { ...VRChatConfigFile.value, ...parsedConfig };
             } catch {
-                $message({
+                ElMessage({
                     message: 'Invalid JSON in config.json',
                     type: 'error'
                 });

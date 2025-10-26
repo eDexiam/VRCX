@@ -1,9 +1,7 @@
+import { reactive, watch } from 'vue';
+import { ElMessage } from 'element-plus';
 import { defineStore } from 'pinia';
-import { computed, reactive, watch } from 'vue';
-import { instanceRequest, miscRequest, worldRequest } from '../api';
-import { $app } from '../app';
-import { database } from '../service/database';
-import { watchState } from '../service/watchState';
+
 import {
     checkVRChatCache,
     getAvailablePlatforms,
@@ -13,76 +11,66 @@ import {
     parseLocation,
     replaceBioSymbols
 } from '../shared/utils';
+import { instanceRequest, miscRequest, worldRequest } from '../api';
+import { database } from '../service/database';
 import { useFavoriteStore } from './favorite';
 import { useInstanceStore } from './instance';
 import { useLocationStore } from './location';
 import { useUserStore } from './user';
+import { watchState } from '../service/watchState';
 
 export const useWorldStore = defineStore('World', () => {
     const locationStore = useLocationStore();
     const favoriteStore = useFavoriteStore();
     const instanceStore = useInstanceStore();
     const userStore = useUserStore();
-    const state = reactive({
-        worldDialog: {
-            visible: false,
-            loading: false,
-            id: '',
-            memo: '',
-            $location: {},
-            ref: {},
-            isFavorite: false,
-            avatarScalingDisabled: false,
-            focusViewDisabled: false,
-            rooms: [],
-            treeData: [],
-            bundleSizes: [],
-            lastUpdated: '',
-            inCache: false,
-            cacheSize: 0,
-            cacheLocked: false,
-            cachePath: '',
-            lastVisit: '',
-            visitCount: 0,
-            timeSpent: 0,
-            isPC: false,
-            isQuest: false,
-            isIos: false,
-            hasPersistData: false
-        },
-        cachedWorlds: new Map()
+
+    const worldDialog = reactive({
+        visible: false,
+        loading: false,
+        id: '',
+        memo: '',
+        $location: {},
+        ref: {},
+        isFavorite: false,
+        avatarScalingDisabled: false,
+        focusViewDisabled: false,
+        rooms: [],
+        treeData: [],
+        bundleSizes: [],
+        lastUpdated: '',
+        inCache: false,
+        cacheSize: '',
+        cacheLocked: false,
+        cachePath: '',
+        fileAnalysis: [],
+        lastVisit: '',
+        visitCount: 0,
+        timeSpent: 0,
+        isPC: false,
+        isQuest: false,
+        isIos: false,
+        hasPersistData: false
     });
 
-    const worldDialog = computed({
-        get: () => state.worldDialog,
-        set: (value) => {
-            state.worldDialog = value;
-        }
-    });
-
-    const cachedWorlds = computed({
-        get: () => state.cachedWorlds,
-        set: (value) => {
-            state.cachedWorlds = value;
-        }
-    });
+    let cachedWorlds = new Map();
 
     watch(
         () => watchState.isLoggedIn,
         () => {
-            state.worldDialog.visible = false;
-            state.cachedWorlds.clear();
+            worldDialog.visible = false;
+            cachedWorlds.clear();
         },
         { flush: 'sync' }
     );
 
     /**
-     * aka: `$app.methods.showWorldDialog`
+     *
      * @param {string} tag
      * @param {string} shortName
      */
     function showWorldDialog(tag, shortName = null) {
-        const D = state.worldDialog;
+        const D = worldDialog;
         const L = parseLocation(tag);
         if (L.worldId === '') {
             return;
@@ -96,11 +84,13 @@ export const useWorldStore = defineStore('World', () => {
         D.visible = true;
         D.loading = true;
         D.inCache = false;
-        D.cacheSize = 0;
+        D.cacheSize = '';
         D.cacheLocked = false;
+        D.cachePath = '';
+        D.fileAnalysis = [];
         D.rooms = [];
         D.lastVisit = '';
-        D.visitCount = '';
+        D.visitCount = 0;
         D.timeSpent = 0;
         D.isFavorite = false;
         D.avatarScalingDisabled = false;
@@ -142,7 +132,7 @@ export const useWorldStore = defineStore('World', () => {
             .catch((err) => {
                 D.loading = false;
                 D.visible = false;
-                $app.$message({
+                ElMessage({
                     message: 'Failed to load world',
                     type: 'error'
                 });
@@ -180,10 +170,10 @@ export const useWorldStore = defineStore('World', () => {
                         })
                         .then((args) => {
                             if (
-                                args.params.worldId === state.worldDialog.id &&
-                                state.worldDialog.visible
+                                args.params.worldId === worldDialog.id &&
+                                worldDialog.visible
                             ) {
-                                state.worldDialog.hasPersistData =
+                                worldDialog.hasPersistData =
                                     args.json !== false;
                             }
                         });
@@ -208,10 +198,10 @@ export const useWorldStore = defineStore('World', () => {
     }
 
     function updateVRChatWorldCache() {
-        const D = state.worldDialog;
+        const D = worldDialog;
         if (D.visible) {
             D.inCache = false;
-            D.cacheSize = 0;
+            D.cacheSize = '';
             D.cacheLocked = false;
             D.cachePath = '';
             checkVRChatCache(D.ref).then((cacheInfo) => {
@@ -237,7 +227,7 @@ export const useWorldStore = defineStore('World', () => {
         if (json.description) {
             json.description = replaceBioSymbols(json.description);
         }
-        let ref = state.cachedWorlds.get(json.id);
+        let ref = cachedWorlds.get(json.id);
         if (typeof ref === 'undefined') {
             ref = {
                 id: '',
@@ -280,7 +270,7 @@ export const useWorldStore = defineStore('World', () => {
                 //
                 ...json
             };
-            state.cachedWorlds.set(ref.id, ref);
+            cachedWorlds.set(ref.id, ref);
         } else {
             Object.assign(ref, json);
         }
@@ -290,7 +280,6 @@ export const useWorldStore = defineStore('World', () => {
         if (userDialog.visible && userDialog.$location.worldId === ref.id) {
             userStore.applyUserDialogLocation();
         }
-        const worldDialog = state.worldDialog;
         if (worldDialog.visible && worldDialog.id === ref.id) {
             worldDialog.ref = ref;
             worldDialog.avatarScalingDisabled = ref.tags?.includes(
@@ -322,7 +311,6 @@ export const useWorldStore = defineStore('World', () => {
     }
 
     return {
-        state,
         worldDialog,
         cachedWorlds,
         showWorldDialog,

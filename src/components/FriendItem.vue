@@ -4,7 +4,7 @@
             <div
                 class="avatar"
                 :class="isFriendActiveOrOffline ? undefined : userStatusClass(friend.ref, friend.pendingOffline)">
-                <img v-lazy="userImage(friend.ref, true)" />
+                <img :src="userImage(friend.ref, true)" loading="lazy" />
             </div>
             <div class="detail">
                 <span v-if="!hideNicknames && friend.$nickName" class="name" :style="{ color: friend.ref.$userColour }">
@@ -17,37 +17,34 @@
                 <span v-if="isFriendActiveOrOffline" class="extra">{{ friend.ref.statusDescription }}</span>
                 <template v-else>
                     <span v-if="friend.pendingOffline" class="extra">
-                        <i class="el-icon-warning-outline" /> {{ $t('side_panel.pending_offline') }}
+                        <el-icon><WarningFilled /></el-icon> {{ t('side_panel.pending_offline') }}
                     </span>
                     <template v-else-if="isGroupByInstance">
-                        <i v-if="isFriendTraveling" class="el-icon el-icon-loading"></i>
+                        <el-icon v-if="isFriendTraveling" class="is-loading" style="margin-right: 3px"
+                            ><Loading
+                        /></el-icon>
                         <Timer
                             class="extra"
                             :epoch="epoch"
                             :style="isFriendTraveling ? { display: 'inline-block', overflow: 'unset' } : undefined" />
                     </template>
-                    <Location
-                        v-else
-                        class="extra"
-                        :location="friend.ref.location"
-                        :traveling="friend.ref.travelingToLocation"
-                        :link="false" />
+                    <Location v-else class="extra" :location="locationProp" :traveling="travelingProp" :link="false" />
                 </template>
             </div>
         </template>
         <template v-else-if="!friend.ref && !isRefreshFriendsLoading">
             <span>{{ friend.name || friend.id }}</span>
             <el-button
-                ttype="text"
-                icon="el-icon-close"
-                size="mini"
+                type="text"
+                :icon="Close"
+                size="small"
                 style="margin-left: 5px"
                 @click.stop="$emit('confirm-delete-friend', friend.id)">
             </el-button>
         </template>
 
         <el-skeleton v-else animated class="skeleton" :throttle="100">
-            <template slot="template">
+            <template #template>
                 <div>
                     <el-skeleton-item variant="circle" />
                     <div>
@@ -61,31 +58,40 @@
 </template>
 
 <script setup>
-    import { storeToRefs } from 'pinia';
+    import { Close, Loading, WarningFilled } from '@element-plus/icons-vue';
     import { computed } from 'vue';
-    import { userImage, userStatusClass } from '../shared/utils';
+    import { storeToRefs } from 'pinia';
+    import { useI18n } from 'vue-i18n';
+
     import { useAppearanceSettingsStore, useFriendStore } from '../stores';
+    import { userImage, userStatusClass } from '../shared/utils';
 
     const props = defineProps({
         friend: { type: Object, required: true },
         isGroupByInstance: Boolean
     });
 
+    defineEmits(['click', 'confirm-delete-friend']);
+
     const { hideNicknames } = storeToRefs(useAppearanceSettingsStore());
     const { isRefreshFriendsLoading } = storeToRefs(useFriendStore());
+    const { t } = useI18n();
 
     const isFriendTraveling = computed(() => props.friend.ref?.location === 'traveling');
     const isFriendActiveOrOffline = computed(() => props.friend.state === 'active' || props.friend.state === 'offline');
     const epoch = computed(() =>
         isFriendTraveling.value ? props.friend.ref?.$travelingToTime : props.friend.ref?.$location_at
     );
+
+    const locationProp = computed(() => props.friend.ref?.location || '');
+    const travelingProp = computed(() => props.friend.ref?.travelingToLocation || '');
 </script>
 
 <style scoped>
     .skeleton {
         height: 40px;
         width: 100%;
-        ::v-deep .el-skeleton {
+        :deep(.el-skeleton) {
             height: 100%;
             > div {
                 height: 100%;

@@ -1,12 +1,7 @@
-import Noty from 'noty';
+import { nextTick, ref, watch } from 'vue';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import { defineStore } from 'pinia';
-import { computed, reactive, watch } from 'vue';
-import { avatarRequest, imageRequest } from '../api';
-import { $app } from '../app';
-import { database } from '../service/database';
-import { AppGlobal } from '../service/appConfig';
-import webApiService from '../service/webapi';
-import { watchState } from '../service/watchState';
+
 import {
     checkVRChatCache,
     extractFileId,
@@ -16,11 +11,17 @@ import {
     replaceBioSymbols,
     storeAvatarImage
 } from '../shared/utils';
+import { avatarRequest, miscRequest } from '../api';
+import { AppDebug } from '../service/appConfig';
+import { database } from '../service/database';
+import { useAdvancedSettingsStore } from './settings/advanced';
 import { useAvatarProviderStore } from './avatarProvider';
 import { useFavoriteStore } from './favorite';
-import { useAdvancedSettingsStore } from './settings/advanced';
 import { useUserStore } from './user';
 import { useVRCXUpdaterStore } from './vrcxUpdater';
+import { watchState } from '../service/watchState';
+
+import webApiService from '../service/webapi';
 
 export const useAvatarStore = defineStore('Avatar', () => {
     const favoriteStore = useFavoriteStore();
@@ -29,82 +30,47 @@ export const useAvatarStore = defineStore('Avatar', () => {
     const advancedSettingsStore = useAdvancedSettingsStore();
     const userStore = useUserStore();
 
-    const state = reactive({
-        avatarDialog: {
-            visible: false,
-            loading: false,
-            id: '',
-            memo: '',
-            ref: {},
-            isFavorite: false,
-            isBlocked: false,
-            isQuestFallback: false,
-            hasImposter: false,
-            imposterVersion: '',
-            isPC: false,
-            isQuest: false,
-            isIos: false,
-            bundleSizes: [],
-            platformInfo: {},
-            galleryImages: [],
-            galleryLoading: false,
-            lastUpdated: '',
-            inCache: false,
-            cacheSize: 0,
-            cacheLocked: false,
-            cachePath: ''
-        },
-        cachedAvatarModerations: new Map(),
-        avatarHistory: new Set(),
-        avatarHistoryArray: [],
-        cachedAvatars: new Map(),
-        cachedAvatarNames: new Map()
-    });
+    let cachedAvatarModerations = new Map();
+    let cachedAvatars = new Map();
+    let cachedAvatarNames = new Map();
 
-    const avatarDialog = computed({
-        get: () => state.avatarDialog,
-        set: (value) => {
-            state.avatarDialog = value;
-        }
+    const avatarDialog = ref({
+        visible: false,
+        loading: false,
+        id: '',
+        memo: '',
+        ref: {},
+        isFavorite: false,
+        isBlocked: false,
+        isQuestFallback: false,
+        hasImposter: false,
+        imposterVersion: '',
+        isPC: false,
+        isQuest: false,
+        isIos: false,
+        bundleSizes: [],
+        platformInfo: {},
+        galleryImages: [],
+        galleryLoading: false,
+        lastUpdated: '',
+        inCache: false,
+        cacheSize: '',
+        cacheLocked: false,
+        cachePath: '',
+        fileAnalysis: []
     });
-    const avatarHistory = state.avatarHistory;
-    const avatarHistoryArray = computed({
-        get: () => state.avatarHistoryArray,
-        set: (value) => {
-            state.avatarHistoryArray = value;
-        }
-    });
-
-    const cachedAvatarModerations = computed({
-        get: () => state.cachedAvatarModerations,
-        set: (value) => {
-            state.cachedAvatarModerations = value;
-        }
-    });
-
-    const cachedAvatars = computed({
-        get: () => state.cachedAvatars,
-        set: (value) => {
-            state.cachedAvatars = value;
-        }
-    });
-
-    const cachedAvatarNames = computed({
-        get: () => state.cachedAvatarNames,
-        set: (value) => {
-            state.cachedAvatarNames = value;
-        }
-    });
+    const avatarHistory = ref(new Set());
+    const avatarHistoryArray = ref([]);
 
     watch(
         () => watchState.isLoggedIn,
         (isLoggedIn) => {
-            state.avatarDialog.visible = false;
-            state.cachedAvatars.clear();
-            state.cachedAvatarNames.clear();
-            state.cachedAvatarModerations.clear();
-            state.avatarHistory.clear();
-            state.avatarHistoryArray = [];
+            avatarDialog.value.visible = false;
+            cachedAvatars.clear();
+            cachedAvatarNames.clear();
+            cachedAvatarModerations.clear();
+            avatarHistory.value.clear();
+            avatarHistoryArray.value = [];
             if (isLoggedIn) {
                 getAvatarHistory();
             }
@@ -119,7 +85,7 @@ export const useAvatarStore = defineStore('Avatar', () => {
     function applyAvatar(json) {
         json.name = replaceBioSymbols(json.name);
         json.description = replaceBioSymbols(json.description);
-        let ref = state.cachedAvatars.get(json.id);
+        let ref = cachedAvatars.get(json.id);
         if (typeof ref === 'undefined') {
             ref = {
                 acknowledgements: '',
@@ -131,9 +97,12 @@ export const useAvatarStore = defineStore('Avatar', () => {
                 highestPrice: null,
                 id: '',
                 imageUrl: '',
+                listingDate: null,
                 lock: false,
                 lowestPrice: null,
                 name: '',
+                pendingUpload: false,
+                performance: {},
                 productId: null,
                 publishedListings: [],
                 releaseStatus: '',
@@ -148,7 +117,7 @@ export const useAvatarStore = defineStore('Avatar', () => {
                 version: 0,
                 ...json
             };
-            state.cachedAvatars.set(ref.id, ref);
+            cachedAvatars.set(ref.id, ref);
         } else {
             const { unityPackages } = ref;
             Object.assign(ref, json);
@@ -200,14 +169,15 @@ export const useAvatarStore = defineStore('Avatar', () => {
      * @returns
      */
     function showAvatarDialog(avatarId) {
-        const D = state.avatarDialog;
+        const D = avatarDialog.value;
         D.visible = true;
         D.loading = true;
         D.id = avatarId;
         D.inCache = false;
-        D.cacheSize = 0;
+        D.cacheSize = '';
         D.cacheLocked = false;
         D.cachePath = '';
+        D.fileAnalysis = [];
         D.isQuestFallback = false;
         D.isPC = false;
         D.isQuest = false;
@@ -221,10 +191,10 @@ export const useAvatarStore = defineStore('Avatar', () => {
         D.galleryLoading = true;
         D.isFavorite =
             favoriteStore.cachedFavoritesByObjectId.has(avatarId) ||
-            (userStore.currentUser.$isVRCPlus &&
+            (userStore.isLocalUserVrcPlusSupporter &&
                 favoriteStore.localAvatarFavoritesList.includes(avatarId));
-        D.isBlocked = state.cachedAvatarModerations.has(avatarId);
-        const ref2 = state.cachedAvatars.get(avatarId);
+        D.isBlocked = cachedAvatarModerations.has(avatarId);
+        const ref2 = cachedAvatars.get(avatarId);
         if (typeof ref2 !== 'undefined') {
             D.ref = ref2;
             updateVRChatAvatarCache();
@@ -272,17 +242,17 @@ export const useAvatarStore = defineStore('Avatar', () => {
                 throw err;
             })
             .finally(() => {
-                $app.$nextTick(() => (D.loading = false));
+                nextTick(() => (D.loading = false));
             });
     }
 
     /**
-     * aka: `$app.methods.getAvatarGallery`
+     *
      * @param {string} avatarId
      * @returns {Promise<string[]>}
      */
     async function getAvatarGallery(avatarId) {
-        const D = state.avatarDialog;
+        const D = avatarDialog.value;
         const args = await avatarRequest
             .getAvatarGallery(avatarId)
             .finally(() => {
@@ -320,7 +290,7 @@ export const useAvatarStore = defineStore('Avatar', () => {
             json.created = new Date(json.created).toJSON();
         }
 
-        let ref = state.cachedAvatarModerations.get(json.targetAvatarId);
+        let ref = cachedAvatarModerations.get(json.targetAvatarId);
         if (typeof ref === 'undefined') {
             ref = {
                 avatarModerationType: '',
@@ -328,13 +298,13 @@ export const useAvatarStore = defineStore('Avatar', () => {
                 targetAvatarId: '',
                 ...json
             };
-            state.cachedAvatarModerations.set(ref.targetAvatarId, ref);
+            cachedAvatarModerations.set(ref.targetAvatarId, ref);
         } else {
             Object.assign(ref, json);
         }
 
         // update avatar dialog
-        const D = state.avatarDialog;
+        const D = avatarDialog.value;
         if (
             D.visible &&
             ref.avatarModerationType === 'block' &&
@@ -347,10 +317,10 @@ export const useAvatarStore = defineStore('Avatar', () => {
     }
 
     function updateVRChatAvatarCache() {
-        const D = state.avatarDialog;
+        const D = avatarDialog.value;
         if (D.visible) {
             D.inCache = false;
-            D.cacheSize = 0;
+            D.cacheSize = '';
             D.cacheLocked = false;
             D.cachePath = '';
             checkVRChatCache(D.ref).then((cacheInfo) => {
@@ -365,11 +335,11 @@ export const useAvatarStore = defineStore('Avatar', () => {
     }
 
     /**
-     * aka: `$app.methods.getAvatarHistory`
+     *
      * @returns {Promise<void>}
      */
     async function getAvatarHistory() {
-        state.avatarHistory = new Set();
+        avatarHistory.value = new Set();
         const historyArray = await database.getAvatarHistory(
             userStore.currentUser.id
         );
@@ -379,9 +349,9 @@ export const useAvatarStore = defineStore('Avatar', () => {
                 continue;
             }
             applyAvatar(avatar);
-            state.avatarHistory.add(avatar.id);
+            avatarHistory.value.add(avatar.id);
         }
-        state.avatarHistoryArray = historyArray;
+        avatarHistoryArray.value = historyArray;
     }
 
     /**
@@ -400,16 +370,16 @@ export const useAvatarStore = defineStore('Avatar', () => {
                     return;
                 }
 
-                const historyArray = state.avatarHistoryArray;
+                const historyArray = avatarHistoryArray.value;
                 for (let i = 0; i < historyArray.length; ++i) {
                     if (historyArray[i].id === ref.id) {
                         historyArray.splice(i, 1);
                     }
                 }
 
-                state.avatarHistoryArray.unshift(ref);
-                state.avatarHistory.delete(ref.id);
-                state.avatarHistory.add(ref.id);
+                avatarHistoryArray.value.unshift(ref);
+                avatarHistory.value.delete(ref.id);
+                avatarHistory.value.add(ref.id);
             })
             .catch((err) => {
                 console.error('Failed to add avatar to history:', err);
@@ -417,22 +387,21 @@ export const useAvatarStore = defineStore('Avatar', () => {
     }
 
     function clearAvatarHistory() {
-        state.avatarHistory = new Set();
-        state.avatarHistoryArray = [];
+        avatarHistory.value = new Set();
+        avatarHistoryArray.value = [];
         database.clearAvatarHistory();
     }
 
     function promptClearAvatarHistory() {
-        $app.$confirm('Continue? Clear Avatar History', 'Confirm', {
+        ElMessageBox.confirm('Continue? Clear Avatar History', 'Confirm', {
             confirmButtonText: 'Confirm',
             cancelButtonText: 'Cancel',
-            type: 'info',
-            callback: (action) => {
-                if (action === 'confirm') {
-                    clearAvatarHistory();
-                }
-            }
-        });
+            type: 'info'
+        })
+            .then(() => {
+                clearAvatarHistory();
+            })
+            .catch(() => {});
     }
 
     /**
@@ -448,12 +417,12 @@ export const useAvatarStore = defineStore('Avatar', () => {
                 avatarName: '-'
             };
         }
-        if (state.cachedAvatarNames.has(fileId)) {
-            return state.cachedAvatarNames.get(fileId);
+        if (cachedAvatarNames.has(fileId)) {
+            return cachedAvatarNames.get(fileId);
         }
         try {
-            const args = await imageRequest.getAvatarImages({ fileId });
-            return storeAvatarImage(args, state.cachedAvatarNames);
+            const args = await miscRequest.getFile({ fileId });
+            return storeAvatarImage(args, cachedAvatarNames);
         } catch (error) {
             console.error('Failed to get avatar images:', error);
             return {
@@ -478,7 +447,7 @@ export const useAvatarStore = defineStore('Avatar', () => {
                     }
                 });
                 const json = JSON.parse(response.data);
-                if (AppGlobal.debugWebRequests) {
+                if (AppDebug.debugWebRequests) {
                     console.log(json, response);
                 }
                 if (response.status === 200 && typeof json === 'object') {
@@ -506,7 +475,7 @@ export const useAvatarStore = defineStore('Avatar', () => {
             } catch (err) {
                 const msg = `Avatar search failed for ${search} with ${avatarProviderStore.avatarRemoteDatabaseProvider}\n${err}`;
                 console.error(msg);
-                $app.$message({
+                ElMessage({
                     message: msg,
                     type: 'error'
                 });
@@ -558,7 +527,7 @@ export const useAvatarStore = defineStore('Avatar', () => {
                 }
             });
             const json = JSON.parse(response.data);
-            if (AppGlobal.debugWebRequests) {
+            if (AppDebug.debugWebRequests) {
                 console.log(json, response);
             }
             if (response.status === 200 && typeof json === 'object') {
@@ -584,7 +553,7 @@ export const useAvatarStore = defineStore('Avatar', () => {
         } catch (err) {
             const msg = `Avatar lookup failed for ${authorId} with ${url}\n${err}`;
             console.error(msg);
-            $app.$message({
+            ElMessage({
                 message: msg,
                 type: 'error'
             });
@@ -593,22 +562,20 @@ export const useAvatarStore = defineStore('Avatar', () => {
     }
 
     function selectAvatarWithConfirmation(id) {
-        $app.$confirm(`Continue? Select Avatar`, 'Confirm', {
+        ElMessageBox.confirm(`Continue? Select Avatar`, 'Confirm', {
             confirmButtonText: 'Confirm',
             cancelButtonText: 'Cancel',
-            type: 'info',
-            callback: (action) => {
-                if (action !== 'confirm') {
-                    return;
-                }
+            type: 'info'
+        })
+            .then(() => {
                 selectAvatarWithoutConfirmation(id);
-            }
-        });
+            })
+            .catch(() => {});
     }
 
     function selectAvatarWithoutConfirmation(id) {
         if (userStore.currentUser.currentAvatar === id) {
-            $app.$message({
+            ElMessage({
                 message: 'Avatar already selected',
                 type: 'info'
             });
@@ -619,7 +586,7 @@ export const useAvatarStore = defineStore('Avatar', () => {
                 avatarId: id
             })
             .then(() => {
-                $app.$message({
+                ElMessage({
                     message: 'Avatar changed',
                     type: 'success'
                 });
@@ -628,7 +595,7 @@ export const useAvatarStore = defineStore('Avatar', () => {
 
     function checkAvatarCache(fileId) {
         let avatarId = '';
-        for (let ref of state.cachedAvatars.values()) {
+        for (let ref of cachedAvatars.values()) {
             if (extractFileId(ref.imageUrl) === fileId) {
                 avatarId = ref.id;
             }
@@ -654,7 +621,7 @@ export const useAvatarStore = defineStore('Avatar', () => {
     ) {
         const fileId = extractFileId(currentAvatarImageUrl);
         if (!fileId) {
-            $app.$message({
+            ElMessage({
                 message: 'Sorry, the author is unknown',
                 type: 'error'
             });
@@ -677,13 +644,13 @@ export const useAvatarStore = defineStore('Avatar', () => {
             }
             if (!avatarId) {
                 if (avatarInfo.ownerId === refUserId) {
-                    $app.$message({
+                    ElMessage({
                         message:
                             "It's personal (own) avatar or not found in avatar database",
                         type: 'warning'
                     });
                 } else {
-                    $app.$message({
+                    ElMessage({
                         message: 'Avatar not found in avatar database',
                         type: 'warning'
                     });
@@ -706,7 +673,6 @@ export const useAvatarStore = defineStore('Avatar', () => {
     }
 
     return {
-        state,
         avatarDialog,
         avatarHistory,
         avatarHistoryArray,
