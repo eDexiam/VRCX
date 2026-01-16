@@ -12,7 +12,7 @@
                         <span class="category-title">{{ t('view.tools.group.header') }}</span>
                     </div>
                     <div class="tools-grid" v-show="!categoryCollapsed['group']">
-                        <el-card :body-style="{ padding: '0px' }" class="tool-card">
+                        <Card class="tool-card p-0 gap-0">
                             <div class="tool-content" @click="showGroupCalendarDialog">
                                 <div class="tool-icon">
                                     <i class="ri-calendar-event-line"></i>
@@ -22,7 +22,7 @@
                                     <div class="tool-description">{{ t('view.tools.group.calendar_description') }}</div>
                                 </div>
                             </div>
-                        </el-card>
+                        </Card>
                     </div>
                 </div>
 
@@ -34,8 +34,8 @@
                         <span class="category-title">{{ t('view.tools.pictures.header') }}</span>
                     </div>
                     <div class="tools-grid" v-show="!categoryCollapsed['image']">
-                        <el-card :body-style="{ padding: '0px' }" class="tool-card">
-                            <div class="tool-content" @click="showScreenshotMetadataDialog">
+                        <Card class="tool-card p-0 gap-0">
+                            <div class="tool-content" @click="showScreenshotMetadataPage">
                                 <div class="tool-icon">
                                     <i class="ri-screenshot-2-line"></i>
                                 </div>
@@ -46,9 +46,9 @@
                                     </div>
                                 </div>
                             </div>
-                        </el-card>
-                        <el-card :body-style="{ padding: '0px' }" class="tool-card">
-                            <div class="tool-content" @click="showGalleryDialog">
+                        </Card>
+                        <Card class="tool-card p-0 gap-0">
+                            <div class="tool-content" @click="showGalleryPage">
                                 <div class="tool-icon">
                                     <i class="ri-multi-image-line"></i>
                                 </div>
@@ -59,8 +59,8 @@
                                     </div>
                                 </div>
                             </div>
-                        </el-card>
-                        <el-card :body-style="{ padding: '0px' }" class="tool-card">
+                        </Card>
+                        <Card class="tool-card p-0 gap-0">
                             <div class="tool-content" @click="openVrcPhotosFolder">
                                 <div class="tool-icon">
                                     <i class="ri-folder-image-line"></i>
@@ -72,8 +72,8 @@
                                     </div>
                                 </div>
                             </div>
-                        </el-card>
-                        <el-card :body-style="{ padding: '0px' }" class="tool-card">
+                        </Card>
+                        <Card class="tool-card p-0 gap-0">
                             <div class="tool-content" @click="openVrcScreenshotsFolder">
                                 <div class="tool-icon">
                                     <i class="ri-folder-image-line"></i>
@@ -87,7 +87,7 @@
                                     </div>
                                 </div>
                             </div>
-                        </el-card>
+                        </Card>
                     </div>
                 </div>
 
@@ -100,7 +100,7 @@
                     </div>
 
                     <div class="tools-grid" v-show="!categoryCollapsed['user']">
-                        <el-card :body-style="{ padding: '0px' }" class="tool-card">
+                        <Card class="tool-card p-0 gap-0">
                             <div class="tool-content" @click="showExportDiscordNamesDialog">
                                 <div class="tool-icon">
                                     <i class="ri-discord-line"></i>
@@ -112,8 +112,8 @@
                                     </div>
                                 </div>
                             </div>
-                        </el-card>
-                        <el-card :body-style="{ padding: '0px' }" class="tool-card">
+                        </Card>
+                        <Card class="tool-card p-0 gap-0">
                             <div class="tool-content" @click="showNoteExportDialog">
                                 <div class="tool-icon">
                                     <i class="ri-user-shared-line"></i>
@@ -125,9 +125,9 @@
                                     </div>
                                 </div>
                             </div>
-                        </el-card>
+                        </Card>
 
-                        <el-card :body-style="{ padding: '0px' }" class="tool-card">
+                        <Card class="tool-card p-0 gap-0">
                             <div class="tool-content" @click="showExportFriendsListDialog">
                                 <div class="tool-icon">
                                     <i class="ri-user-shared-line"></i>
@@ -139,8 +139,8 @@
                                     </div>
                                 </div>
                             </div>
-                        </el-card>
-                        <el-card :body-style="{ padding: '0px' }" class="tool-card">
+                        </Card>
+                        <Card class="tool-card p-0 gap-0">
                             <div class="tool-content" @click="showExportAvatarsListDialog">
                                 <div class="tool-icon">
                                     <i class="ri-user-shared-line"></i>
@@ -152,7 +152,31 @@
                                     </div>
                                 </div>
                             </div>
-                        </el-card>
+                        </Card>
+                    </div>
+                </div>
+
+                <div class="tool-category">
+                    <div class="category-header" @click="toggleCategory('other')">
+                        <el-icon class="rotation-transition" :class="{ 'is-rotated': !categoryCollapsed['other'] }"
+                            ><ArrowRight
+                        /></el-icon>
+                        <span class="category-title">{{ t('view.tools.other.header') }}</span>
+                    </div>
+                    <div class="tools-grid" v-show="!categoryCollapsed['other']">
+                        <Card class="tool-card p-0 gap-0">
+                            <div class="tool-content" @click="showEditInviteMessageDialog">
+                                <div class="tool-icon">
+                                    <i class="ri-edit-box-line"></i>
+                                </div>
+                                <div class="tool-info">
+                                    <div class="tool-name">{{ t('view.tools.other.edit_invite_message') }}</div>
+                                    <div class="tool-description">
+                                        {{ t('view.tools.other.edit_invite_message_description') }}
+                                    </div>
+                                </div>
+                            </div>
+                        </Card>
                     </div>
                 </div>
             </div>
@@ -161,13 +185,9 @@
             <GroupCalendarDialog
                 :visible="isGroupCalendarDialogVisible"
                 @close="isGroupCalendarDialogVisible = false" />
-            <ScreenshotMetadataDialog
-                :isScreenshotMetadataDialogVisible="isScreenshotMetadataDialogVisible"
-                @close="isScreenshotMetadataDialogVisible = false" />
             <NoteExportDialog
                 :isNoteExportDialogVisible="isNoteExportDialogVisible"
                 @close="isNoteExportDialogVisible = false" />
-            <GalleryDialog />
             <ExportDiscordNamesDialog
                 v-model:discordNamesDialogVisible="isExportDiscordNamesDialogVisible"
                 :friends="friends" />
@@ -175,56 +195,59 @@
                 v-model:isExportFriendsListDialogVisible="isExportFriendsListDialogVisible"
                 :friends="friends" />
             <ExportAvatarsListDialog v-model:isExportAvatarsListDialogVisible="isExportAvatarsListDialogVisible" />
+            <EditInviteMessageDialog
+                v-model:isEditInviteMessagesDialogVisible="isEditInviteMessagesDialogVisible"
+                @close="isEditInviteMessagesDialogVisible = false" />
         </template>
     </div>
 </template>
 
 <script setup>
-    import { computed, defineAsyncComponent, ref, watch } from 'vue';
+    import { computed, defineAsyncComponent, ref } from 'vue';
+    import { useRoute, useRouter } from 'vue-router';
     import { ArrowRight } from '@element-plus/icons-vue';
-    import { ElMessage } from 'element-plus';
+    import { Card } from '@/components/ui/card';
     import { storeToRefs } from 'pinia';
+    import { toast } from 'vue-sonner';
     import { useI18n } from 'vue-i18n';
-    import { useRoute } from 'vue-router';
 
     import { useFriendStore, useGalleryStore } from '../../stores';
 
     const GroupCalendarDialog = defineAsyncComponent(() => import('./dialogs/GroupCalendarDialog.vue'));
-    const ScreenshotMetadataDialog = defineAsyncComponent(() => import('./dialogs/ScreenshotMetadataDialog.vue'));
     const NoteExportDialog = defineAsyncComponent(() => import('./dialogs/NoteExportDialog.vue'));
-    const GalleryDialog = defineAsyncComponent(() => import('./dialogs/GalleryDialog.vue'));
-
+    const EditInviteMessageDialog = defineAsyncComponent(() => import('./dialogs/EditInviteMessagesDialog.vue'));
     const ExportDiscordNamesDialog = defineAsyncComponent(() => import('./dialogs/ExportDiscordNamesDialog.vue'));
     const ExportFriendsListDialog = defineAsyncComponent(() => import('./dialogs/ExportFriendsListDialog.vue'));
     const ExportAvatarsListDialog = defineAsyncComponent(() => import('./dialogs/ExportAvatarsListDialog.vue'));
 
     const { t } = useI18n();
+    const router = useRouter();
+    const route = useRoute();
 
-    const { showGalleryDialog } = useGalleryStore();
+    const { showGalleryPage } = useGalleryStore();
     const { friends } = storeToRefs(useFriendStore());
 
     const categoryCollapsed = ref({
         group: false,
         image: false,
-        user: false
+        user: false,
+        other: false
     });
 
     const isGroupCalendarDialogVisible = ref(false);
-    const isScreenshotMetadataDialogVisible = ref(false);
     const isNoteExportDialogVisible = ref(false);
     const isExportDiscordNamesDialogVisible = ref(false);
     const isExportFriendsListDialogVisible = ref(false);
     const isExportAvatarsListDialogVisible = ref(false);
-    const isToolsTabVisible = computed(() => {
-        return useRoute().name === 'tools';
-    });
+    const isEditInviteMessagesDialogVisible = ref(false);
+    const isToolsTabVisible = computed(() => route.name === 'tools');
 
     const showGroupCalendarDialog = () => {
         isGroupCalendarDialogVisible.value = true;
     };
 
-    const showScreenshotMetadataDialog = () => {
-        isScreenshotMetadataDialogVisible.value = true;
+    const showScreenshotMetadataPage = () => {
+        router.push({ name: 'screenshot-metadata' });
     };
 
     const showNoteExportDialog = () => {
@@ -233,6 +256,10 @@
 
     const toggleCategory = (category) => {
         categoryCollapsed.value[category] = !categoryCollapsed.value[category];
+    };
+
+    const showEditInviteMessageDialog = () => {
+        isEditInviteMessagesDialogVisible.value = true;
     };
 
     function showExportDiscordNamesDialog() {
@@ -250,15 +277,9 @@
     function openVrcPhotosFolder() {
         AppApi.OpenVrcPhotosFolder().then((result) => {
             if (result) {
-                ElMessage({
-                    message: 'Folder opened',
-                    type: 'success'
-                });
+                toast.success('Folder opened');
             } else {
-                ElMessage({
-                    message: "Folder dosn't exist",
-                    type: 'error'
-                });
+                toast.error("Folder dosn't exist");
             }
         });
     }
@@ -266,21 +287,15 @@
     function openVrcScreenshotsFolder() {
         AppApi.OpenVrcScreenshotsFolder().then((result) => {
             if (result) {
-                ElMessage({
-                    message: 'Folder opened',
-                    type: 'success'
-                });
+                toast.success('Folder opened');
             } else {
-                ElMessage({
-                    message: "Folder dosn't exist",
-                    type: 'error'
-                });
+                toast.error("Folder dosn't exist");
             }
         });
     }
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
     .tool-categories {
         margin-top: 20px;
         padding: 0 20px;
@@ -296,11 +311,10 @@
             padding: 8px 12px;
             border-radius: 6px;
             margin-bottom: 12px;
-            background-color: var(--el-color-primary-light-9);
             transition: all 0.2s ease;
 
             &:hover {
-                background-color: var(--el-color-primary-light-8);
+                background-color: var(--el-color-primary-light-9);
             }
 
             .el-icon-arrow-right {
@@ -314,7 +328,6 @@
                 margin-left: 5px;
                 font-size: 16px;
                 font-weight: 600;
-                color: var(--el-color-primary);
             }
         }
     }
@@ -332,14 +345,11 @@
         overflow: visible;
         border-radius: 8px;
         cursor: pointer;
+        width: 100%;
 
         &:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-        }
-
-        :deep(.el-card__body) {
-            overflow: visible;
+            box-shadow: var(--el-box-shadow-light);
         }
 
         .tool-content {
@@ -356,7 +366,7 @@
                 background-color: var(--el-color-primary-light-9);
                 border-radius: 12px;
                 margin-right: 20px;
-                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+                box-shadow: var(--el-box-shadow-lighter);
 
                 i {
                     font-size: 28px;
@@ -381,12 +391,6 @@
                 }
             }
         }
-    }
-
-    :deep(.el-card) {
-        border-radius: 8px;
-        width: 100%;
-        overflow: visible;
     }
 
     .is-rotated {

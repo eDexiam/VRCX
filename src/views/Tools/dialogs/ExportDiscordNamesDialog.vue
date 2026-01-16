@@ -8,20 +8,19 @@
         <div style="font-size: 12px">
             {{ t('dialog.discord_names.description') }}
         </div>
-        <el-input
+        <InputGroupTextareaField
             v-model="discordNamesContent"
-            type="textarea"
-            size="small"
             :rows="15"
-            resize="none"
             readonly
-            style="margin-top: 15px" />
+            style="margin-top: 15px"
+            input-class="resize-none" />
     </el-dialog>
 </template>
 
 <script setup>
     import { ref, watch } from 'vue';
     import { storeToRefs } from 'pinia';
+    import { InputGroupTextareaField } from '@/components/ui/input-group';
     import { useI18n } from 'vue-i18n';
 
     import { useUserStore } from '../../../stores';
@@ -66,11 +65,12 @@
             return str;
         };
         for (const userId of friends) {
-            const { ref } = props.friends.get(userId);
             let discord = '';
-            if (typeof ref === 'undefined') {
+            const friend = props.friends.get(userId);
+            if (typeof friend?.ref === 'undefined') {
                 continue;
             }
+            const ref = friend.ref;
             const name = ref.displayName;
             if (ref.statusDescription) {
                 const statusRegex = /(?:discord|dc|dis)(?: |=|:|˸|;)(.*)/gi.exec(ref.statusDescription);

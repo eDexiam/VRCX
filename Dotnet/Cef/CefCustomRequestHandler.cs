@@ -1,9 +1,3 @@
-// Copyright(c) 2019-2025 pypy, Natsumi and individual contributors.
-// All rights reserved.
-//
-// This work is licensed under the terms of the MIT license.
-// For a copy, see <https://opensource.org/licenses/MIT>.
-
 using System.Security.Cryptography.X509Certificates;
 using CefSharp;
 using NLog;
@@ -13,14 +7,14 @@ namespace VRCX
     public class CustomRequestHandler : IRequestHandler
     {
         private readonly Logger _logger = LogManager.GetCurrentClassLogger();
-        
+
         public bool OnBeforeBrowse(IWebBrowser chromiumWebBrowser, IBrowser browser, IFrame frame, IRequest request, bool userGesture, bool isRedirect)
         {
             if (Program.LaunchDebug ||
                 request.Url.StartsWith("file://vrcx/") ||
                 request.Url.StartsWith("chrome-extension://"))
                 return false;
-            
+
             _logger.Error("Blocking navigation to: {Url}", request.Url);
             return true;
         }
@@ -69,6 +63,23 @@ namespace VRCX
         public void OnRenderProcessTerminated(IWebBrowser chromiumWebBrowser, IBrowser browser, CefTerminationStatus status,
             int errorCode, string errorMessage)
         {
+            var message = status switch
+            {
+                CefTerminationStatus.AbnormalTermination => "Browser terminated abnormally.",
+                CefTerminationStatus.ProcessWasKilled => "Browser was killed.",
+                CefTerminationStatus.ProcessCrashed => "Browser crashed.",
+                CefTerminationStatus.OutOfMemory => "Browser out of memory.",
+                _ => $"Browser terminated with unhandled status code '{status}'"
+            };
+            _logger.Error("Render process terminated: {Message} ErrorCode: {ErrorCode} ErrorMessage: {ErrorMessage}",
+                message, errorCode, errorMessage);
+            StartupArgs.LaunchArguments.LaunchCommand = $"crash/{message}";
+
+            if (chromiumWebBrowser.IsDisposed || chromiumWebBrowser.IsLoading)
+                return;
+
+            _logger.Info("Attempting to reload browser...");
+            chromiumWebBrowser.Reload();
         }
     }
 }

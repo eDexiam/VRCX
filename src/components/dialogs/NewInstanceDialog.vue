@@ -5,471 +5,502 @@
         :title="t('dialog.new_instance.header')"
         width="650px"
         append-to-body>
-        <el-tabs v-model="newInstanceDialog.selectedTab" type="card" @tab-click="newInstanceTabClick">
+        <el-tabs v-model="newInstanceDialog.selectedTab" @tab-click="newInstanceTabClick">
             <el-tab-pane name="Normal" :label="t('dialog.new_instance.normal')">
-                <el-form :model="newInstanceDialog" label-width="150px">
-                    <el-form-item :label="t('dialog.new_instance.access_type')">
-                        <el-radio-group v-model="newInstanceDialog.accessType" size="small" @change="buildInstance">
-                            <el-radio-button label="public">{{
-                                t('dialog.new_instance.access_type_public')
-                            }}</el-radio-button>
-                            <el-radio-button label="group">{{
-                                t('dialog.new_instance.access_type_group')
-                            }}</el-radio-button>
-                            <el-radio-button label="friends+">{{
-                                t('dialog.new_instance.access_type_friend_plus')
-                            }}</el-radio-button>
-                            <el-radio-button label="friends">{{
-                                t('dialog.new_instance.access_type_friend')
-                            }}</el-radio-button>
-                            <el-radio-button label="invite+">{{
-                                t('dialog.new_instance.access_type_invite_plus')
-                            }}</el-radio-button>
-                            <el-radio-button label="invite">{{
-                                t('dialog.new_instance.access_type_invite')
-                            }}</el-radio-button>
-                        </el-radio-group>
-                    </el-form-item>
-                    <el-form-item
-                        v-if="newInstanceDialog.accessType === 'group'"
-                        :label="t('dialog.new_instance.group_access_type')">
-                        <el-radio-group
-                            v-model="newInstanceDialog.groupAccessType"
-                            size="small"
-                            @change="buildInstance">
-                            <el-radio-button
-                                label="members"
+                <FieldGroup class="gap-4">
+                    <Field>
+                        <FieldLabel>{{ t('dialog.new_instance.access_type') }}</FieldLabel>
+                        <FieldContent>
+                            <ToggleGroup
+                                type="single"
+                                required
+                                variant="outline"
+                                size="sm"
+                                :model-value="newInstanceDialog.accessType"
+                                @update:model-value="
+                                    (value) => {
+                                        newInstanceDialog.accessType = value;
+                                        buildInstance();
+                                    }
+                                ">
+                                <ToggleGroupItem value="public">{{
+                                    t('dialog.new_instance.access_type_public')
+                                }}</ToggleGroupItem>
+                                <ToggleGroupItem value="group">{{
+                                    t('dialog.new_instance.access_type_group')
+                                }}</ToggleGroupItem>
+                                <ToggleGroupItem value="friends+">{{
+                                    t('dialog.new_instance.access_type_friend_plus')
+                                }}</ToggleGroupItem>
+                                <ToggleGroupItem value="friends">{{
+                                    t('dialog.new_instance.access_type_friend')
+                                }}</ToggleGroupItem>
+                                <ToggleGroupItem value="invite+">{{
+                                    t('dialog.new_instance.access_type_invite_plus')
+                                }}</ToggleGroupItem>
+                                <ToggleGroupItem value="invite">{{
+                                    t('dialog.new_instance.access_type_invite')
+                                }}</ToggleGroupItem>
+                            </ToggleGroup>
+                        </FieldContent>
+                    </Field>
+                    <Field v-if="newInstanceDialog.accessType === 'group'">
+                        <FieldLabel>{{ t('dialog.new_instance.group_access_type') }}</FieldLabel>
+                        <FieldContent>
+                            <ToggleGroup
+                                type="single"
+                                required
+                                variant="outline"
+                                size="sm"
+                                :model-value="newInstanceDialog.groupAccessType"
+                                @update:model-value="
+                                    (value) => {
+                                        newInstanceDialog.groupAccessType = value;
+                                        buildInstance();
+                                    }
+                                ">
+                                <ToggleGroupItem
+                                    value="members"
+                                    :disabled="
+                                        !hasGroupPermission(newInstanceDialog.groupRef, 'group-instance-open-create')
+                                    "
+                                    >{{ t('dialog.new_instance.group_access_type_members') }}</ToggleGroupItem
+                                >
+                                <ToggleGroupItem
+                                    value="plus"
+                                    :disabled="
+                                        !hasGroupPermission(newInstanceDialog.groupRef, 'group-instance-plus-create')
+                                    "
+                                    >{{ t('dialog.new_instance.group_access_type_plus') }}</ToggleGroupItem
+                                >
+                                <ToggleGroupItem
+                                    value="public"
+                                    :disabled="
+                                        !hasGroupPermission(
+                                            newInstanceDialog.groupRef,
+                                            'group-instance-public-create'
+                                        ) || newInstanceDialog.groupRef.privacy === 'private'
+                                    "
+                                    >{{ t('dialog.new_instance.group_access_type_public') }}</ToggleGroupItem
+                                >
+                            </ToggleGroup>
+                        </FieldContent>
+                    </Field>
+                    <Field>
+                        <FieldLabel>{{ t('dialog.new_instance.region') }}</FieldLabel>
+                        <FieldContent>
+                            <ToggleGroup
+                                type="single"
+                                required
+                                variant="outline"
+                                size="sm"
+                                :model-value="newInstanceDialog.region"
+                                @update:model-value="
+                                    (value) => {
+                                        newInstanceDialog.region = value;
+                                        buildInstance();
+                                    }
+                                ">
+                                <ToggleGroupItem value="US West">{{
+                                    t('dialog.new_instance.region_usw')
+                                }}</ToggleGroupItem>
+                                <ToggleGroupItem value="US East">{{
+                                    t('dialog.new_instance.region_use')
+                                }}</ToggleGroupItem>
+                                <ToggleGroupItem value="Europe">{{
+                                    t('dialog.new_instance.region_eu')
+                                }}</ToggleGroupItem>
+                                <ToggleGroupItem value="Japan">{{
+                                    t('dialog.new_instance.region_jp')
+                                }}</ToggleGroupItem>
+                            </ToggleGroup>
+                        </FieldContent>
+                    </Field>
+                    <Field v-if="newInstanceDialog.accessType === 'group'">
+                        <FieldLabel>{{ t('dialog.new_instance.queueEnabled') }}</FieldLabel>
+                        <FieldContent>
+                            <Checkbox v-model="newInstanceDialog.queueEnabled" @update:modelValue="buildInstance" />
+                        </FieldContent>
+                    </Field>
+                    <Field v-if="newInstanceDialog.accessType === 'group'">
+                        <FieldLabel>{{ t('dialog.new_instance.ageGate') }}</FieldLabel>
+                        <FieldContent>
+                            <Checkbox
+                                v-model="newInstanceDialog.ageGate"
                                 :disabled="
-                                    !hasGroupPermission(newInstanceDialog.groupRef, 'group-instance-open-create')
+                                    !hasGroupPermission(newInstanceDialog.groupRef, 'group-instance-age-gated-create')
                                 "
-                                >{{ t('dialog.new_instance.group_access_type_members') }}</el-radio-button
-                            >
-                            <el-radio-button
-                                label="plus"
-                                :disabled="
-                                    !hasGroupPermission(newInstanceDialog.groupRef, 'group-instance-plus-create')
-                                "
-                                >{{ t('dialog.new_instance.group_access_type_plus') }}</el-radio-button
-                            >
-                            <el-radio-button
-                                label="public"
-                                :disabled="
-                                    !hasGroupPermission(newInstanceDialog.groupRef, 'group-instance-public-create') ||
-                                    newInstanceDialog.groupRef.privacy === 'private'
-                                "
-                                >{{ t('dialog.new_instance.group_access_type_public') }}</el-radio-button
-                            >
-                        </el-radio-group>
-                    </el-form-item>
-                    <el-form-item :label="t('dialog.new_instance.region')">
-                        <el-radio-group v-model="newInstanceDialog.region" size="small" @change="buildInstance">
-                            <el-radio-button label="US West">{{ t('dialog.new_instance.region_usw') }}</el-radio-button>
-                            <el-radio-button label="US East">{{ t('dialog.new_instance.region_use') }}</el-radio-button>
-                            <el-radio-button label="Europe">{{ t('dialog.new_instance.region_eu') }}</el-radio-button>
-                            <el-radio-button label="Japan">{{ t('dialog.new_instance.region_jp') }}</el-radio-button>
-                        </el-radio-group>
-                    </el-form-item>
-                    <el-form-item
-                        v-if="newInstanceDialog.accessType === 'group'"
-                        :label="t('dialog.new_instance.queueEnabled')">
-                        <el-checkbox v-model="newInstanceDialog.queueEnabled" @change="buildInstance"></el-checkbox>
-                    </el-form-item>
-                    <el-form-item
-                        v-if="newInstanceDialog.accessType === 'group'"
-                        :label="t('dialog.new_instance.ageGate')">
-                        <el-checkbox
-                            v-model="newInstanceDialog.ageGate"
-                            :disabled="
-                                !hasGroupPermission(newInstanceDialog.groupRef, 'group-instance-age-gated-create')
-                            "
-                            @change="buildInstance"></el-checkbox>
-                    </el-form-item>
-                    <el-form-item :label="t('dialog.new_instance.display_name')">
-                        <el-input
-                            :disabled="!isLocalUserVrcPlusSupporter"
-                            v-model="newInstanceDialog.displayName"
-                            size="small"
-                            @click="$event.target.tagName === 'INPUT' && $event.target.select()"
-                            @change="buildInstance"></el-input>
-                    </el-form-item>
-                    <el-form-item
-                        v-if="newInstanceDialog.accessType === 'group'"
-                        :label="t('dialog.new_instance.group_id')">
-                        <el-select
-                            v-model="newInstanceDialog.groupId"
-                            clearable
-                            :placeholder="t('dialog.new_instance.group_placeholder')"
-                            filterable
-                            style="width: 100%"
-                            @change="buildInstance">
-                            <el-option-group :label="t('dialog.new_instance.group_placeholder')">
-                                <el-option
-                                    v-for="group in currentUserGroups.values()"
-                                    :key="group.id"
-                                    :label="group.name"
-                                    :value="group.id"
-                                    class="x-friend-item"
-                                    style="height: auto; width: 478px">
-                                    <template
-                                        v-if="
-                                            group &&
-                                            (hasGroupPermission(group, 'group-instance-public-create') ||
-                                                hasGroupPermission(group, 'group-instance-plus-create') ||
-                                                hasGroupPermission(group, 'group-instance-open-create'))
-                                        ">
+                                @update:modelValue="buildInstance" />
+                        </FieldContent>
+                    </Field>
+                    <Field>
+                        <FieldLabel>{{ t('dialog.new_instance.display_name') }}</FieldLabel>
+                        <FieldContent>
+                            <InputGroupField
+                                :disabled="!isLocalUserVrcPlusSupporter"
+                                v-model="newInstanceDialog.displayName"
+                                size="sm"
+                                @click="$event.target.tagName === 'INPUT' && $event.target.select()"
+                                @change="buildInstance" />
+                        </FieldContent>
+                    </Field>
+                    <Field v-if="newInstanceDialog.accessType === 'group'">
+                        <FieldLabel>{{ t('dialog.new_instance.group_id') }}</FieldLabel>
+                        <FieldContent>
+                            <VirtualCombobox
+                                v-model="newInstanceDialog.groupId"
+                                :groups="normalGroupPickerGroups"
+                                :placeholder="t('dialog.new_instance.group_placeholder')"
+                                :search-placeholder="t('dialog.new_instance.group_placeholder')"
+                                :clearable="true"
+                                :close-on-select="true"
+                                :deselect-on-reselect="true"
+                                @change="buildInstance">
+                                <template #item="{ item, selected }">
+                                    <div class="x-friend-item flex w-full items-center">
                                         <div class="avatar">
-                                            <img :src="group.iconUrl" loading="lazy" />
+                                            <img :src="item.iconUrl" loading="lazy" />
                                         </div>
                                         <div class="detail">
-                                            <span class="name" v-text="group.name"></span>
+                                            <span class="name" v-text="item.label"></span>
                                         </div>
-                                    </template>
-                                </el-option>
-                            </el-option-group>
-                        </el-select>
-                    </el-form-item>
-                    <el-form-item
+                                        <CheckIcon
+                                            :class="['ml-auto size-4', selected ? 'opacity-100' : 'opacity-0']" />
+                                    </div>
+                                </template>
+                            </VirtualCombobox>
+                        </FieldContent>
+                    </Field>
+                    <Field
                         v-if="
                             newInstanceDialog.accessType === 'group' && newInstanceDialog.groupAccessType === 'members'
                         "
-                        :label="t('dialog.new_instance.roles')">
-                        <el-select
-                            v-model="newInstanceDialog.roleIds"
-                            multiple
-                            clearable
-                            :placeholder="t('dialog.new_instance.role_placeholder')"
-                            style="width: 100%"
-                            @change="buildInstance">
-                            <el-option-group :label="t('dialog.new_instance.role_placeholder')">
-                                <el-option
-                                    v-for="role in newInstanceDialog.selectedGroupRoles"
-                                    :key="role.id"
-                                    class="x-friend-item"
-                                    :label="role.name"
-                                    :value="role.id"
-                                    style="height: auto; width: 478px">
-                                    <div class="detail">
-                                        <span class="name" v-text="role.name"></span>
-                                    </div>
-                                </el-option>
-                            </el-option-group>
-                        </el-select>
-                    </el-form-item>
+                        class="items-start">
+                        <FieldLabel>{{ t('dialog.new_instance.roles') }}</FieldLabel>
+                        <FieldContent>
+                            <Select
+                                multiple
+                                :model-value="Array.isArray(newInstanceDialog.roleIds) ? newInstanceDialog.roleIds : []"
+                                @update:modelValue="handleRoleIdsChange">
+                                <SelectTrigger size="sm" class="w-full">
+                                    <SelectValue>
+                                        <span class="truncate">
+                                            {{ selectedRoleSummary || t('dialog.new_instance.role_placeholder') }}
+                                        </span>
+                                    </SelectValue>
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectGroup>
+                                        <SelectItem
+                                            v-for="role in newInstanceDialog.selectedGroupRoles"
+                                            :key="role.id"
+                                            :value="role.id">
+                                            {{ role.name }}
+                                        </SelectItem>
+                                    </SelectGroup>
+                                </SelectContent>
+                            </Select>
+                        </FieldContent>
+                    </Field>
                     <template v-if="newInstanceDialog.instanceCreated">
-                        <el-form-item :label="t('dialog.new_instance.location')">
-                            <el-input
-                                v-model="newInstanceDialog.location"
-                                size="small"
-                                readonly
-                                @click="$event.target.tagName === 'INPUT' && $event.target.select()"></el-input>
-                        </el-form-item>
-                        <el-form-item :label="t('dialog.new_instance.url')">
-                            <el-input v-model="newInstanceDialog.url" size="small" readonly></el-input>
-                        </el-form-item>
+                        <Field>
+                            <FieldLabel>{{ t('dialog.new_instance.location') }}</FieldLabel>
+                            <FieldContent>
+                                <InputGroupField
+                                    v-model="newInstanceDialog.location"
+                                    size="sm"
+                                    readonly
+                                    @click="$event.target.tagName === 'INPUT' && $event.target.select()" />
+                            </FieldContent>
+                        </Field>
+                        <Field>
+                            <FieldLabel>{{ t('dialog.new_instance.url') }}</FieldLabel>
+                            <FieldContent>
+                                <InputGroupField v-model="newInstanceDialog.url" size="sm" readonly />
+                            </FieldContent>
+                        </Field>
                     </template>
-                </el-form>
+                </FieldGroup>
             </el-tab-pane>
             <el-tab-pane name="Legacy" :label="t('dialog.new_instance.legacy')">
-                <el-form :model="newInstanceDialog" label-width="150px">
-                    <el-form-item :label="t('dialog.new_instance.access_type')">
-                        <el-radio-group
-                            v-model="newInstanceDialog.accessType"
-                            size="small"
-                            @change="buildLegacyInstance">
-                            <el-radio-button label="public">{{
-                                t('dialog.new_instance.access_type_public')
-                            }}</el-radio-button>
-                            <el-radio-button label="group">{{
-                                t('dialog.new_instance.access_type_group')
-                            }}</el-radio-button>
-                            <el-radio-button label="friends+">{{
-                                t('dialog.new_instance.access_type_friend_plus')
-                            }}</el-radio-button>
-                            <el-radio-button label="friends">{{
-                                t('dialog.new_instance.access_type_friend')
-                            }}</el-radio-button>
-                            <el-radio-button label="invite+">{{
-                                t('dialog.new_instance.access_type_invite_plus')
-                            }}</el-radio-button>
-                            <el-radio-button label="invite">{{
-                                t('dialog.new_instance.access_type_invite')
-                            }}</el-radio-button>
-                        </el-radio-group>
-                    </el-form-item>
-                    <el-form-item
-                        v-if="newInstanceDialog.accessType === 'group'"
-                        :label="t('dialog.new_instance.group_access_type')">
-                        <el-radio-group
-                            v-model="newInstanceDialog.groupAccessType"
-                            size="small"
-                            @change="buildLegacyInstance">
-                            <el-radio-button label="members">{{
-                                t('dialog.new_instance.group_access_type_members')
-                            }}</el-radio-button>
-                            <el-radio-button label="plus">{{
-                                t('dialog.new_instance.group_access_type_plus')
-                            }}</el-radio-button>
-                            <el-radio-button label="public">{{
-                                t('dialog.new_instance.group_access_type_public')
-                            }}</el-radio-button>
-                        </el-radio-group>
-                    </el-form-item>
-                    <el-form-item :label="t('dialog.new_instance.region')">
-                        <el-radio-group v-model="newInstanceDialog.region" size="small" @change="buildLegacyInstance">
-                            <el-radio-button label="US West">{{ t('dialog.new_instance.region_usw') }}</el-radio-button>
-                            <el-radio-button label="US East">{{ t('dialog.new_instance.region_use') }}</el-radio-button>
-                            <el-radio-button label="Europe">{{ t('dialog.new_instance.region_eu') }}</el-radio-button>
-                            <el-radio-button label="Japan">{{ t('dialog.new_instance.region_jp') }}</el-radio-button>
-                        </el-radio-group>
-                    </el-form-item>
-                    <el-form-item
-                        v-if="newInstanceDialog.accessType === 'group'"
-                        :label="t('dialog.new_instance.ageGate')">
-                        <el-checkbox v-model="newInstanceDialog.ageGate" @change="buildInstance"></el-checkbox>
-                    </el-form-item>
-                    <el-form-item :label="t('dialog.new_instance.world_id')">
-                        <el-input
-                            v-model="newInstanceDialog.worldId"
-                            size="small"
-                            @click="$event.target.tagName === 'INPUT' && $event.target.select()"
-                            @change="buildLegacyInstance"></el-input>
-                    </el-form-item>
-                    <el-form-item :label="t('dialog.new_instance.instance_id')">
-                        <el-input
-                            v-model="newInstanceDialog.instanceName"
-                            :placeholder="t('dialog.new_instance.instance_id_placeholder')"
-                            size="small"
-                            @change="buildLegacyInstance"></el-input>
-                    </el-form-item>
-                    <el-form-item
+                <FieldGroup class="gap-4">
+                    <Field>
+                        <FieldLabel>{{ t('dialog.new_instance.access_type') }}</FieldLabel>
+                        <FieldContent>
+                            <ToggleGroup
+                                type="single"
+                                required
+                                variant="outline"
+                                size="sm"
+                                :model-value="newInstanceDialog.accessType"
+                                @update:model-value="
+                                    (value) => {
+                                        newInstanceDialog.accessType = value;
+                                        buildLegacyInstance();
+                                    }
+                                ">
+                                <ToggleGroupItem value="public">{{
+                                    t('dialog.new_instance.access_type_public')
+                                }}</ToggleGroupItem>
+                                <ToggleGroupItem value="group">{{
+                                    t('dialog.new_instance.access_type_group')
+                                }}</ToggleGroupItem>
+                                <ToggleGroupItem value="friends+">{{
+                                    t('dialog.new_instance.access_type_friend_plus')
+                                }}</ToggleGroupItem>
+                                <ToggleGroupItem value="friends">{{
+                                    t('dialog.new_instance.access_type_friend')
+                                }}</ToggleGroupItem>
+                                <ToggleGroupItem value="invite+">{{
+                                    t('dialog.new_instance.access_type_invite_plus')
+                                }}</ToggleGroupItem>
+                                <ToggleGroupItem value="invite">{{
+                                    t('dialog.new_instance.access_type_invite')
+                                }}</ToggleGroupItem>
+                            </ToggleGroup>
+                        </FieldContent>
+                    </Field>
+                    <Field v-if="newInstanceDialog.accessType === 'group'">
+                        <FieldLabel>{{ t('dialog.new_instance.group_access_type') }}</FieldLabel>
+                        <FieldContent>
+                            <ToggleGroup
+                                type="single"
+                                required
+                                variant="outline"
+                                size="sm"
+                                :model-value="newInstanceDialog.groupAccessType"
+                                @update:model-value="
+                                    (value) => {
+                                        newInstanceDialog.groupAccessType = value;
+                                        buildLegacyInstance();
+                                    }
+                                ">
+                                <ToggleGroupItem value="members">{{
+                                    t('dialog.new_instance.group_access_type_members')
+                                }}</ToggleGroupItem>
+                                <ToggleGroupItem value="plus">{{
+                                    t('dialog.new_instance.group_access_type_plus')
+                                }}</ToggleGroupItem>
+                                <ToggleGroupItem value="public">{{
+                                    t('dialog.new_instance.group_access_type_public')
+                                }}</ToggleGroupItem>
+                            </ToggleGroup>
+                        </FieldContent>
+                    </Field>
+                    <Field>
+                        <FieldLabel>{{ t('dialog.new_instance.region') }}</FieldLabel>
+                        <FieldContent>
+                            <ToggleGroup
+                                type="single"
+                                required
+                                variant="outline"
+                                size="sm"
+                                :model-value="newInstanceDialog.region"
+                                @update:model-value="
+                                    (value) => {
+                                        newInstanceDialog.region = value;
+                                        buildLegacyInstance();
+                                    }
+                                ">
+                                <ToggleGroupItem value="US West">{{
+                                    t('dialog.new_instance.region_usw')
+                                }}</ToggleGroupItem>
+                                <ToggleGroupItem value="US East">{{
+                                    t('dialog.new_instance.region_use')
+                                }}</ToggleGroupItem>
+                                <ToggleGroupItem value="Europe">{{
+                                    t('dialog.new_instance.region_eu')
+                                }}</ToggleGroupItem>
+                                <ToggleGroupItem value="Japan">{{
+                                    t('dialog.new_instance.region_jp')
+                                }}</ToggleGroupItem>
+                            </ToggleGroup>
+                        </FieldContent>
+                    </Field>
+                    <Field v-if="newInstanceDialog.accessType === 'group'">
+                        <FieldLabel>{{ t('dialog.new_instance.ageGate') }}</FieldLabel>
+                        <FieldContent>
+                            <Checkbox v-model="newInstanceDialog.ageGate" @update:modelValue="buildInstance" />
+                        </FieldContent>
+                    </Field>
+                    <Field>
+                        <FieldLabel>{{ t('dialog.new_instance.world_id') }}</FieldLabel>
+                        <FieldContent>
+                            <InputGroupField
+                                v-model="newInstanceDialog.worldId"
+                                size="sm"
+                                @click="$event.target.tagName === 'INPUT' && $event.target.select()"
+                                @change="buildLegacyInstance" />
+                        </FieldContent>
+                    </Field>
+                    <Field>
+                        <FieldLabel>{{ t('dialog.new_instance.instance_id') }}</FieldLabel>
+                        <FieldContent>
+                            <InputGroupField
+                                v-model="newInstanceDialog.instanceName"
+                                :placeholder="t('dialog.new_instance.instance_id_placeholder')"
+                                size="sm"
+                                @change="buildLegacyInstance" />
+                        </FieldContent>
+                    </Field>
+                    <Field
                         v-if="
                             newInstanceDialog.selectedTab === 'Legacy' &&
                             newInstanceDialog.accessType !== 'public' &&
                             newInstanceDialog.accessType !== 'group'
                         "
-                        :label="t('dialog.new_instance.instance_creator')">
-                        <el-select
-                            v-model="newInstanceDialog.userId"
-                            clearable
-                            :placeholder="t('dialog.new_instance.instance_creator_placeholder')"
-                            filterable
-                            style="width: 100%"
-                            @change="buildLegacyInstance">
-                            <el-option-group v-if="currentUser" :label="t('side_panel.me')">
-                                <el-option
-                                    class="x-friend-item"
-                                    :label="currentUser.displayName"
-                                    :value="currentUser.id"
-                                    style="height: auto">
-                                    <div class="avatar" :class="userStatusClass(currentUser)">
-                                        <img :src="userImage(currentUser)" loading="lazy" />
+                        class="items-start">
+                        <FieldLabel>{{ t('dialog.new_instance.instance_creator') }}</FieldLabel>
+                        <FieldContent>
+                            <VirtualCombobox
+                                v-model="newInstanceDialog.userId"
+                                :groups="creatorPickerGroups"
+                                :placeholder="t('dialog.new_instance.instance_creator_placeholder')"
+                                :search-placeholder="t('dialog.new_instance.instance_creator_placeholder')"
+                                :clearable="true"
+                                :close-on-select="true"
+                                :deselect-on-reselect="true"
+                                @change="buildLegacyInstance">
+                                <template #item="{ item, selected }">
+                                    <div class="x-friend-item flex w-full items-center">
+                                        <template v-if="item.user">
+                                            <div class="avatar" :class="userStatusClass(item.user)">
+                                                <img :src="userImage(item.user)" loading="lazy" />
+                                            </div>
+                                            <div class="detail">
+                                                <span
+                                                    class="name"
+                                                    :style="{ color: item.user.$userColour }"
+                                                    v-text="item.user.displayName"></span>
+                                            </div>
+                                        </template>
+                                        <template v-else>
+                                            <span v-text="item.label"></span>
+                                        </template>
+
+                                        <CheckIcon
+                                            :class="['ml-auto size-4', selected ? 'opacity-100' : 'opacity-0']" />
                                     </div>
-                                    <div class="detail">
-                                        <span class="name" v-text="currentUser.displayName"></span>
+                                </template>
+                            </VirtualCombobox>
+                        </FieldContent>
+                    </Field>
+                    <Field v-if="newInstanceDialog.accessType === 'group'">
+                        <FieldLabel>{{ t('dialog.new_instance.group_id') }}</FieldLabel>
+                        <FieldContent>
+                            <VirtualCombobox
+                                v-model="newInstanceDialog.groupId"
+                                :groups="legacyGroupPickerGroups"
+                                :placeholder="t('dialog.new_instance.group_placeholder')"
+                                :search-placeholder="t('dialog.new_instance.group_placeholder')"
+                                :clearable="true"
+                                :close-on-select="true"
+                                :deselect-on-reselect="true"
+                                @change="buildLegacyInstance">
+                                <template #item="{ item, selected }">
+                                    <div class="x-friend-item flex w-full items-center">
+                                        <div class="avatar">
+                                            <img :src="item.iconUrl" loading="lazy" />
+                                        </div>
+                                        <div class="detail">
+                                            <span class="name" v-text="item.label"></span>
+                                        </div>
+                                        <CheckIcon
+                                            :class="['ml-auto size-4', selected ? 'opacity-100' : 'opacity-0']" />
                                     </div>
-                                </el-option>
-                            </el-option-group>
-                            <el-option-group v-if="vipFriends.length" :label="t('side_panel.favorite')">
-                                <el-option
-                                    v-for="friend in vipFriends"
-                                    :key="friend.id"
-                                    class="x-friend-item"
-                                    :label="friend.name"
-                                    :value="friend.id"
-                                    style="height: auto">
-                                    <template v-if="friend.ref">
-                                        <div class="avatar" :class="userStatusClass(friend.ref)">
-                                            <img :src="userImage(friend.ref)" loading="lazy" />
-                                        </div>
-                                        <div class="detail">
-                                            <span
-                                                class="name"
-                                                :style="{ color: friend.ref.$userColour }"
-                                                v-text="friend.ref.displayName"></span>
-                                        </div>
-                                    </template>
-                                    <span v-else v-text="friend.id"></span>
-                                </el-option>
-                            </el-option-group>
-                            <el-option-group v-if="onlineFriends.length" :label="t('side_panel.online')">
-                                <el-option
-                                    v-for="friend in onlineFriends"
-                                    :key="friend.id"
-                                    class="x-friend-item"
-                                    :label="friend.name"
-                                    :value="friend.id"
-                                    style="height: auto">
-                                    <template v-if="friend.ref">
-                                        <div class="avatar" :class="userStatusClass(friend.ref)">
-                                            <img :src="userImage(friend.ref)" loading="lazy" />
-                                        </div>
-                                        <div class="detail">
-                                            <span
-                                                class="name"
-                                                :style="{ color: friend.ref.$userColour }"
-                                                v-text="friend.ref.displayName"></span>
-                                        </div>
-                                    </template>
-                                    <span v-else v-text="friend.id"></span>
-                                </el-option>
-                            </el-option-group>
-                            <el-option-group v-if="activeFriends.length" :label="t('side_panel.active')">
-                                <el-option
-                                    v-for="friend in activeFriends"
-                                    :key="friend.id"
-                                    class="x-friend-item"
-                                    :label="friend.name"
-                                    :value="friend.id"
-                                    style="height: auto">
-                                    <template v-if="friend.ref">
-                                        <div class="avatar">
-                                            <img :src="userImage(friend.ref)" loading="lazy" />
-                                        </div>
-                                        <div class="detail">
-                                            <span
-                                                class="name"
-                                                :style="{ color: friend.ref.$userColour }"
-                                                v-text="friend.ref.displayName"></span>
-                                        </div>
-                                    </template>
-                                    <span v-else v-text="friend.id"></span>
-                                </el-option>
-                            </el-option-group>
-                            <el-option-group v-if="offlineFriends.length" :label="t('side_panel.offline')">
-                                <el-option
-                                    v-for="friend in offlineFriends"
-                                    :key="friend.id"
-                                    class="x-friend-item"
-                                    :label="friend.name"
-                                    :value="friend.id"
-                                    style="height: auto">
-                                    <template v-if="friend.ref">
-                                        <div class="avatar">
-                                            <img :src="userImage(friend.ref)" loading="lazy" />
-                                        </div>
-                                        <div class="detail">
-                                            <span
-                                                class="name"
-                                                :style="{ color: friend.ref.$userColour }"
-                                                v-text="friend.ref.displayName"></span>
-                                        </div>
-                                    </template>
-                                    <span v-else v-text="friend.id"></span>
-                                </el-option>
-                            </el-option-group>
-                        </el-select>
-                    </el-form-item>
-                    <el-form-item
-                        v-if="newInstanceDialog.accessType === 'group'"
-                        :label="t('dialog.new_instance.group_id')">
-                        <el-select
-                            v-model="newInstanceDialog.groupId"
-                            clearable
-                            :placeholder="t('dialog.new_instance.group_placeholder')"
-                            filterable
-                            style="width: 100%"
-                            @change="buildLegacyInstance">
-                            <el-option-group :label="t('dialog.new_instance.group_placeholder')">
-                                <el-option
-                                    v-for="group in currentUserGroups.values()"
-                                    :key="group.id"
-                                    class="x-friend-item"
-                                    :label="group.name"
-                                    :value="group.id"
-                                    style="height: auto; width: 478px">
-                                    <template v-if="group">
-                                        <div class="avatar">
-                                            <img :src="group.iconUrl" loading="lazy" />
-                                        </div>
-                                        <div class="detail">
-                                            <span class="name" v-text="group.name"></span></div
-                                    ></template>
-                                </el-option>
-                            </el-option-group>
-                        </el-select>
-                    </el-form-item>
-                    <el-form-item :label="t('dialog.new_instance.location')">
-                        <el-input
-                            v-model="newInstanceDialog.location"
-                            size="small"
-                            readonly
-                            @click="$event.target.tagName === 'INPUT' && $event.target.select()"></el-input>
-                    </el-form-item>
-                    <el-form-item :label="t('dialog.new_instance.url')">
-                        <el-input v-model="newInstanceDialog.url" size="small" readonly></el-input>
-                    </el-form-item>
-                </el-form>
+                                </template>
+                            </VirtualCombobox>
+                        </FieldContent>
+                    </Field>
+                    <Field>
+                        <FieldLabel>{{ t('dialog.new_instance.location') }}</FieldLabel>
+                        <FieldContent>
+                            <InputGroupField
+                                v-model="newInstanceDialog.location"
+                                size="sm"
+                                readonly
+                                @click="$event.target.tagName === 'INPUT' && $event.target.select()" />
+                        </FieldContent>
+                    </Field>
+                    <Field>
+                        <FieldLabel>{{ t('dialog.new_instance.url') }}</FieldLabel>
+                        <FieldContent>
+                            <InputGroupField v-model="newInstanceDialog.url" size="sm" readonly />
+                        </FieldContent>
+                    </Field>
+                </FieldGroup>
             </el-tab-pane>
         </el-tabs>
         <template v-if="newInstanceDialog.selectedTab === 'Normal'" #footer>
             <template v-if="newInstanceDialog.instanceCreated">
-                <el-button @click="copyInstanceUrl(newInstanceDialog.location)">{{
+                <Button variant="outline" class="mr-2" @click="copyInstanceUrl(newInstanceDialog.location)">{{
                     t('dialog.new_instance.copy_url')
-                }}</el-button>
-                <el-button @click="selfInvite(newInstanceDialog.location)">{{
+                }}</Button>
+                <Button variant="outline" class="mr-2" @click="selfInvite(newInstanceDialog.location)">{{
                     t('dialog.new_instance.self_invite')
-                }}</el-button>
-                <el-button
+                }}</Button>
+                <Button
+                    variant="outline"
+                    class="mr-2"
                     :disabled="
                         (newInstanceDialog.accessType === 'friends' || newInstanceDialog.accessType === 'invite') &&
                         newInstanceDialog.userId !== currentUser.id
                     "
                     @click="showInviteDialog(newInstanceDialog.location)"
-                    >{{ t('dialog.new_instance.invite') }}</el-button
+                    >{{ t('dialog.new_instance.invite') }}</Button
                 >
-                <template v-if="canOpenInstanceInGame()">
-                    <el-button @click="showLaunchDialog(newInstanceDialog.location, newInstanceDialog.shortName)">{{
-                        t('dialog.new_instance.launch')
-                    }}</el-button>
-                    <el-button @click="handleAttachGame(newInstanceDialog.location, newInstanceDialog.shortName)">
+                <template v-if="canOpenInstanceInGame">
+                    <Button
+                        variant="secondary"
+                        class="mr-2"
+                        @click="showLaunchDialog(newInstanceDialog.location, newInstanceDialog.shortName)"
+                        >{{ t('dialog.new_instance.launch') }}</Button
+                    >
+                    <Button @click="handleAttachGame(newInstanceDialog.location, newInstanceDialog.shortName)">
                         {{ t('dialog.new_instance.open_ingame') }}
-                    </el-button>
+                    </Button>
                 </template>
                 <template v-else>
-                    <el-button
-                        type="primary"
-                        @click="showLaunchDialog(newInstanceDialog.location, newInstanceDialog.shortName)"
-                        >{{ t('dialog.new_instance.launch') }}</el-button
-                    >
+                    <Button @click="showLaunchDialog(newInstanceDialog.location, newInstanceDialog.shortName)">{{
+                        t('dialog.new_instance.launch')
+                    }}</Button>
                 </template>
             </template>
             <template v-else>
-                <el-button type="primary" @click="handleCreateNewInstance">{{
-                    t('dialog.new_instance.create_instance')
-                }}</el-button>
+                <Button @click="handleCreateNewInstance">{{ t('dialog.new_instance.create_instance') }}</Button>
             </template>
         </template>
         <template v-else-if="newInstanceDialog.selectedTab === 'Legacy'" #footer>
-            <el-button @click="copyInstanceUrl(newInstanceDialog.location)">{{
+            <Button variant="outline" class="mr-2" @click="copyInstanceUrl(newInstanceDialog.location)">{{
                 t('dialog.new_instance.copy_url')
-            }}</el-button>
-            <el-button @click="selfInvite(newInstanceDialog.location)">{{
+            }}</Button>
+            <Button variant="outline" class="mr-2" @click="selfInvite(newInstanceDialog.location)">{{
                 t('dialog.new_instance.self_invite')
-            }}</el-button>
-            <el-button
+            }}</Button>
+            <Button
+                variant="outline"
                 :disabled="
                     (newInstanceDialog.accessType === 'friends' || newInstanceDialog.accessType === 'invite') &&
                     newInstanceDialog.userId !== currentUser.id
                 "
                 @click="showInviteDialog(newInstanceDialog.location)"
-                >{{ t('dialog.new_instance.invite') }}</el-button
+                >{{ t('dialog.new_instance.invite') }}</Button
             >
-            <template v-if="canOpenInstanceInGame()">
-                <el-button @click="showLaunchDialog(newInstanceDialog.location, newInstanceDialog.shortName)">{{
-                    t('dialog.new_instance.launch')
-                }}</el-button>
-                <el-button
-                    type="primary"
-                    @click="handleAttachGame(newInstanceDialog.location, newInstanceDialog.shortName)">
+            <template v-if="canOpenInstanceInGame">
+                <Button
+                    variant="secondary"
+                    class="mr-2"
+                    @click="showLaunchDialog(newInstanceDialog.location, newInstanceDialog.shortName)"
+                    >{{ t('dialog.new_instance.launch') }}</Button
+                >
+                <Button @click="handleAttachGame(newInstanceDialog.location, newInstanceDialog.shortName)">
                     {{ t('dialog.new_instance.open_ingame') }}
-                </el-button>
+                </Button>
             </template>
             <template v-else>
-                <el-button
-                    type="primary"
-                    @click="showLaunchDialog(newInstanceDialog.location, newInstanceDialog.shortName)"
-                    >{{ t('dialog.new_instance.launch') }}</el-button
-                >
+                <Button @click="showLaunchDialog(newInstanceDialog.location, newInstanceDialog.shortName)">{{
+                    t('dialog.new_instance.launch')
+                }}</Button>
             </template>
         </template>
         <InviteDialog :invite-dialog="inviteDialog" @closeInviteDialog="closeInviteDialog" />
@@ -477,9 +508,14 @@
 </template>
 
 <script setup>
+    import { Field, FieldContent, FieldGroup, FieldLabel } from '@/components/ui/field';
     import { computed, nextTick, ref, watch } from 'vue';
-    import { ElMessage } from 'element-plus';
+    import { Button } from '@/components/ui/button';
+    import { Check as CheckIcon } from 'lucide-vue-next';
+    import { Checkbox } from '@/components/ui/checkbox';
+    import { InputGroupField } from '@/components/ui/input-group';
     import { storeToRefs } from 'pinia';
+    import { toast } from 'vue-sonner';
     import { useI18n } from 'vue-i18n';
 
     import {
@@ -500,7 +536,10 @@
         useLocationStore,
         useUserStore
     } from '../../stores';
+    import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
     import { groupRequest, instanceRequest, worldRequest } from '../../api';
+    import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group';
+    import { VirtualCombobox } from '../ui/virtual-combobox';
     import { getNextDialogIndex } from '../../shared/utils/base/ui';
 
     import InviteDialog from './InviteDialog/InviteDialog.vue';
@@ -562,6 +601,124 @@
         userIds: [],
         friendsInInstance: []
     });
+
+    const instanceCreatableGroups = computed(() => {
+        return Array.from(currentUserGroups.value.values()).filter((group) => {
+            if (!group) {
+                return false;
+            }
+            return (
+                hasGroupPermission(group, 'group-instance-public-create') ||
+                hasGroupPermission(group, 'group-instance-plus-create') ||
+                hasGroupPermission(group, 'group-instance-open-create')
+            );
+        });
+    });
+
+    const normalGroupPickerGroups = computed(() => [
+        {
+            key: 'instanceCreatableGroups',
+            label: t('dialog.new_instance.group_placeholder'),
+            items: instanceCreatableGroups.value.map((group) => ({
+                value: String(group.id),
+                label: group.name,
+                search: group.name,
+                iconUrl: group.iconUrl
+            }))
+        }
+    ]);
+
+    const legacyGroupPickerGroups = computed(() => [
+        {
+            key: 'currentUserGroups',
+            label: t('dialog.new_instance.group_placeholder'),
+            items: Array.from(currentUserGroups.value.values())
+                .filter(Boolean)
+                .map((group) => ({
+                    value: String(group.id),
+                    label: group.name,
+                    search: group.name,
+                    iconUrl: group.iconUrl
+                }))
+        }
+    ]);
+
+    const selectedRoleSummary = computed(() => {
+        const roleIds = newInstanceDialog.value.roleIds ?? [];
+        if (!Array.isArray(roleIds) || roleIds.length === 0) {
+            return '';
+        }
+        const roleById = new Map((newInstanceDialog.value.selectedGroupRoles ?? []).map((r) => [r.id, r.name]));
+        const names = roleIds.map((id) => roleById.get(id) ?? String(id));
+        return names.slice(0, 3).join(', ') + (names.length > 3 ? ` +${names.length - 3}` : '');
+    });
+
+    const friendById = computed(() => {
+        const map = new Map();
+        for (const friend of vipFriends.value) map.set(friend.id, friend);
+        for (const friend of onlineFriends.value) map.set(friend.id, friend);
+        for (const friend of activeFriends.value) map.set(friend.id, friend);
+        for (const friend of offlineFriends.value) map.set(friend.id, friend);
+        return map;
+    });
+
+    function resolveUserDisplayName(userId) {
+        if (currentUser.value?.id && currentUser.value.id === userId) {
+            return currentUser.value.displayName;
+        }
+        const friend = friendById.value.get(userId);
+        return friend?.ref?.displayName ?? friend?.name ?? String(userId);
+    }
+
+    const creatorPickerGroups = computed(() => {
+        const groups = [];
+
+        if (currentUser.value) {
+            groups.push({
+                key: 'me',
+                label: t('side_panel.me'),
+                items: [
+                    {
+                        value: String(currentUser.value.id),
+                        label: currentUser.value.displayName,
+                        search: currentUser.value.displayName,
+                        user: currentUser.value
+                    }
+                ]
+            });
+        }
+
+        const addFriendGroup = (key, label, friends) => {
+            if (!friends?.length) return;
+            groups.push({
+                key,
+                label,
+                items: friends.map((friend) => {
+                    const user = friend?.ref ?? null;
+                    const displayName = resolveUserDisplayName(friend.id);
+                    return {
+                        value: String(friend.id),
+                        label: displayName,
+                        search: displayName,
+                        user
+                    };
+                })
+            });
+        };
+
+        addFriendGroup('vip', t('side_panel.favorite'), vipFriends.value);
+        addFriendGroup('online', t('side_panel.online'), onlineFriends.value);
+        addFriendGroup('active', t('side_panel.active'), activeFriends.value);
+        addFriendGroup('offline', t('side_panel.offline'), offlineFriends.value);
+
+        return groups;
+    });
+
+    function handleRoleIdsChange(value) {
+        const next = Array.isArray(value) ? value.map((v) => String(v ?? '')).filter(Boolean) : [];
+        newInstanceDialog.value.roleIds = next;
+        buildInstance();
+    }
 
     watch(
         () => props.newInstanceDialogLocationTag,
@@ -734,10 +891,7 @@
                 worldId: L.worldId
             })
             .then((args) => {
-                ElMessage({
-                    message: 'Self invite sent',
-                    type: 'success'
-                });
+                toast.success('Self invite sent');
                 return args;
             });
     }

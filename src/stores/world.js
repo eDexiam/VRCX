@@ -1,6 +1,6 @@
-import { reactive, watch } from 'vue';
-import { ElMessage } from 'element-plus';
+import { reactive, shallowReactive, watch } from 'vue';
 import { defineStore } from 'pinia';
+import { toast } from 'vue-sonner';
 
 import {
     checkVRChatCache,
@@ -36,7 +36,7 @@ export const useWorldStore = defineStore('World', () => {
         avatarScalingDisabled: false,
         focusViewDisabled: false,
         rooms: [],
-        treeData: [],
+        treeData: {},
         bundleSizes: [],
         lastUpdated: '',
         inCache: false,
@@ -53,7 +53,7 @@ export const useWorldStore = defineStore('World', () => {
         hasPersistData: false
     });
 
-    let cachedWorlds = new Map();
+    const cachedWorlds = shallowReactive(new Map());
 
     watch(
         () => watchState.isLoggedIn,
@@ -78,7 +78,7 @@ export const useWorldStore = defineStore('World', () => {
         L.shortName = shortName;
         D.id = L.worldId;
         D.$location = L;
-        D.treeData = [];
+        D.treeData = {};
         D.bundleSizes = [];
         D.lastUpdated = '';
         D.visible = true;
@@ -132,17 +132,14 @@ export const useWorldStore = defineStore('World', () => {
             .catch((err) => {
                 D.loading = false;
                 D.visible = false;
-                ElMessage({
-                    message: 'Failed to load world',
-                    type: 'error'
-                });
+                toast.error('Failed to load world');
                 throw err;
             })
             .then((args) => {
                 if (D.id === args.ref.id) {
                     D.loading = false;
                     D.ref = args.ref;
-                    D.isFavorite = favoriteStore.cachedFavoritesByObjectId.has(
+                    D.isFavorite = favoriteStore.getCachedFavoritesByObjectId(
                         D.id
                     );
                     if (!D.isFavorite) {
@@ -215,6 +212,23 @@ export const useWorldStore = defineStore('World', () => {
         }
     }
 
+    function cleanupWorldCache(WorldCache) {
+        const maxCacheSize = 10000;
+
+        if (WorldCache.size <= maxCacheSize) {
+            return;
+        }
+
+        const deletedCount = WorldCache.size - maxCacheSize;
+        while (WorldCache.size > maxCacheSize) {
+            const deletedKey = WorldCache.keys().next().value;
+            WorldCache.delete(deletedKey);
+        }
+        console.log(
+            `World cache cleanup: Deleted ${deletedCount}. Current cache size: ${WorldCache.size}`
+        );
+    }
+
     /**
      *
      * @param {object} json
@@ -270,6 +284,7 @@ export const useWorldStore = defineStore('World', () => {
                 //
                 ...json
             };
+            cleanupWorldCache(cachedWorlds);
             cachedWorlds.set(ref.id, ref);
         } else {
             Object.assign(ref, json);

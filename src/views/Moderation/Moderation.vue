@@ -1,108 +1,85 @@
 <template>
-    <div class="x-container">
-        <!-- 工具栏 -->
+    <div class="x-container" ref="moderationRef">
         <div class="tool-slot">
-            <el-select
-                v-model="playerModerationTable.filters[0].value"
-                @change="saveTableFilters()"
+            <Select
                 multiple
-                clearable
-                style="flex: 1"
-                :placeholder="t('view.moderation.filter_placeholder')">
-                <el-option
-                    v-for="item in moderationTypes"
-                    :key="item"
-                    :label="t('view.moderation.filters.' + item)"
-                    :value="item" />
-            </el-select>
-            <el-input
+                :model-value="
+                    Array.isArray(playerModerationTable.filters?.[0]?.value)
+                        ? playerModerationTable.filters[0].value
+                        : []
+                "
+                @update:modelValue="handleModerationFilterChange">
+                <SelectTrigger class="w-full" style="flex: 1">
+                    <SelectValue :placeholder="t('view.moderation.filter_placeholder')" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectGroup>
+                        <SelectItem v-for="item in moderationTypes" :key="item" :value="item">
+                            {{ t('view.moderation.filters.' + item) }}
+                        </SelectItem>
+                    </SelectGroup>
+                </SelectContent>
+            </Select>
+            <InputGroupField
                 v-model="playerModerationTable.filters[1].value"
                 :placeholder="t('view.moderation.search_placeholder')"
                 class="filter-input" />
-            <el-tooltip placement="bottom" :content="t('view.moderation.refresh_tooltip')">
-                <el-button
-                    type="default"
-                    :loading="playerModerationTable.loading"
-                    @click="refreshPlayerModerations()"
-                    :icon="Refresh"
-                    circle />
-            </el-tooltip>
+            <TooltipWrapper side="bottom" :content="t('view.moderation.refresh_tooltip')">
+                <Button
+                    class="rounded-full"
+                    variant="outline"
+                    size="icon-sm"
+                    :disabled="playerModerationTable.loading"
+                    @click="refreshPlayerModerations()">
+                    <Spinner v-if="playerModerationTable.loading" />
+                    <Refresh v-else />
+                </Button>
+            </TooltipWrapper>
         </div>
 
-        <DataTable v-bind="playerModerationTable">
-            <el-table-column :label="t('table.moderation.date')" prop="created" :sortable="true" width="130">
-                <template #default="scope">
-                    <el-tooltip placement="right">
-                        <template #content>
-                            <span>{{ formatDateFilter(scope.row.created, 'long') }}</span>
-                        </template>
-                        <span>{{ formatDateFilter(scope.row.created, 'short') }}</span>
-                    </el-tooltip>
-                </template>
-            </el-table-column>
-            <el-table-column :label="t('table.moderation.type')" prop="type" width="100">
-                <template #default="scope">
-                    <span v-text="t('view.moderation.filters.' + scope.row.type)"></span>
-                </template>
-            </el-table-column>
-            <el-table-column :label="t('table.moderation.source')" prop="sourceDisplayName">
-                <template #default="scope">
-                    <span
-                        class="x-link"
-                        v-text="scope.row.sourceDisplayName"
-                        @click="showUserDialog(scope.row.sourceUserId)"></span>
-                </template>
-            </el-table-column>
-            <el-table-column :label="t('table.moderation.target')" prop="targetDisplayName">
-                <template #default="scope">
-                    <span
-                        class="x-link"
-                        v-text="scope.row.targetDisplayName"
-                        @click="showUserDialog(scope.row.targetUserId)"></span>
-                </template>
-            </el-table-column>
-            <el-table-column :label="t('table.moderation.action')" width="80" align="right">
-                <template #default="scope">
-                    <template v-if="scope.row.sourceUserId === currentUser.id">
-                        <el-button
-                            v-if="shiftHeld"
-                            style="color: #f56c6c"
-                            type="text"
-                            :icon="Close"
-                            size="small"
-                            @click="deletePlayerModeration(scope.row)"></el-button>
-                        <el-button
-                            v-else
-                            type="text"
-                            :icon="Close"
-                            size="small"
-                            @click="deletePlayerModerationPrompt(scope.row)"></el-button>
-                    </template>
-                </template>
-            </el-table-column>
-        </DataTable>
+        <DataTableLayout
+            :table="table"
+            :loading="playerModerationTable.loading"
+            :table-style="tableHeightStyle"
+            :page-sizes="pageSizes"
+            :total-items="totalItems"
+            :on-page-size-change="handlePageSizeChange" />
     </div>
 </template>
 
 <script setup>
-    import { Close, Refresh } from '@element-plus/icons-vue';
-    import { ElMessageBox } from 'element-plus';
+    import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+    import { computed, ref, watch } from 'vue';
+    import { Button } from '@/components/ui/button';
+    import { InputGroupField } from '@/components/ui/input-group';
+    import { Refresh } from '@element-plus/icons-vue';
+    import { Spinner } from '@/components/ui/spinner';
     import { storeToRefs } from 'pinia';
     import { useI18n } from 'vue-i18n';
 
-    import { useModerationStore, useUiStore, useUserStore } from '../../stores';
-    import { formatDateFilter } from '../../shared/utils';
+    import { useAppearanceSettingsStore, useModalStore, useModerationStore, useVrcxStore } from '../../stores';
+    import { DataTableLayout } from '../../components/ui/data-table';
+    import { createColumns } from './columns.jsx';
     import { moderationTypes } from '../../shared/constants';
     import { playerModerationRequest } from '../../api';
+    import { useDataTableScrollHeight } from '../../composables/useDataTableScrollHeight';
+    import { useVrcxVueTable } from '../../lib/table/useVrcxVueTable';
 
     import configRepository from '../../service/config.js';
 
     const { t } = useI18n();
-    const { showUserDialog } = useUserStore();
     const { playerModerationTable } = storeToRefs(useModerationStore());
     const { refreshPlayerModerations, handlePlayerModerationDelete } = useModerationStore();
-    const { shiftHeld } = storeToRefs(useUiStore());
-    const { currentUser } = storeToRefs(useUserStore());
+    const appearanceSettingsStore = useAppearanceSettingsStore();
+    const vrcxStore = useVrcxStore();
+    const modalStore = useModalStore();
+
+    const moderationRef = ref(null);
+    const { tableStyle: tableHeightStyle } = useDataTableScrollHeight(moderationRef, {
+        offset: 30,
+        toolbarHeight: 54,
+        paginationHeight: 52
+    });
 
     async function init() {
         playerModerationTable.value.filters[0].value = JSON.parse(
@@ -119,6 +96,11 @@
         );
     }
 
+    function handleModerationFilterChange(value) {
+        playerModerationTable.value.filters[0].value = Array.isArray(value) ? value : [];
+        saveTableFilters();
+    }
+
     async function deletePlayerModeration(row) {
         const args = await playerModerationRequest.deletePlayerModeration({
             moderated: row.targetUserId,
@@ -128,18 +110,91 @@
     }
 
     function deletePlayerModerationPrompt(row) {
-        ElMessageBox.confirm(`Continue? Delete Moderation ${row.type}`, 'Confirm', {
-            confirmButtonText: 'Confirm',
-            cancelButtonText: 'Cancel',
-            type: 'info'
-        })
-            .then((action) => {
-                if (action === 'confirm') {
-                    deletePlayerModeration(row);
-                }
+        modalStore
+            .confirm({
+                description: `Continue? Delete Moderation ${row.type}`,
+                title: 'Confirm'
             })
+            .then(({ ok }) => ok && deletePlayerModeration(row))
             .catch(() => {});
     }
+
+    const moderationDisplayData = computed(() => {
+        const data = playerModerationTable.value.data;
+        const typeFilter = playerModerationTable.value.filters?.[0]?.value ?? [];
+        const searchFilter = playerModerationTable.value.filters?.[1]?.value ?? '';
+        const typeSet = Array.isArray(typeFilter)
+            ? new Set(typeFilter.map((value) => String(value).toLowerCase()))
+            : null;
+        const searchValue = String(searchFilter).trim().toLowerCase();
+
+        return data.filter((row) => {
+            if (typeSet && typeSet.size > 0) {
+                const rowType = String(row.type ?? '').toLowerCase();
+                if (!typeSet.has(rowType)) {
+                    return false;
+                }
+            }
+            if (searchValue) {
+                const source = String(row.sourceDisplayName ?? '').toLowerCase();
+                const target = String(row.targetDisplayName ?? '').toLowerCase();
+                if (!source.includes(searchValue) && !target.includes(searchValue)) {
+                    return false;
+                }
+            }
+            return true;
+        });
+    });
+
+    const columns = createColumns({
+        onDelete: deletePlayerModeration,
+        onDeletePrompt: deletePlayerModerationPrompt
+    });
+
+    const pageSizes = computed(() => appearanceSettingsStore.tablePageSizes);
+    const pageSize = computed(() =>
+        playerModerationTable.value.pageSizeLinked
+            ? appearanceSettingsStore.tablePageSize
+            : playerModerationTable.value.pageSize
+    );
+
+    const { table, pagination } = useVrcxVueTable({
+        persistKey: 'moderation',
+        data: moderationDisplayData,
+        columns,
+        getRowId: (row) => row.id ?? `${row.type}:${row.sourceUserId}:${row.targetUserId}:${row.created ?? ''}`,
+        initialSorting: [{ id: 'created', desc: true }],
+        initialPagination: {
+            pageIndex: 0,
+            pageSize: pageSize.value
+        }
+    });
+
+    const totalItems = computed(() => {
+        const length = table.getFilteredRowModel().rows.length;
+        const max = vrcxStore.maxTableSize;
+        return length > max && length < max + 51 ? max : length;
+    });
+
+    const handlePageSizeChange = (size) => {
+        if (playerModerationTable.value.pageSizeLinked) {
+            appearanceSettingsStore.setTablePageSize(size);
+        } else {
+            playerModerationTable.value.pageSize = size;
+        }
+    };
+
+    watch(pageSize, (size) => {
+        if (pagination.value.pageSize === size) {
+            return;
+        }
+        pagination.value = {
+            ...pagination.value,
+            pageIndex: 0,
+            pageSize: size
+        };
+        table.setPageSize(size);
+    });
 </script>
 
 <style scoped>

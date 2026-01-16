@@ -22,7 +22,11 @@ contextBridge.exposeInMainWorld('interopApi', {
 const validChannels = ['launch-command'];
 
 contextBridge.exposeInMainWorld('electron', {
-    getArch: () => ipcRenderer.invoke('getArch'),
+    getArch: () => ipcRenderer.invoke('app:getArch'),
+    getClipboardText: () => ipcRenderer.invoke('app:getClipboardText'),
+    getNoUpdater: () => ipcRenderer.invoke('app:getNoUpdater'),
+    setTrayIconNotification: (notify) =>
+        ipcRenderer.invoke('app:setTrayIconNotification', notify),
     openFileDialog: () => ipcRenderer.invoke('dialog:openFile'),
     openDirectoryDialog: () => ipcRenderer.invoke('dialog:openDirectory'),
     onWindowPositionChanged: (callback) =>
@@ -35,9 +39,7 @@ contextBridge.exposeInMainWorld('electron', {
     desktopNotification: (title, body, icon) =>
         ipcRenderer.invoke('notification:showNotification', title, body, icon),
     restartApp: () => ipcRenderer.invoke('app:restart'),
-    getWristOverlayWindow: () =>
-        ipcRenderer.invoke('app:getWristOverlayWindow'),
-    getHmdOverlayWindow: () => ipcRenderer.invoke('app:getHmdOverlayWindow'),
+    getOverlayWindow: () => ipcRenderer.invoke('app:getOverlayWindow'),
     updateVr: (active, hmdOverlay, wristOverlay, menuButton, overlayHand) =>
         ipcRenderer.invoke(
             'app:updateVr',

@@ -10,42 +10,20 @@
             <input class="inviteImageUploadButton" type="file" accept="image/*" @change="inviteImageUpload" />
         </template>
 
-        <DataTable
-            v-bind="inviteRequestResponseMessageTable"
-            style="margin-top: 10px; cursor: pointer"
-            @row-click="showSendInviteResponseConfirmDialog">
-            <el-table-column :label="t('table.profile.invite_messages.slot')" prop="slot" :sortable="true" width="70">
-            </el-table-column>
-            <el-table-column :label="t('table.profile.invite_messages.message')" prop="message"> </el-table-column>
-            <el-table-column
-                :label="t('table.profile.invite_messages.cool_down')"
-                prop="updatedAt"
-                :sortable="true"
-                width="110"
-                align="right">
-                <template #default="scope">
-                    <countdown-timer :datetime="scope.row.updatedAt" :hours="1"></countdown-timer>
-                </template>
-            </el-table-column>
-            <el-table-column :label="t('table.profile.invite_messages.action')" width="70" align="right">
-                <template #default="scope">
-                    <el-button
-                        type="text"
-                        :icon="Edit"
-                        size="small"
-                        @click.stop="showEditAndSendInviteResponseDialog(scope.row)">
-                    </el-button>
-                </template>
-            </el-table-column>
-        </DataTable>
+        <DataTableLayout
+            style="margin-top: 10px"
+            :table="inviteRequestResponseTable"
+            :loading="false"
+            :show-pagination="false"
+            :on-row-click="handleInviteRequestResponseRowClick" />
 
         <template #footer>
-            <el-button @click="cancelSendInviteRequestResponse">
+            <Button variant="secondary" class="mr-2" @click="cancelSendInviteRequestResponse">
                 {{ t('dialog.invite_request_response_message.cancel') }}
-            </el-button>
-            <el-button @click="refreshInviteMessageTableData('requestResponse')">
+            </Button>
+            <Button @click="refreshInviteMessageTableData('requestResponse')">
                 {{ t('dialog.invite_request_response_message.refresh') }}
-            </el-button>
+            </Button>
         </template>
         <EditAndSendInviteResponseDialog
             :edit-and-send-invite-response-dialog="editAndSendInviteResponseDialog"
@@ -61,12 +39,15 @@
 </template>
 
 <script setup>
-    import { Edit } from '@element-plus/icons-vue';
-    import { ref } from 'vue';
+    import { computed, ref } from 'vue';
+    import { Button } from '@/components/ui/button';
+    import { DataTableLayout } from '@/components/ui/data-table';
     import { storeToRefs } from 'pinia';
     import { useI18n } from 'vue-i18n';
+    import { useVrcxVueTable } from '@/lib/table/useVrcxVueTable';
 
     import { useGalleryStore, useInviteStore, useUserStore } from '../../../stores';
+    import { createColumns } from './sendInviteRequestResponseColumns.jsx';
 
     import EditAndSendInviteResponseDialog from './EditAndSendInviteResponseDialog.vue';
     import SendInviteResponseConfirmDialog from './SendInviteResponseConfirmDialog.vue';
@@ -100,6 +81,26 @@
     const sendInviteResponseConfirmDialog = ref({
         visible: false
     });
+
+    const inviteRequestResponseRows = computed(() => inviteRequestResponseMessageTable.value?.data ?? []);
+    const inviteRequestResponseColumns = computed(() =>
+        createColumns({
+            onEdit: showEditAndSendInviteResponseDialog
+        })
+    );
+
+    const { table: inviteRequestResponseTable } = useVrcxVueTable({
+        persistKey: 'invite-request-response-message',
+        data: inviteRequestResponseRows,
+        columns: inviteRequestResponseColumns,
+        getRowId: (row) => String(row?.slot ?? ''),
+        enablePagination: false,
+        initialSorting: [{ id: 'slot', desc: false }]
+    });
+
+    function handleInviteRequestResponseRowClick(row) {
+        showSendInviteResponseConfirmDialog(row?.original);
+    }
 
     function showEditAndSendInviteResponseDialog(row) {
         emit('update:sendInviteResponseDialog', { ...props.sendInviteResponseDialog, messageSlot: row });

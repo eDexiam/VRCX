@@ -1,11 +1,12 @@
-import { ElMessage, ElMessageBox } from 'element-plus';
 import { storeToRefs } from 'pinia';
+import { toast } from 'vue-sonner';
 
 import Noty from 'noty';
 
 import {
     useAvatarStore,
     useInstanceStore,
+    useModalStore,
     useSearchStore,
     useWorldStore
 } from '../../stores';
@@ -159,17 +160,11 @@ function copyToClipboard(text, message = 'Copied successfully!') {
     navigator.clipboard
         .writeText(text)
         .then(() => {
-            ElMessage({
-                message: message,
-                type: 'success'
-            });
+            toast.success(message);
         })
         .catch((err) => {
             console.error('Copy failed:', err);
-            ElMessage({
-                message: 'Copy failed!',
-                type: 'error'
-            });
+            toast.error('Copy failed!');
         });
 }
 
@@ -326,6 +321,13 @@ function buildTreeData(json) {
     node.sort(function (a, b) {
         const A = String(a.key).toUpperCase();
         const B = String(b.key).toUpperCase();
+        // sort _ to top
+        if (A.startsWith('_') && !B.startsWith('_')) {
+            return -1;
+        }
+        if (B.startsWith('_') && !A.startsWith('_')) {
+            return 1;
+        }
         if (A < B) {
             return -1;
         }
@@ -393,25 +395,22 @@ function openExternalLink(link) {
         return;
     }
 
-    ElMessageBox.confirm(`${link}`, 'Open External Link', {
-        distinguishCancelAndClose: true,
-        confirmButtonText: 'Open',
-        cancelButtonText: 'Copy',
-        type: 'info',
-        beforeClose: (action, instance, done) => {
-            if (action === 'cancel') {
-                copyToClipboard(link);
-            }
-            done();
-        }
-    })
-        .then((action) => {
-            console.log(action);
-            if (action === 'confirm') {
-                AppApi.OpenLink(link);
-            }
+    const modalStore = useModalStore();
+    modalStore
+        .confirm({
+            description: `${link}`,
+            title: 'Open External Link',
+            confirmText: 'Open',
+            cancelText: 'Copy'
         })
-        .catch(() => {});
+        // TODO: beforeClose alert dialog
+        .then(({ ok }) => {
+            if (!ok) {
+                copyToClipboard(link, 'Link copied to clipboard!');
+                return;
+            }
+            AppApi.OpenLink(link);
+        });
 }
 
 /**
@@ -492,13 +491,13 @@ async function getBundleDateSize(ref) {
             // update avatar dialog
             avatarDialog.value.bundleSizes[platform] = bundleSizes[platform];
             avatarDialog.value.lastUpdated = createdAt;
-            avatarDialog.value.fileAnalysis = buildTreeData(bundleJson);
+            avatarDialog.value.fileAnalysis = bundleJson;
         }
         // update world dialog
         if (worldDialog.value.id === ref.id) {
             worldDialog.value.bundleSizes[platform] = bundleSizes[platform];
             worldDialog.value.lastUpdated = createdAt;
-            worldDialog.value.fileAnalysis = buildTreeData(bundleJson);
+            worldDialog.value.fileAnalysis = bundleJson;
         }
         // update player list
         if (currentInstanceLocation.value.worldId === ref.id) {

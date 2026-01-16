@@ -5,51 +5,38 @@
         :title="t('dialog.friend_export.header')"
         width="650px"
         destroy-on-close>
-        <el-dropdown trigger="click" size="small">
-            <el-button size="small">
-                <span v-if="friendExportFavoriteGroup">
-                    {{ friendExportFavoriteGroup.displayName }} ({{ friendExportFavoriteGroup.count }}/{{
-                        friendExportFavoriteGroup.capacity
-                    }})
-                    <el-icon class="el-icon--right"><ArrowDown /></el-icon>
-                </span>
-                <span v-else
-                    >All Favorites <el-icon class="el-icon--right"><ArrowDown /></el-icon
-                ></span>
-            </el-button>
-            <template #dropdown>
-                <el-dropdown-menu>
-                    <el-dropdown-item style="display: block; margin: 10px 0" @click="selectFriendExportGroup(null)">
-                        All Favorites
-                    </el-dropdown-item>
-                    <template v-for="groupAPI in favoriteFriendGroups" :key="groupAPI.name">
-                        <el-dropdown-item
-                            style="display: block; margin: 10px 0"
-                            @click="selectFriendExportGroup(groupAPI)">
-                            {{ groupAPI.displayName }} ({{ groupAPI.count }}/{{ groupAPI.capacity }})
-                        </el-dropdown-item>
-                    </template>
-                </el-dropdown-menu>
-            </template>
-        </el-dropdown>
+        <Select :model-value="friendExportFavoriteGroupSelection" @update:modelValue="handleFriendExportGroupSelect">
+            <SelectTrigger size="sm">
+                <SelectValue placeholder="All Favorites" />
+            </SelectTrigger>
+            <SelectContent>
+                <SelectGroup>
+                    <SelectItem :value="FRIEND_EXPORT_ALL_VALUE">All Favorites</SelectItem>
+                    <SelectItem v-for="groupAPI in favoriteFriendGroups" :key="groupAPI.name" :value="groupAPI.name">
+                        {{ groupAPI.displayName }} ({{ groupAPI.count }}/{{ groupAPI.capacity }})
+                    </SelectItem>
+                </SelectGroup>
+            </SelectContent>
+        </Select>
+
         <br />
-        <el-input
+
+        <InputGroupTextareaField
             v-model="friendExportContent"
-            type="textarea"
-            size="small"
             :rows="15"
-            resize="none"
             readonly
             style="margin-top: 15px"
-            @click="handleCopyFriendExportData"></el-input>
+            input-class="resize-none"
+            @click="handleCopyFriendExportData" />
     </el-dialog>
 </template>
 
 <script setup>
+    import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
     import { computed, ref, watch } from 'vue';
-    import { ArrowDown } from '@element-plus/icons-vue';
-    import { ElMessage } from 'element-plus';
     import { storeToRefs } from 'pinia';
+    import { InputGroupTextareaField } from '@/components/ui/input-group';
+    import { toast } from 'vue-sonner';
     import { useI18n } from 'vue-i18n';
 
     import { useFavoriteStore } from '../../../stores';
@@ -65,10 +52,11 @@
 
     const emit = defineEmits(['update:friendExportDialogVisible']);
 
-    const favoriteStore = useFavoriteStore();
-    const { favoriteFriends, favoriteFriendGroups } = storeToRefs(favoriteStore);
+    const { favoriteFriends, favoriteFriendGroups } = storeToRefs(useFavoriteStore());
 
     const friendExportFavoriteGroup = ref(null);
+    const FRIEND_EXPORT_ALL_VALUE = '__all__';
+    const friendExportFavoriteGroupSelection = ref(FRIEND_EXPORT_ALL_VALUE);
     const friendExportContent = ref('');
 
     const isDialogVisible = computed({
@@ -91,7 +79,18 @@
 
     function showFriendExportDialog() {
         friendExportFavoriteGroup.value = null;
+        friendExportFavoriteGroupSelection.value = FRIEND_EXPORT_ALL_VALUE;
         updateFriendExportDialog();
+    }
+
+    function handleFriendExportGroupSelect(value) {
+        friendExportFavoriteGroupSelection.value = value;
+        if (value === FRIEND_EXPORT_ALL_VALUE) {
+            selectFriendExportGroup(null);
+            return;
+        }
+        const group = favoriteFriendGroups.value.find((g) => g.name === value) || null;
+        selectFriendExportGroup(group);
     }
 
     function handleCopyFriendExportData(event) {
@@ -101,34 +100,40 @@
         navigator.clipboard
             .writeText(friendExportContent.value)
             .then(() => {
-                ElMessage({
-                    message: 'Copied successfully!',
-                    type: 'success',
-                    duration: 2000
-                });
+                toast.success('Copied successfully!', { duration: 2000 });
             })
             .catch((err) => {
                 console.error('Copy failed:', err);
-                ElMessage({
-                    message: 'Copy failed!',
-                    type: 'error'
-                });
+                toast.error('Copy failed!');
             });
     }
 
     function updateFriendExportDialog() {
-        const _ = function (str) {
-            if (/[\x00-\x1f,"]/.test(str) === true) {
-                return `"${str.replace(/"/g, '""')}"`;
+        const needsCsvQuotes = (text) => {
+            for (let i = 0; i < text.length; i++) {
+                if (text.charCodeAt(i) < 0x20) {
+                    return true;
+                }
             }
-            return str;
+            return text.includes(',') || text.includes('"');
+        };
+
+        const formatter = function (value) {
+            if (value === null || typeof value === 'undefined') {
+                return '';
+            }
+            const text = String(value);
+            if (needsCsvQuotes(text)) {
+                return `"${text.replace(/"/g, '""')}"`;
+            }
+            return text;
         };
         const lines = ['UserID,Name'];
         favoriteFriendGroups.value.forEach((group) => {
             if (!friendExportFavoriteGroup.value || friendExportFavoriteGroup.value === group) {
                 favoriteFriends.value.forEach((ref) => {
                     if (group.key === ref.groupKey) {
-                        lines.push(`${_(ref.id)},${_(ref.name)}`);
+                        lines.push(`${formatter(ref.id)},${formatter(ref.name)}`);
                     }
                 });
             }
@@ -138,6 +143,7 @@
 
     function selectFriendExportGroup(group) {
         friendExportFavoriteGroup.value = group;
+        friendExportFavoriteGroupSelection.value = group?.name ?? FRIEND_EXPORT_ALL_VALUE;
         updateFriendExportDialog();
     }
 </script>

@@ -62,7 +62,7 @@ const favoriteReq = {
                 json,
                 params
             };
-            useFavoriteStore().handleFavoriteDelete(args);
+            useFavoriteStore().handleFavoriteDelete(params.objectId);
             return args;
         });
     },
@@ -108,7 +108,7 @@ const favoriteReq = {
     /**
      * @param {{
      *    type: string,
-     *    group: string (name)
+     *    group: string
      * }} params
      * @return { Promise<{json: any, params}> }
      */

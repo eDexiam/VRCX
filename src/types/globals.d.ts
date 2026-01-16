@@ -2,11 +2,13 @@
 /// <reference types="jest" />
 
 declare global {
+    const VERSION: string;
+    const NIGHTLY: boolean;
+
     const WINDOWS: boolean;
     const LINUX: boolean;
 
     interface Window {
-        $app: any;
         $pinia: any;
         $vr: any;
         $debug: AppDebug;
@@ -23,7 +25,7 @@ declare global {
         utils: any;
         dayjs: any;
         configRepository: any;
-        datebase: any;
+        database: any;
         gameLogService: any;
         crypto: any;
         sqliteService: any;
@@ -36,6 +38,9 @@ declare global {
         };
         electron: {
             getArch: () => Promise<string>;
+            getClipboardText: () => Promise<string>;
+            getNoUpdater: () => Promise<boolean>;
+            setTrayIconNotification: (notify: boolean) => Promise<void>;
             openFileDialog: () => Promise<string>;
             openDirectoryDialog: () => Promise<string>;
             desktopNotification: (
@@ -60,8 +65,7 @@ declare global {
             ) => void;
             onBrowserFocus: (Function: (event: any) => void) => void;
             restartApp: () => Promise<void>;
-            getWristOverlayWindow: () => Promise<boolean>;
-            getHmdOverlayWindow: () => Promise<boolean>;
+            getOverlayWindow: () => Promise<boolean>;
             updateVr: (
                 active: bool,
                 hmdOverlay: bool,
@@ -118,12 +122,9 @@ declare global {
     };
 
     const SQLite: {
-        Execute: (
-            sql: string,
-            args: string
-        ) => Promise<{ Item1: any; Item2: any[] }>;
+        Execute: (sql: string, args: string) => Promise<any[]>;
         ExecuteJson: (sql: string, args: string) => Promise<string>;
-        ExecuteNonQuery: (sql: string, args: string) => Promise<void>;
+        ExecuteNonQuery: (sql: string, args: string) => Promise<Number>;
     };
 
     const LogWatcher: {
@@ -166,8 +167,6 @@ declare global {
             menuButton: boolean,
             overlayHand: number
         ): Promise<void>;
-        RefreshVR(): Promise<void>;
-        RestartVR(): Promise<void>;
         SetZoom(zoomLevel: number): Promise<void>;
         GetZoom(): Promise<number>;
         DesktopNotification(
@@ -177,7 +176,6 @@ declare global {
         ): Promise<void>;
         RestartApplication(isUpgrade: boolean): Promise<void>;
         CheckForUpdateExe(): Promise<boolean>;
-        ExecuteVrFeedFunction(key: string, json: string): Promise<void>;
         ExecuteVrOverlayFunction(key: string, json: string): Promise<void>;
         FocusWindow(): Promise<void>;
         ChangeTheme(value: number): Promise<void>;
@@ -187,6 +185,8 @@ declare global {
         CopyImageToClipboard(path: string): Promise<void>;
         FlashWindow(): Promise<void>;
         SetUserAgent(): Promise<void>;
+        SetTrayIconNotification(notify: boolean): Promise<void>;
+        OpenCalendarFile(icsContent: string): Promise<void>;
 
         // Common Functions
         GetColourFromUserID(userId: string): Promise<number>;
@@ -363,7 +363,6 @@ declare global {
         GetUptime(): Promise<number>;
         CurrentCulture(): Promise<string>;
         CustomVrScript(): Promise<string>;
-        GetExecuteVrFeedFunctionQueue(): Promise<Map<string, string>>;
         GetExecuteVrOverlayFunctionQueue(): Promise<Map<string, string>>;
     };
 
@@ -415,4 +414,4 @@ declare global {
     };
 }
 
-export {};
+export { };

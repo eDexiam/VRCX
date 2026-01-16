@@ -1,10 +1,11 @@
-import { ElMessage, ElMessageBox } from 'element-plus';
+import { toast } from 'vue-sonner';
 
 import Noty from 'noty';
 
 import {
     useAuthStore,
     useAvatarStore,
+    useModalStore,
     useNotificationStore,
     useUpdateLoopStore,
     useUserStore
@@ -25,13 +26,14 @@ const t = i18n.global.t;
 /**
  * @template T
  * @param {string} endpoint
- * @param {RequestInit & { params?: any }} [options]
+ * @param {RequestInit & { params?: any } & {customMsg?: string}} [options]
  * @returns {Promise<T>}
  */
 export function request(endpoint, options) {
     const userStore = useUserStore();
     const avatarStore = useAvatarStore();
     const authStore = useAuthStore();
+    const modalStore = useModalStore();
     const notificationStore = useNotificationStore();
     const updateLoopStore = useUpdateLoopStore();
     if (
@@ -159,7 +161,9 @@ export function request(endpoint, options) {
                 if (text) {
                     new Noty({
                         type: 'success',
-                        text: escapeTag(text)
+                        text: options.customMsg
+                            ? options.customMsg
+                            : escapeTag(text)
                     }).show();
                 }
                 return data;
@@ -184,22 +188,19 @@ export function request(endpoint, options) {
                 }
             }
             if (status === 403 && endpoint === 'config') {
-                ElMessageBox.alert(
-                    t('api.error.message.vpn_in_use'),
-                    `403 ${t('api.error.message.login_error')}`
-                ).catch(() => {});
+                modalStore.alert({
+                    description: t('api.error.message.vpn_in_use'),
+                    title: `403 ${t('api.error.message.login_error')}`
+                });
                 authStore.handleLogoutEvent();
                 $throw(403, endpoint);
             }
             if (
                 init.method === 'GET' &&
                 status === 404 &&
-                endpoint.startsWith('avatars/')
+                endpoint?.startsWith('avatars/')
             ) {
-                ElMessage({
-                    message: t('message.api_handler.avatar_private_or_deleted'),
-                    type: 'error'
-                });
+                toast.error(t('message.api_handler.avatar_private_or_deleted'));
                 avatarStore.avatarDialog.visible = false;
                 $throw(404, data.error?.message || '', endpoint);
             }
@@ -284,10 +285,10 @@ export function $throw(code, error, endpoint) {
             `${t('api.error.message.endpoint')}: "${typeof endpoint === 'string' ? endpoint : JSON.stringify(endpoint)}"`
         );
     }
-    const text = message.map((s) => escapeTag(s)).join('<br>');
     let ignoreError = false;
     if (
         (code === 404 || code === -1) &&
+        typeof endpoint === 'string' &&
         endpoint.split('/').length === 2 &&
         (endpoint.startsWith('users/') ||
             endpoint.startsWith('worlds/') ||
@@ -297,15 +298,22 @@ export function $throw(code, error, endpoint) {
     ) {
         ignoreError = true;
     }
-    if (
-        (code === 403 || code === 404 || code === -1) &&
-        endpoint.startsWith('instances/')
-    ) {
+    if (code === 403 || code === 404 || code === -1) {
+        if (endpoint?.startsWith('instances/')) {
+            ignoreError = true;
+        }
+        if (endpoint?.includes('/mutuals/friends')) {
+            message[1] = `${t('api.error.message.error_message')}: "${t('api.error.message.unavailable')}"`;
+        }
+    }
+    if (endpoint?.startsWith('analysis/')) {
         ignoreError = true;
     }
-    if (endpoint.startsWith('analysis/')) {
+    if (endpoint.endsWith('/mutuals') && (code === 403 || code === -1)) {
         ignoreError = true;
     }
+    const text = message.map((s) => escapeTag(s)).join('<br>');
+
     if (text.length && !ignoreError) {
         if (AppDebug.errorNoty) {
             AppDebug.errorNoty.close();
@@ -370,12 +378,24 @@ export async function processBulk(options) {
     try {
         while (true) {
             const result = await fn(params);
-            const batchSize = result.json.length;
+            let batchSize = 0;
+            if (Array.isArray(result.json)) {
+                batchSize = result.json.length;
+            } else if (Array.isArray(result.results)) {
+                batchSize = result.results.length;
+            } else {
+                throw new Error(
+                    'Invalid result format: expected an array in result.json or result.results'
+                );
+            }
 
             if (typeof handle === 'function') {
                 handle(result);
             }
             if (batchSize === 0) {
+                break;
+            }
+            if (typeof result.hasNext === 'boolean' && !result.hasNext) {
                 break;
             }
 

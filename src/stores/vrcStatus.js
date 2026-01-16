@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue';
-import { ElNotification } from 'element-plus';
 import { defineStore } from 'pinia';
+import { toast } from 'vue-sonner';
+import { useI18n } from 'vue-i18n';
 
 import { formatDateFilter, openExternalLink } from '../shared/utils';
 
@@ -15,6 +16,7 @@ export const useVrcStatusStore = defineStore('VrcStatus', () => {
     const lastTimeFetched = ref(0);
     const pollingInterval = ref(0);
     const alertRef = ref(null);
+    const { t } = useI18n();
 
     const lastStatusText = ref('');
     const statusText = computed(() => {
@@ -24,6 +26,14 @@ export const useVrcStatusStore = defineStore('VrcStatus', () => {
         return lastStatus.value;
     });
 
+    function dismissAlert() {
+        if (!alertRef.value) {
+            return;
+        }
+        toast.dismiss(alertRef.value);
+        alertRef.value = null;
+    }
+
     function updateAlert() {
         if (lastStatusText.value === statusText.value) {
             return;
@@ -32,32 +42,28 @@ export const useVrcStatusStore = defineStore('VrcStatus', () => {
 
         if (!statusText.value) {
             if (alertRef.value) {
-                alertRef.value.close();
-                alertRef.value = ElNotification({
-                    title: 'VRChat Status',
-                    message: `${formatDateFilter(lastStatusTime.value, 'short')}: All Systems Operational`,
-                    type: 'success',
-                    duration: 5000,
-                    showClose: true,
+                dismissAlert();
+                alertRef.value = toast.success(t('status.title'), {
+                    description: `${formatDateFilter(lastStatusTime.value, 'short')}: All Systems Operational`,
                     position: 'bottom-right',
-                    onClick: () => {
-                        openStatusPage();
+                    action: {
+                        label: 'Open',
+                        onClick: () => openStatusPage()
                     }
                 });
             }
             return;
         }
 
-        alertRef.value?.close();
-        alertRef.value = ElNotification({
-            title: 'VRChat Status',
-            message: `${formatDateFilter(lastStatusTime.value, 'short')}: ${statusText.value}`,
-            type: 'warning',
-            duration: 0,
-            showClose: true,
+        dismissAlert();
+        alertRef.value = toast.warning(t('status.title'), {
+            description: `${formatDateFilter(lastStatusTime.value, 'short')}: ${statusText.value}`,
+            duration: Infinity,
+            closeButton: true,
             position: 'bottom-right',
-            onClick: () => {
-                openStatusPage();
+            action: {
+                label: 'Open',
+                onClick: () => openStatusPage()
             }
         });
     }

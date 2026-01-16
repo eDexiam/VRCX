@@ -69,17 +69,12 @@ export const useNotificationStore = defineStore('Notification', () => {
         tableProps: {
             stripe: true,
             size: 'small',
-            defaultSort: {
-                prop: 'created_at',
-                order: 'descending'
-            }
+            defaultSort: null
         },
-        pageSize: 15,
+        pageSize: 20,
         pageSizeLinked: true,
         paginationProps: {
-            small: true,
-            layout: 'sizes,prev,pager,next,total',
-            pageSizes: [10, 15, 20, 25, 50, 100]
+            layout: 'sizes,prev,pager,next,total'
         }
     });
     const unseenNotifications = ref([]);
@@ -137,9 +132,9 @@ export const useNotificationStore = defineStore('Notification', () => {
                     // get instance name for invite
                     const L = parseLocation(ref.details.worldId);
                     if (L.isRealInstance) {
-                        instanceRequest.getInstance({
+                        instanceRequest.getCachedInstance({
                             worldId: L.worldId,
-                            instanceId: L.tag
+                            instanceId: L.instanceId
                         });
                     }
                 }
@@ -158,7 +153,6 @@ export const useNotificationStore = defineStore('Notification', () => {
         const D = userStore.userDialog;
         if (
             D.visible === false ||
-            ref.$isDeleted ||
             ref.type !== 'friendRequest' ||
             ref.senderUserId !== D.id
         ) {
@@ -239,11 +233,18 @@ export const useNotificationStore = defineStore('Notification', () => {
             currentLocation = locationStore.lastLocationDestination;
         }
         if (!currentLocation) {
+            // game log disabled, use API location
+            currentLocation = userStore.currentUser.$locationTag;
+            if (userStore.currentUser.$travelingToLocation) {
+                currentLocation = userStore.currentUser.$travelingToLocation;
+            }
+        }
+        if (!currentLocation) {
             return;
         }
         if (
             generalSettingsStore.autoAcceptInviteRequests === 'All Favorites' &&
-            !favoriteStore.favoriteFriends.some(
+            !favoriteStore.state.favoriteFriends_.some(
                 (x) => x.id === ref.senderUserId
             )
         ) {

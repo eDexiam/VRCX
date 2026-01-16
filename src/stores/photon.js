@@ -1,6 +1,7 @@
 import { computed, reactive, ref } from 'vue';
-import { ElMessage, ElMessageBox } from 'element-plus';
+import { ElMessageBox } from 'element-plus';
 import { defineStore } from 'pinia';
+import { toast } from 'vue-sonner';
 import { useI18n } from 'vue-i18n';
 
 import {
@@ -107,9 +108,7 @@ export const usePhotonStore = defineStore('Photon', () => {
         },
         pageSize: 10,
         paginationProps: {
-            small: true,
-            layout: 'sizes,prev,pager,next,total',
-            pageSizes: [5, 10, 15, 25, 50]
+            layout: 'sizes,prev,pager,next,total'
         }
     });
     const photonEventTablePrevious = ref({
@@ -130,9 +129,7 @@ export const usePhotonStore = defineStore('Photon', () => {
         },
         pageSize: 10,
         paginationProps: {
-            small: true,
-            layout: 'sizes,prev,pager,next,total',
-            pageSizes: [5, 10, 15, 25, 50]
+            layout: 'sizes,prev,pager,next,total'
         }
     });
     const chatboxUserBlacklist = ref(new Map());
@@ -437,10 +434,7 @@ export const usePhotonStore = defineStore('Photon', () => {
                     userStore.lookupUser(ref);
                 }
             } else {
-                ElMessage({
-                    message: 'No user info available',
-                    type: 'error'
-                });
+                toast.error('No user info available');
             }
         }
     }
@@ -572,7 +566,7 @@ export const usePhotonStore = defineStore('Photon', () => {
                     hudTimeout.forEach((item) => {
                         if (
                             timeoutHudOverlayFilter.value === 'VIP' &&
-                            favoriteStore.cachedFavoritesByObjectId.has(
+                            favoriteStore.getCachedFavoritesByObjectId(
                                 item.userId
                             )
                         ) {

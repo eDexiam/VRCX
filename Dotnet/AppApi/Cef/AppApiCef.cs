@@ -1,9 +1,3 @@
-// Copyright(c) 2019-2025 pypy, Natsumi and individual contributors.
-// All rights reserved.
-//
-// This work is licensed under the terms of the MIT license.
-// For a copy, see <https://opensource.org/licenses/MIT>.
-
 using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
@@ -13,6 +7,7 @@ using System.Globalization;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -37,17 +32,15 @@ namespace VRCX
 
         public override void SetVR(bool active, bool hmdOverlay, bool wristOverlay, bool menuButton, int overlayHand)
         {
-            Program.VRCXVRInstance.SetActive(active, hmdOverlay, wristOverlay, menuButton, overlayHand);
-        }
-
-        public override void RefreshVR()
-        {
-            Program.VRCXVRInstance.Restart();
-        }
-
-        public override void RestartVR()
-        {
-            Program.VRCXVRInstance.Restart();
+            var updateVars = new OverlayVars
+            {
+                Active = active,
+                HmdOverlay = hmdOverlay,
+                WristOverlay = wristOverlay,
+                MenuButton = menuButton,
+                OverlayHand = overlayHand
+            };
+            OverlayServer.Instance.UpdateVars(updateVars);
         }
 
         public override void SetZoom(double zoomLevel)
@@ -122,14 +115,15 @@ namespace VRCX
             return File.Exists(Path.Join(Program.AppDataDirectory, "update.exe"));
         }
 
-        public override void ExecuteVrFeedFunction(string function, string json)
-        {
-            Program.VRCXVRInstance.ExecuteVrFeedFunction(function, json);
-        }
-
         public override void ExecuteVrOverlayFunction(string function, string json)
         {
-            Program.VRCXVRInstance.ExecuteVrOverlayFunction(function, json);
+            var message = new OverlayMessage
+            {
+                Type = OverlayMessageType.JsFunctionCall,
+                FunctionName = function,
+                Data = json
+            };
+            OverlayServer.Instance.SendMessage(message);
         }
 
         public override void FocusWindow()
@@ -215,6 +209,34 @@ namespace VRCX
         {
             using var client = MainForm.Instance.Browser.GetDevToolsClient();
             _ = client.Network.SetUserAgentOverrideAsync(Program.Version);
+        }
+
+        public override void SetTrayIconNotification(bool notify)
+        {
+            MainForm.Instance.BeginInvoke(new MethodInvoker(() => { MainForm.Instance.SetTrayIconNotification(notify); }));
+        }
+
+        public override void OpenCalendarFile(string icsContent)
+        {
+            // validate content
+            if (!icsContent.StartsWith("BEGIN:VCALENDAR") ||
+                !icsContent.EndsWith("END:VCALENDAR"))
+                throw new Exception("Invalid calendar file");
+
+            try
+            {
+                var tempPath = Path.Combine(Program.AppDataDirectory, "event.ics");
+                File.WriteAllText(tempPath, icsContent);
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = tempPath,
+                    UseShellExecute = true
+                })?.Dispose();
+            }
+            catch (Exception ex)
+            {
+                logger.Error(ex, "Failed to open calendar file");
+            }
         }
     }
 }

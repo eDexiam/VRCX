@@ -130,7 +130,7 @@ namespace VRCX
             );
             try
             {
-                var item = (object[])values.Item2[0];
+                var item = values[0];
                 using var stream = new MemoryStream(Convert.FromBase64String((string)item[0]));
                 _cookieContainer = new CookieContainer();
                 _cookieContainer.Add(System.Text.Json.JsonSerializer.Deserialize<CookieCollection>(stream));
@@ -523,6 +523,9 @@ namespace VRCX
                     );
                 }
 
+                if (webException.InnerException != null)
+                    Logger.Error($"{webException.Message} | {webException.InnerException}");
+
                 return new Tuple<int, string>(
                     -1,
                     webException.Message
@@ -530,6 +533,9 @@ namespace VRCX
             }
             catch (Exception e)
             {
+                if (e.InnerException != null)
+                    Logger.Error($"{e.Message} | {e.InnerException}");
+
                 return new Tuple<int, string>(
                     -1,
                     e.Message

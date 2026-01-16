@@ -1,17 +1,16 @@
 <template>
     <span v-if="lastJoin" :class="['inline-block', 'ml-5']">
-        <el-tooltip placement="top" class="ml-5">
+        <TooltipWrapper side="top" class="ml-5">
             <template #content>
                 <span>{{ t('dialog.user.info.last_join') }} <Timer :epoch="lastJoin" /></span>
             </template>
-            <el-icon style="display: inline-block"><Location /></el-icon>
-        </el-tooltip>
+            <i class="ri-map-pin-time-line text-muted-foreground"></i>
+        </TooltipWrapper>
     </span>
 </template>
 
 <script setup>
     import { ref, watch } from 'vue';
-    import { Location } from '@element-plus/icons-vue';
     import { storeToRefs } from 'pinia';
     import { useI18n } from 'vue-i18n';
 

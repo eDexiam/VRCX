@@ -1,110 +1,136 @@
 <template>
-    <div class="x-container">
-        <!-- 工具栏 -->
-        <div style="margin: 0 0 10px; display: flex; align-items: center">
-            <el-select
-                v-model="friendLogTable.filters[0].value"
-                multiple
-                clearable
-                style="flex: 1"
-                :placeholder="t('view.friend_log.filter_placeholder')"
-                @change="saveTableFilters">
-                <el-option
-                    v-for="type in [
-                        'Friend',
-                        'Unfriend',
-                        'FriendRequest',
-                        'CancelFriendRequest',
-                        'DisplayName',
-                        'TrustLevel'
-                    ]"
-                    :key="type"
-                    :label="t('view.friend_log.filters.' + type)"
-                    :value="type" />
-            </el-select>
-            <el-input
-                v-model="friendLogTable.filters[1].value"
-                :placeholder="t('view.friend_log.search_placeholder')"
-                style="flex: 0.4; margin-left: 10px" />
-        </div>
-
-        <DataTable v-bind="friendLogTable">
-            <el-table-column :label="t('table.friendLog.date')" prop="created_at" :sortable="true" width="200">
-                <template #default="scope">
-                    <el-tooltip placement="right">
-                        <template #content>
-                            <span>{{ formatDateFilter(scope.row.created_at, 'long') }}</span>
-                        </template>
-                        <span>{{ formatDateFilter(scope.row.created_at, 'short') }}</span>
-                    </el-tooltip>
-                </template>
-            </el-table-column>
-
-            <el-table-column :label="t('table.friendLog.type')" prop="type" width="150">
-                <template #default="scope">
-                    <span v-text="t('view.friend_log.filters.' + scope.row.type)"></span>
-                </template>
-            </el-table-column>
-
-            <el-table-column :label="t('table.friendLog.user')" prop="displayName">
-                <template #default="scope">
-                    <span v-if="scope.row.type === 'DisplayName'">
-                        {{ scope.row.previousDisplayName }} <el-icon><Right /></el-icon>&nbsp;
-                    </span>
-                    <span
-                        class="x-link"
-                        style="padding-right: 10px"
-                        @click="showUserDialog(scope.row.userId)"
-                        v-text="scope.row.displayName || scope.row.userId"></span>
-                    <template v-if="scope.row.type === 'TrustLevel'">
-                        <span>
-                            ({{ scope.row.previousTrustLevel }} <el-icon><Right /></el-icon>
-                            {{ scope.row.trustLevel }})</span
-                        >
-                    </template>
-                </template>
-            </el-table-column>
-
-            <el-table-column :label="t('table.friendLog.action')" width="80" align="right">
-                <template #default="scope">
-                    <el-button
-                        v-if="shiftHeld"
-                        style="color: #f56c6c"
-                        type="text"
-                        :icon="Close"
-                        size="small"
-                        class="button-pd-0"
-                        @click="deleteFriendLog(scope.row)"></el-button>
-                    <el-button
-                        v-else
-                        type="text"
-                        :icon="Delete"
-                        size="small"
-                        class="button-pd-0"
-                        @click="deleteFriendLogPrompt(scope.row)"></el-button>
-                </template>
-            </el-table-column>
-        </DataTable>
+    <div class="x-container" ref="friendLogRef">
+        <DataTableLayout
+            :table="table"
+            :table-style="tableHeightStyle"
+            :page-sizes="pageSizes"
+            :total-items="totalItems"
+            :on-page-size-change="handlePageSizeChange">
+            <template #toolbar>
+                <div style="margin: 0 0 10px; display: flex; align-items: center">
+                    <Select
+                        multiple
+                        :model-value="
+                            Array.isArray(friendLogTable.filters?.[0]?.value) ? friendLogTable.filters[0].value : []
+                        "
+                        @update:modelValue="handleFriendLogFilterChange">
+                        <SelectTrigger class="w-full" style="flex: 1">
+                            <SelectValue :placeholder="t('view.friend_log.filter_placeholder')" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectGroup>
+                                <SelectItem
+                                    v-for="type in [
+                                        'Friend',
+                                        'Unfriend',
+                                        'FriendRequest',
+                                        'CancelFriendRequest',
+                                        'DisplayName',
+                                        'TrustLevel'
+                                    ]"
+                                    :key="type"
+                                    :value="type">
+                                    {{ t('view.friend_log.filters.' + type) }}
+                                </SelectItem>
+                            </SelectGroup>
+                        </SelectContent>
+                    </Select>
+                    <InputGroupField
+                        v-model="friendLogTable.filters[1].value"
+                        :placeholder="t('view.friend_log.search_placeholder')"
+                        style="flex: 0.4; margin-left: 10px" />
+                </div>
+            </template>
+        </DataTableLayout>
     </div>
 </template>
 
 <script setup>
-    import { Close, Delete, Right } from '@element-plus/icons-vue';
-    import { ElMessageBox } from 'element-plus';
+    import { computed, ref, watch } from 'vue';
     import { storeToRefs } from 'pinia';
     import { useI18n } from 'vue-i18n';
-    import { watch } from 'vue';
 
-    import { useAppearanceSettingsStore, useFriendStore, useUiStore, useUserStore } from '../../stores';
-    import { formatDateFilter, removeFromArray } from '../../shared/utils';
+    import dayjs from 'dayjs';
+
+    import {
+        Select,
+        SelectContent,
+        SelectGroup,
+        SelectItem,
+        SelectTrigger,
+        SelectValue
+    } from '../../components/ui/select';
+    import { useAppearanceSettingsStore, useFriendStore, useModalStore, useVrcxStore } from '../../stores';
+    import { DataTableLayout } from '../../components/ui/data-table';
+    import { InputGroupField } from '../../components/ui/input-group';
+    import { createColumns } from './columns.jsx';
     import { database } from '../../service/database';
+    import { removeFromArray } from '../../shared/utils';
+    import { useDataTableScrollHeight } from '../../composables/useDataTableScrollHeight';
+    import { useVrcxVueTable } from '../../lib/table/useVrcxVueTable';
 
     import configRepository from '../../service/config';
 
-    const { hideUnfriends } = storeToRefs(useAppearanceSettingsStore());
-    const { showUserDialog } = useUserStore();
+    const appearanceSettingsStore = useAppearanceSettingsStore();
+    const vrcxStore = useVrcxStore();
+    const modalStore = useModalStore();
+    const { hideUnfriends } = storeToRefs(appearanceSettingsStore);
     const { friendLogTable } = storeToRefs(useFriendStore());
-    const { shiftHeld } = storeToRefs(useUiStore());
+
+    const friendLogRef = ref(null);
+    const { tableStyle: tableHeightStyle } = useDataTableScrollHeight(friendLogRef, {
+        offset: 30,
+        toolbarHeight: 54,
+        paginationHeight: 52
+    });
+
+    const friendLogDisplayData = computed(() => {
+        const data = friendLogTable.value.data;
+        const typeFilter = friendLogTable.value.filters?.[0]?.value ?? [];
+        const searchFilter = friendLogTable.value.filters?.[1]?.value ?? '';
+        const hideUnfriendsFilter = friendLogTable.value.filters?.[2]?.value;
+        const typeSet = Array.isArray(typeFilter)
+            ? new Set(typeFilter.map((value) => String(value).toLowerCase()))
+            : null;
+        const searchValue = String(searchFilter).trim().toLowerCase();
+
+        const filtered = data.filter((row) => {
+            if (hideUnfriendsFilter && row.type === 'Unfriend') {
+                return false;
+            }
+            if (typeSet && typeSet.size > 0) {
+                const rowType = String(row.type ?? '').toLowerCase();
+                if (!typeSet.has(rowType)) {
+                    return false;
+                }
+            }
+            if (searchValue) {
+                const displayName = row.displayName;
+                if (
+                    displayName === undefined ||
+                    displayName === null ||
+                    !String(displayName).toLowerCase().includes(searchValue)
+                ) {
+                    return false;
+                }
+            }
+            return true;
+        });
+
+        return filtered.slice().sort((a, b) => {
+            const aTime = typeof a?.created_at === 'string' ? a.created_at : '';
+            const bTime = typeof b?.created_at === 'string' ? b.created_at : '';
+            const aTs = dayjs(aTime).valueOf();
+            const bTs = dayjs(bTime).valueOf();
+            if (Number.isFinite(aTs) && Number.isFinite(bTs) && aTs !== bTs) {
+                return bTs - aTs;
+            }
+
+            const aId = typeof a?.rowId === 'number' ? a.rowId : 0;
+            const bId = typeof b?.rowId === 'number' ? b.rowId : 0;
+            return bId - aId;
+        });
+    });
 
     watch(
         () => hideUnfriends.value,
@@ -118,27 +144,75 @@
     function saveTableFilters() {
         configRepository.setString('VRCX_friendLogTableFilters', JSON.stringify(friendLogTable.value.filters[0].value));
     }
+    function handleFriendLogFilterChange(value) {
+        friendLogTable.value.filters[0].value = Array.isArray(value) ? value : [];
+        saveTableFilters();
+    }
     function deleteFriendLogPrompt(row) {
-        ElMessageBox.confirm('Continue? Delete Log', 'Confirm', {
-            confirmButtonText: 'Confirm',
-            cancelButtonText: 'Cancel',
-            type: 'info'
-        })
-            .then((action) => {
-                if (action === 'confirm') {
-                    deleteFriendLog(row);
-                }
+        modalStore
+            .confirm({
+                description: 'Continue? Delete Log',
+                title: 'Confirm'
             })
+            .then(({ ok }) => ok && deleteFriendLog(row))
             .catch(() => {});
     }
     function deleteFriendLog(row) {
         removeFromArray(friendLogTable.value.data, row);
         database.deleteFriendLogHistory(row.rowId);
     }
+
+    const columns = createColumns({
+        onDelete: deleteFriendLog,
+        onDeletePrompt: deleteFriendLogPrompt
+    });
+
+    const pageSizes = computed(() => appearanceSettingsStore.tablePageSizes);
+    const pageSize = computed(() =>
+        friendLogTable.value.pageSizeLinked ? appearanceSettingsStore.tablePageSize : friendLogTable.value.pageSize
+    );
+
+    const { table, pagination } = useVrcxVueTable({
+        persistKey: 'friendLog',
+        data: friendLogDisplayData,
+        columns,
+        getRowId: (row) => `${row.type}:${row.rowId ?? row.userId ?? row.created_at ?? ''}`,
+        initialSorting: [],
+        initialPagination: {
+            pageIndex: 0,
+            pageSize: pageSize.value
+        }
+    });
+
+    const totalItems = computed(() => {
+        const length = table.getFilteredRowModel().rows.length;
+        const max = vrcxStore.maxTableSize;
+        return length > max && length < max + 51 ? max : length;
+    });
+
+    const handlePageSizeChange = (size) => {
+        if (friendLogTable.value.pageSizeLinked) {
+            appearanceSettingsStore.setTablePageSize(size);
+        } else {
+            friendLogTable.value.pageSize = size;
+        }
+    };
+
+    watch(pageSize, (size) => {
+        if (pagination.value.pageSize === size) {
+            return;
+        }
+        pagination.value = {
+            ...pagination.value,
+            pageIndex: 0,
+            pageSize: size
+        };
+        table.setPageSize(size);
+    });
 </script>
 
 <style scoped>
-    .button-pd-0 {
-        padding: 0 !important;
+    .table-user {
+        color: var(--x-table-user-text-color);
     }
 </style>

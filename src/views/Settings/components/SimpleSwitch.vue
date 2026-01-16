@@ -1,18 +1,20 @@
-﻿<template>
+<template>
     <div class="simple-switch">
         <div class="name" :style="{ width: longLabel ? '300px' : undefined }">
             {{ label }}
-            <el-tooltip v-if="tooltip" placement="top" :content="tooltip"
+            <TooltipWrapper v-if="tooltip" side="top" :content="tooltip"
                 ><el-icon size="small" class="tooltip"><InfoFilled /></el-icon
-            ></el-tooltip>
+            ></TooltipWrapper>
         </div>
 
-        <el-switch class="switch" :model-value="value" @change="change" :disabled="disabled"></el-switch>
+        <Switch class="switch" :model-value="value" @update:modelValue="change" :disabled="disabled" />
     </div>
 </template>
 
 <script setup>
     import { InfoFilled } from '@element-plus/icons-vue';
+
+    import { Switch } from '../../../components/ui/switch';
     defineProps({
         label: String,
         value: Boolean,
@@ -32,6 +34,7 @@
     .simple-switch {
         font-size: 12px;
         display: flex;
+        align-items: center;
     }
     .simple-switch > .name {
         width: 225px;

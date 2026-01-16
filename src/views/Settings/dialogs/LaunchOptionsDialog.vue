@@ -8,46 +8,50 @@
         <div style="font-size: 12px">
             {{ t('dialog.launch_options.description') }} <br />
             {{ t('dialog.launch_options.example') }}
-            <el-tag size="small"
+            <Badge variant="outline"
                 >--fps=144 --enable-debug-gui --enable-sdk-log-levels --enable-udon-debug-logging
-            </el-tag>
+            </Badge>
         </div>
 
-        <el-input
+        <InputGroupTextareaField
             v-model="launchOptionsDialog.launchArguments"
-            type="textarea"
-            size="small"
-            show-word-limit
             :autosize="{ minRows: 2, maxRows: 5 }"
+            :rows="2"
             placeholder=""
-            style="margin-top: 10px">
-        </el-input>
+            style="margin-top: 10px"
+            input-class="resize-none" />
 
         <template v-if="!isLinux">
             <div style="font-size: 12px; margin-top: 10px">
                 {{ t('dialog.launch_options.path_override') }}
             </div>
 
-            <el-input
+            <InputGroupTextareaField
                 v-model="launchOptionsDialog.vrcLaunchPathOverride"
-                type="textarea"
                 placeholder="C:\Program Files (x86)\Steam\steamapps\common\VRChat"
                 :rows="1"
-                style="display: block; margin-top: 10px">
-            </el-input>
+                style="display: block; margin-top: 10px"
+                input-class="resize-none min-h-0" />
         </template>
 
         <template #footer>
-            <div style="display: flex">
-                <el-button @click="openExternalLink('https://docs.vrchat.com/docs/launch-options')">
-                    {{ t('dialog.launch_options.vrchat_docs') }}
-                </el-button>
-                <el-button @click="openExternalLink('https://docs.unity3d.com/Manual/CommandLineArguments.html')">
-                    {{ t('dialog.launch_options.unity_manual') }}
-                </el-button>
-                <el-button type="primary" style="margin-left: auto" @click="updateLaunchOptions">
+            <div class="flex items-center justify-between">
+                <div>
+                    <Button
+                        variant="outline"
+                        class="mr-2"
+                        @click="openExternalLink('https://docs.vrchat.com/docs/launch-options')">
+                        {{ t('dialog.launch_options.vrchat_docs') }}
+                    </Button>
+                    <Button
+                        variant="outline"
+                        @click="openExternalLink('https://docs.unity3d.com/Manual/CommandLineArguments.html')">
+                        {{ t('dialog.launch_options.unity_manual') }}
+                    </Button>
+                </div>
+                <Button @click="updateLaunchOptions">
                     {{ t('dialog.launch_options.save') }}
-                </el-button>
+                </Button>
             </div>
         </template>
     </el-dialog>
@@ -55,10 +59,13 @@
 
 <script setup>
     import { computed, ref } from 'vue';
-    import { ElMessage } from 'element-plus';
+    import { Button } from '@/components/ui/button';
+    import { InputGroupTextareaField } from '@/components/ui/input-group';
     import { storeToRefs } from 'pinia';
+    import { toast } from 'vue-sonner';
     import { useI18n } from 'vue-i18n';
 
+    import { Badge } from '../../../components/ui/badge';
     import { openExternalLink } from '../../../shared/utils';
     import { useLaunchStore } from '../../../stores';
 
@@ -103,17 +110,11 @@
             D.vrcLaunchPathOverride.endsWith('.exe') &&
             !D.vrcLaunchPathOverride.endsWith('launch.exe')
         ) {
-            ElMessage({
-                message: 'Invalid path, you must enter VRChat folder or launch.exe',
-                type: 'error'
-            });
+            toast.error('Invalid path, you must enter VRChat folder or launch.exe');
             return;
         }
         configRepository.setString('vrcLaunchPathOverride', D.vrcLaunchPathOverride);
-        ElMessage({
-            message: 'Updated launch options',
-            type: 'success'
-        });
+        toast.success('Updated launch options');
         closeDialog();
     }
 

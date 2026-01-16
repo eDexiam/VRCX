@@ -1,11 +1,14 @@
 import { reactive, ref, watch } from 'vue';
-import { ElMessage, ElMessageBox } from 'element-plus';
+import { ElMessageBox } from 'element-plus';
 import { defineStore } from 'pinia';
+import { toast } from 'vue-sonner';
 import { useI18n } from 'vue-i18n';
 
 import { AppDebug } from '../../service/appConfig';
 import { database } from '../../service/database';
+import { languageCodes } from '../../localization';
 import { useGameStore } from '../game';
+import { useModalStore } from '../modal';
 import { useVRCXUpdaterStore } from '../vrcxUpdater';
 import { useVrcxStore } from '../vrcx';
 import { watchState } from '../../service/watchState';
@@ -17,8 +20,9 @@ export const useAdvancedSettingsStore = defineStore('AdvancedSettings', () => {
     const gameStore = useGameStore();
     const vrcxStore = useVrcxStore();
     const VRCXUpdaterStore = useVRCXUpdaterStore();
+    const modalStore = useModalStore();
 
-    const { availableLocales, t } = useI18n();
+    const { t } = useI18n();
 
     const state = reactive({
         folderSelectorDialogVisible: false
@@ -44,6 +48,12 @@ export const useAdvancedSettingsStore = defineStore('AdvancedSettings', () => {
     const youTubeApiKey = ref('');
     const translationApi = ref(false);
     const translationApiKey = ref('');
+    const translationApiType = ref('google'); // 'google' | 'openai'
+    const translationApiEndpoint = ref(
+        'https://api.openai.com/v1/chat/completions'
+    );
+    const translationApiModel = ref('gpt-4o-mini');
+    const translationApiPrompt = ref('');
     const progressPie = ref(false);
     const progressPieFilter = ref(true);
     const showConfirmationOnSwitchAvatar = ref(false);
@@ -52,7 +62,7 @@ export const useAdvancedSettingsStore = defineStore('AdvancedSettings', () => {
     const ugcFolderPath = ref('');
     const autoDeleteOldPrints = ref(false);
     const notificationOpacity = ref(100);
-    const currentUserInventory = ref(new Map());
+    const currentUserInventory = reactive(new Map());
     const isVRChatConfigDialogVisible = ref(false);
     const saveInstanceEmoji = ref(false);
     const vrcRegistryAutoBackup = ref(true);
@@ -62,7 +72,7 @@ export const useAdvancedSettingsStore = defineStore('AdvancedSettings', () => {
     watch(
         () => watchState.isLoggedIn,
         () => {
-            currentUserInventory.value.clear();
+            currentUserInventory.clear();
             isVRChatConfigDialogVisible.value = false;
         },
         { flush: 'sync' }
@@ -90,6 +100,10 @@ export const useAdvancedSettingsStore = defineStore('AdvancedSettings', () => {
             youTubeApiKeyConfig,
             translationApiConfig,
             translationApiKeyConfig,
+            translationApiTypeConfig,
+            translationApiEndpointConfig,
+            translationApiModelConfig,
+            translationApiPromptConfig,
             progressPieConfig,
             progressPieFilterConfig,
             showConfirmationOnSwitchAvatarConfig,
@@ -131,6 +145,10 @@ export const useAdvancedSettingsStore = defineStore('AdvancedSettings', () => {
             configRepository.getString('VRCX_youtubeAPIKey', ''),
             configRepository.getBool('VRCX_translationAPI', false),
             configRepository.getString('VRCX_translationAPIKey', ''),
+            configRepository.getString('VRCX_translationAPIType', 'google'),
+            configRepository.getString('VRCX_translationAPIEndpoint', ''),
+            configRepository.getString('VRCX_translationAPIModel', ''),
+            configRepository.getString('VRCX_translationAPIPrompt', ''),
             configRepository.getBool('VRCX_progressPie', false),
             configRepository.getBool('VRCX_progressPieFilter', true),
             configRepository.getBool(
@@ -147,10 +165,7 @@ export const useAdvancedSettingsStore = defineStore('AdvancedSettings', () => {
             configRepository.getString('VRCX_SentryEnabled', '')
         ]);
 
-        if (
-            !bioLanguageConfig ||
-            !availableLocales.includes(bioLanguageConfig)
-        ) {
+        if (!bioLanguageConfig || !languageCodes.includes(bioLanguageConfig)) {
             bioLanguage.value = 'en';
         } else {
             bioLanguage.value = bioLanguageConfig;
@@ -178,6 +193,10 @@ export const useAdvancedSettingsStore = defineStore('AdvancedSettings', () => {
         youTubeApiKey.value = youTubeApiKeyConfig;
         translationApi.value = translationApiConfig;
         translationApiKey.value = translationApiKeyConfig;
+        translationApiType.value = translationApiTypeConfig;
+        translationApiEndpoint.value = translationApiEndpointConfig;
+        translationApiModel.value = translationApiModelConfig;
+        translationApiPrompt.value = translationApiPromptConfig;
         progressPie.value = progressPieConfig;
         progressPieFilter.value = progressPieFilterConfig;
         showConfirmationOnSwitchAvatar.value =
@@ -249,6 +268,7 @@ export const useAdvancedSettingsStore = defineStore('AdvancedSettings', () => {
             'VRCX_cropInstancePrints',
             cropInstancePrints.value
         );
+        cropPrintsChanged();
     }
     function setSaveInstanceStickers() {
         saveInstanceStickers.value = !saveInstanceStickers.value;
@@ -321,7 +341,10 @@ export const useAdvancedSettingsStore = defineStore('AdvancedSettings', () => {
     }
     async function setTranslationApi() {
         translationApi.value = !translationApi.value;
-        await configRepository.setBool('VRCX_translationAPI', youTubeApi.value);
+        await configRepository.setBool(
+            'VRCX_translationAPI',
+            translationApi.value
+        );
     }
     /**
      * @param {string} value
@@ -338,6 +361,34 @@ export const useAdvancedSettingsStore = defineStore('AdvancedSettings', () => {
         await configRepository.setString(
             'VRCX_translationAPIKey',
             translationApiKey.value
+        );
+    }
+    async function setTranslationApiType(value) {
+        translationApiType.value = value || 'google';
+        await configRepository.setString(
+            'VRCX_translationAPIType',
+            translationApiType.value
+        );
+    }
+    async function setTranslationApiEndpoint(value) {
+        translationApiEndpoint.value = value;
+        await configRepository.setString(
+            'VRCX_translationAPIEndpoint',
+            translationApiEndpoint.value
+        );
+    }
+    async function setTranslationApiModel(value) {
+        translationApiModel.value = value;
+        await configRepository.setString(
+            'VRCX_translationAPIModel',
+            translationApiModel.value
+        );
+    }
+    async function setTranslationApiPrompt(value) {
+        translationApiPrompt.value = value;
+        await configRepository.setString(
+            'VRCX_translationAPIPrompt',
+            translationApiPrompt.value
         );
     }
     function setBioLanguage(language) {
@@ -417,76 +468,58 @@ export const useAdvancedSettingsStore = defineStore('AdvancedSettings', () => {
     }
 
     async function checkSentryConsent() {
-        ElMessageBox.confirm(
-            'Help improve VRCX by allowing anonymous error reporting?</br></br>' +
-                '• Only collects crash and error information.</br>' +
-                '• No personal data or VRChat information is collected.</br>' +
-                '• Only enabled in nightly builds.</br>' +
-                '• Can be disabled at anytime in Advanced Settings.',
-            'Anonymous Error Reporting',
-            {
-                type: 'warning',
-                center: true,
-                dangerouslyUseHTMLString: true,
-                closeOnClickModal: false,
-                closeOnPressEscape: false,
-                distinguishCancelAndClose: true
-            }
-        )
-            .then(() => {
-                sentryErrorReporting.value = true;
-                configRepository.setString('VRCX_SentryEnabled', 'true');
-
-                ElMessageBox.confirm(
-                    'Error reporting setting has been enabled. Would you like to restart VRCX now for the change to take effect?',
-                    'Restart Required',
-                    {
-                        confirmButtonText: 'Restart Now',
-                        cancelButtonText: 'Later',
-                        type: 'warning',
-                        center: true,
-                        closeOnClickModal: false,
-                        closeOnPressEscape: false
-                    }
-                ).then(() => {
-                    VRCXUpdaterStore.restartVRCX(false);
-                });
+        modalStore
+            .confirm({
+                description:
+                    'Help improve VRCX by allowing anonymous error reporting?</br></br>' +
+                    '• Only collects crash and error information.</br>' +
+                    '• No personal data or VRChat information is collected.</br>' +
+                    '• Only enabled in nightly builds.</br>' +
+                    '• Can be disabled at anytime in Advanced Settings.',
+                title: 'Anonymous Error Reporting'
             })
-            .catch((action) => {
-                const act =
-                    typeof action === 'string' ? action : action?.action;
-                if (act === 'cancel') {
-                    sentryErrorReporting.value = false;
-                    configRepository.setString('VRCX_SentryEnabled', 'false');
-                }
+            .then(async ({ ok }) => {
+                if (!ok) return;
+                modalStore
+                    .confirm({
+                        description:
+                            'Error reporting setting has been enabled. Would you like to restart VRCX now for the change to take effect?',
+                        title: 'Restart Required',
+                        confirmText: 'Restart Now',
+                        cancelText: 'Later'
+                    })
+                    .then(async ({ ok }) => {
+                        if (!ok) return;
+
+                        sentryErrorReporting.value = true;
+                        configRepository.setBool('VRCX_SentryEnabled', true);
+
+                        VRCXUpdaterStore.restartVRCX(false);
+                    });
             });
     }
 
     async function setSentryErrorReporting() {
-        if (VRCXUpdaterStore.branch !== 'Nightly') {
-            return;
-        }
+        if (VRCXUpdaterStore.branch !== 'Nightly') return;
 
-        sentryErrorReporting.value = !sentryErrorReporting.value;
-        await configRepository.setString(
-            'VRCX_SentryEnabled',
-            sentryErrorReporting.value ? 'true' : 'false'
-        );
-
-        ElMessageBox.confirm(
-            'Error reporting setting has been disabled. Would you like to restart VRCX now for the change to take effect?',
-            'Restart Required',
-            {
-                confirmButtonText: 'Restart Now',
-                cancelButtonText: 'Later',
-                type: 'info',
-                center: true
-            }
-        )
-            .then(() => {
-                VRCXUpdaterStore.restartVRCX(false);
+        modalStore
+            .confirm({
+                description:
+                    'Error reporting setting has been disabled. Would you like to restart VRCX now for the change to take effect?',
+                title: 'Restart Required',
+                confirmText: 'Restart Now',
+                cancelText: 'Later'
             })
-            .catch(() => {});
+            .then(async ({ ok }) => {
+                if (!ok) return;
+
+                sentryErrorReporting.value = !sentryErrorReporting.value;
+                await configRepository.setBool(
+                    'VRCX_SentryEnabled',
+                    sentryErrorReporting.value
+                );
+                VRCXUpdaterStore.restartVRCX(false);
+            });
     }
 
     async function getSqliteTableSizes() {
@@ -549,7 +582,7 @@ export const useAdvancedSettingsStore = defineStore('AdvancedSettings', () => {
      * @param {string} videoId
      */
     async function lookupYouTubeVideo(videoId) {
-        if (!youTubeApi.value) {
+        if (!youTubeApiKey.value) {
             console.warn('no Youtube API key configured');
             return null;
         }
@@ -583,154 +616,198 @@ export const useAdvancedSettingsStore = defineStore('AdvancedSettings', () => {
         return data;
     }
 
-    async function translateText(text, targetLang) {
-        if (!translationApiKey.value) {
-            ElMessage({
-                message: 'No Translation API key configured',
-                type: 'warning'
-            });
+    async function translateText(text, targetLang, overrides) {
+        if (!translationApi.value) {
+            toast.warning('Translation API disabled');
             return null;
+        }
+
+        const provider =
+            overrides?.type || translationApiType.value || 'google';
+
+        if (provider === 'google') {
+            const keyToUse = overrides?.key ?? translationApiKey.value;
+            if (!keyToUse) {
+                toast.warning('No Translation API key configured');
+                return null;
+            }
+            try {
+                const response = await webApiService.execute({
+                    url: `https://translation.googleapis.com/language/translate/v2?key=${keyToUse}`,
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Referer: 'https://vrcx.app'
+                    },
+                    body: JSON.stringify({
+                        q: text,
+                        target: targetLang,
+                        format: 'text'
+                    })
+                });
+                if (response.status !== 200) {
+                    throw new Error(
+                        `Translation API error: ${response.status} - ${response.data}`
+                    );
+                }
+                const data = JSON.parse(response.data);
+                if (AppDebug.debugWebRequests) {
+                    console.log(data, response);
+                }
+                return data.data.translations[0].translatedText;
+            } catch (err) {
+                toast.error(`Translation failed: ${err.message}`);
+                return null;
+            }
+        }
+
+        const endpoint =
+            overrides?.endpoint ||
+            translationApiEndpoint.value ||
+            'https://api.openai.com/v1/chat/completions';
+        const model =
+            overrides?.model || translationApiModel.value || 'gpt-5.1';
+        const prompt =
+            overrides?.prompt ||
+            translationApiPrompt.value ||
+            `You are a translation assistant. Translate the user message into ${targetLang}. Only return the translated text.`;
+
+        if (!endpoint || !model) {
+            toast.warning('Translation endpoint/model missing');
+            return null;
+        }
+
+        const headers = {
+            'Content-Type': 'application/json',
+            Referer: 'https://vrcx.app'
+        };
+        const keyToUse = overrides?.key ?? translationApiKey.value;
+        if (keyToUse) {
+            headers.Authorization = `Bearer ${keyToUse}`;
         }
 
         try {
             const response = await webApiService.execute({
-                url: `https://translation.googleapis.com/language/translate/v2?key=${translationApiKey.value}`,
+                url: endpoint,
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Referer: 'https://vrcx.app'
-                },
+                headers,
                 body: JSON.stringify({
-                    q: text,
-                    target: targetLang,
-                    format: 'text'
+                    model,
+                    messages: [
+                        {
+                            role: 'system',
+                            content: prompt
+                        },
+                        {
+                            role: 'user',
+                            content: text
+                        }
+                    ]
                 })
             });
+
             if (response.status !== 200) {
                 throw new Error(
                     `Translation API error: ${response.status} - ${response.data}`
                 );
             }
+
             const data = JSON.parse(response.data);
             if (AppDebug.debugWebRequests) {
                 console.log(data, response);
             }
-            return data.data.translations[0].translatedText;
+
+            const translated = data?.choices?.[0]?.message?.content;
+            return typeof translated === 'string' ? translated.trim() : null;
         } catch (err) {
-            ElMessage({
-                message: `Translation failed: ${err.message}`,
-                type: 'error'
-            });
+            toast.error(`Translation failed: ${err.message}`);
             return null;
         }
     }
 
     function cropPrintsChanged() {
         if (!cropInstancePrints.value) return;
-        ElMessageBox.confirm(
-            t(
-                'view.settings.advanced.advanced.save_instance_prints_to_file.crop_convert_old'
-            ),
-            {
-                confirmButtonText: t(
+        modalStore
+            .confirm({
+                description: t(
+                    'view.settings.advanced.advanced.save_instance_prints_to_file.crop_convert_old'
+                ),
+                title: '',
+                confirmText: t(
                     'view.settings.advanced.advanced.save_instance_prints_to_file.crop_convert_old_confirm'
                 ),
-                cancelButtonText: t(
+                cancelText: t(
                     'view.settings.advanced.advanced.save_instance_prints_to_file.crop_convert_old_cancel'
-                ),
-                type: 'info',
-                showInput: false
-            }
-        )
-            .then(async ({ action }) => {
-                if (action === 'confirm') {
-                    const msgBox = ElMessage({
-                        message: 'Batch print cropping in progress...',
-                        type: 'warning',
-                        duration: 0
-                    });
-                    try {
-                        await AppApi.CropAllPrints(ugcFolderPath.value);
-                        ElMessage({
-                            message: 'Batch print cropping complete',
-                            type: 'success'
-                        });
-                    } catch (err) {
-                        console.error(err);
-                        ElMessage({
-                            message: `Batch print cropping failed: ${err}`,
-                            type: 'error'
-                        });
-                    } finally {
-                        msgBox.close();
-                    }
+                )
+            })
+            .then(async ({ ok }) => {
+                if (!ok) return;
+                const msgBox = toast.warning(
+                    'Batch print cropping in progress...',
+                    { duration: Infinity, position: 'bottom-right' }
+                );
+                try {
+                    await AppApi.CropAllPrints(ugcFolderPath.value);
+                    toast.success('Batch print cropping complete');
+                } catch (err) {
+                    console.error(err);
+                    toast.error(`Batch print cropping failed: ${err}`);
+                } finally {
+                    toast.dismiss(msgBox);
                 }
             })
             .catch(() => {});
     }
 
     function askDeleteAllScreenshotMetadata() {
-        ElMessageBox.confirm(
-            t(
-                'view.settings.advanced.advanced.delete_all_screenshot_metadata.ask'
-            ),
-            {
-                confirmButtonText: t(
+        modalStore
+            .confirm({
+                description: t(
+                    'view.settings.advanced.advanced.delete_all_screenshot_metadata.ask'
+                ),
+                title: '',
+                confirmText: t(
                     'view.settings.advanced.advanced.delete_all_screenshot_metadata.confirm_yes'
                 ),
-                cancelButtonText: t(
+                cancelText: t(
                     'view.settings.advanced.advanced.delete_all_screenshot_metadata.confirm_no'
-                ),
-                type: 'warning',
-                showInput: false
-            }
-        )
-            .then(({ action }) => {
-                if (action === 'confirm') {
-                    deleteAllScreenshotMetadata();
-                }
+                )
+            })
+            .then(({ ok }) => {
+                if (!ok) return;
+                deleteAllScreenshotMetadata();
             })
             .catch(() => {});
     }
 
     function deleteAllScreenshotMetadata() {
-        ElMessageBox.confirm(
-            t(
-                'view.settings.advanced.advanced.delete_all_screenshot_metadata.confirm'
-            ),
-            {
-                confirmButtonText: t(
+        modalStore
+            .confirm({
+                description: t(
+                    'view.settings.advanced.advanced.delete_all_screenshot_metadata.confirm'
+                ),
+                title: '',
+                confirmText: t(
                     'view.settings.advanced.advanced.save_instance_prints_to_file.crop_convert_old_confirm'
                 ),
-                cancelButtonText: t(
+                cancelText: t(
                     'view.settings.advanced.advanced.save_instance_prints_to_file.crop_convert_old_cancel'
-                ),
-                type: 'warning',
-                showInput: false
-            }
-        )
-            .then(async ({ action }) => {
-                if (action === 'confirm') {
-                    const msgBox = ElMessage({
-                        message: 'Batch metadata removal in progress...',
-                        type: 'warning',
-                        duration: 0
-                    });
-                    try {
-                        await AppApi.DeleteAllScreenshotMetadata();
-                        ElMessage({
-                            message: 'Batch metadata removal complete',
-                            type: 'success'
-                        });
-                    } catch (err) {
-                        console.error(err);
-                        ElMessage({
-                            message: `Batch metadata removal failed: ${err}`,
-                            type: 'error'
-                        });
-                    } finally {
-                        msgBox.close();
-                    }
+                )
+            })
+            .then(async ({ ok }) => {
+                if (!ok) return;
+                const msgBox = toast.warning(
+                    'Batch metadata removal in progress...',
+                    { duration: Infinity, position: 'bottom-right' }
+                );
+                try {
+                    await AppApi.DeleteAllScreenshotMetadata();
+                    toast.success('Batch metadata removal complete');
+                } catch (err) {
+                    console.error(err);
+                    toast.error(`Batch metadata removal failed: ${err}`);
+                } finally {
+                    toast.dismiss(msgBox);
                 }
             })
             .catch(() => {});
@@ -831,6 +908,10 @@ export const useAdvancedSettingsStore = defineStore('AdvancedSettings', () => {
         translationApi,
         youTubeApiKey,
         translationApiKey,
+        translationApiType,
+        translationApiEndpoint,
+        translationApiModel,
+        translationApiPrompt,
         progressPie,
         progressPieFilter,
         showConfirmationOnSwitchAvatar,
@@ -866,6 +947,10 @@ export const useAdvancedSettingsStore = defineStore('AdvancedSettings', () => {
         setTranslationApi,
         setYouTubeApiKey,
         setTranslationApiKey,
+        setTranslationApiType,
+        setTranslationApiEndpoint,
+        setTranslationApiModel,
+        setTranslationApiPrompt,
         setProgressPie,
         setProgressPieFilter,
         setShowConfirmationOnSwitchAvatar,

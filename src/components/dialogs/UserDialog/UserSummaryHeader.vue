@@ -20,38 +20,41 @@
         <div style="flex: 1; display: flex; align-items: center; margin-left: 15px">
             <div style="flex: 1">
                 <div>
-                    <el-tooltip v-if="userDialog.ref.status" placement="top">
+                    <TooltipWrapper v-if="userDialog.ref.status" side="top">
                         <template #content>
                             <span>{{ getUserStateText(userDialog.ref) }}</span>
                         </template>
                         <i class="x-user-status" :class="userStatusClass(userDialog.ref)"></i>
-                    </el-tooltip>
+                    </TooltipWrapper>
                     <template v-if="userDialog.previousDisplayNames.length > 0">
-                        <el-tooltip placement="bottom">
+                        <TooltipWrapper side="bottom">
                             <template #content>
                                 <span>{{ t('dialog.user.previous_display_names') }}</span>
                                 <div
-                                    v-for="displayName in userDialog.previousDisplayNames"
-                                    :key="displayName"
+                                    v-for="data in userDialog.previousDisplayNames"
+                                    :key="data.displayName"
                                     placement="top">
-                                    <span v-text="displayName"></span>
+                                    <span>{{ data.displayName }}</span>
+                                    <span v-if="data.updated_at">
+                                        &horbar; {{ formatDateFilter(data.updated_at, 'long') }}</span
+                                    >
                                 </div>
                             </template>
                             <el-icon><CaretBottom /></el-icon>
-                        </el-tooltip>
+                        </TooltipWrapper>
                     </template>
                     <span
                         class="dialog-title"
                         style="margin-left: 5px; margin-right: 5px; cursor: pointer"
                         v-text="userDialog.ref.displayName"
                         @click="copyUserDisplayName(userDialog.ref.displayName)"></span>
-                    <el-tooltip v-if="userDialog.ref.pronouns" placement="top" :content="t('dialog.user.pronouns')">
+                    <TooltipWrapper v-if="userDialog.ref.pronouns" side="top" :content="t('dialog.user.pronouns')">
                         <span
                             class="x-grey"
                             style="margin-right: 5px; font-family: monospace; font-size: 12px"
                             v-text="userDialog.ref.pronouns"></span>
-                    </el-tooltip>
-                    <el-tooltip v-for="item in userDialog.ref.$languages" :key="item.key" placement="top">
+                    </TooltipWrapper>
+                    <TooltipWrapper v-for="item in userDialog.ref.$languages" :key="item.key" side="top">
                         <template #content>
                             <span>{{ item.value }} ({{ item.key }})</span>
                         </template>
@@ -59,7 +62,7 @@
                             class="flags"
                             :class="languageClass(item.key)"
                             style="display: inline-block; margin-right: 5px"></span>
-                    </el-tooltip>
+                    </TooltipWrapper>
                     <template v-if="userDialog.ref.id === currentUser.id">
                         <br />
                         <span
@@ -70,127 +73,117 @@
                     </template>
                 </div>
                 <div style="margin-top: 5px" v-show="!userDialog.loading">
-                    <el-tag
-                        type="info"
-                        effect="plain"
-                        size="small"
-                        class="name"
-                        :class="userDialog.ref.$trustClass"
-                        style="margin-right: 5px; margin-top: 5px">
-                        {{ userDialog.ref.$trustLevel }}
-                    </el-tag>
-                    <el-tag
+                    <TooltipWrapper side="top" :content="t('dialog.user.tags.trust_level')">
+                        <Badge
+                            variant="outline"
+                            class="name"
+                            :class="userDialog.ref.$trustClass"
+                            style="margin-right: 5px; margin-top: 5px">
+                            <i class="ri-shield-line"></i> {{ userDialog.ref.$trustLevel }}
+                        </Badge>
+                    </TooltipWrapper>
+                    <TooltipWrapper
+                        v-if="userDialog.ref.ageVerified && userDialog.ref.ageVerificationStatus"
+                        side="top"
+                        :content="t('dialog.user.tags.age_verified')">
+                        <Badge
+                            variant="outline"
+                            class="x-tag-age-verification"
+                            style="margin-right: 5px; margin-top: 5px">
+                            <template v-if="userDialog.ref.ageVerificationStatus === '18+'">
+                                <i class="ri-info-card-line"></i> 18+
+                            </template>
+                            <template v-else>
+                                <i class="ri-info-card-line"></i>
+                            </template>
+                        </Badge>
+                    </TooltipWrapper>
+                    <TooltipWrapper
                         v-if="userDialog.isFriend && userDialog.friend"
-                        type="info"
-                        effect="plain"
-                        size="small"
-                        class="x-tag-friend"
-                        style="margin-right: 5px; margin-top: 5px">
-                        {{
-                            t('dialog.user.tags.friend_no', {
-                                number: userDialog.ref.$friendNumber ? userDialog.ref.$friendNumber : ''
-                            })
-                        }}
-                    </el-tag>
-                    <el-tag
+                        side="top"
+                        :content="t('dialog.user.tags.friend_number')">
+                        <Badge variant="outline" class="x-tag-friend" style="margin-right: 5px; margin-top: 5px">
+                            <i class="ri-user-add-line"></i>
+                            {{ userDialog.ref.$friendNumber ? userDialog.ref.$friendNumber : '' }}
+                        </Badge>
+                    </TooltipWrapper>
+                    <TooltipWrapper
+                        v-if="userDialog.mutualFriendCount"
+                        side="top"
+                        :content="t('dialog.user.tags.mutual_friends')">
+                        <Badge variant="outline" class="x-tag-mutual-friend" style="margin-right: 5px; margin-top: 5px">
+                            <i class="ri-group-line"></i>
+                            {{ userDialog.mutualFriendCount }}
+                        </Badge>
+                    </TooltipWrapper>
+                    <Badge
                         v-if="userDialog.ref.$isTroll"
-                        type="info"
-                        effect="plain"
-                        size="small"
+                        variant="outline"
                         class="x-tag-troll"
                         style="margin-right: 5px; margin-top: 5px">
                         Nuisance
-                    </el-tag>
-                    <el-tag
+                    </Badge>
+                    <Badge
                         v-if="userDialog.ref.$isProbableTroll"
-                        type="info"
-                        effect="plain"
-                        size="small"
+                        variant="outline"
                         class="x-tag-troll"
                         style="margin-right: 5px; margin-top: 5px">
                         Almost Nuisance
-                    </el-tag>
-                    <el-tag
+                    </Badge>
+                    <Badge
                         v-if="userDialog.ref.$isModerator"
-                        type="info"
-                        effect="plain"
-                        size="small"
+                        variant="outline"
                         class="x-tag-vip"
                         style="margin-right: 5px; margin-top: 5px">
                         {{ t('dialog.user.tags.vrchat_team') }}
-                    </el-tag>
-                    <el-tag
-                        v-if="userDialog.ref.$platform === 'standalonewindows'"
-                        type="info"
-                        effect="plain"
-                        size="small"
-                        class="x-tag-platform-pc"
-                        style="margin-right: 5px; margin-top: 5px">
-                        PC
-                    </el-tag>
-                    <el-tag
-                        v-else-if="userDialog.ref.$platform === 'android'"
-                        type="info"
-                        effect="plain"
-                        size="small"
-                        class="x-tag-platform-quest"
-                        style="margin-right: 5px; margin-top: 5px">
-                        Android
-                    </el-tag>
-                    <el-tag
-                        v-else-if="userDialog.ref.$platform === 'ios'"
-                        type="info"
-                        effect="plain"
-                        size="small"
-                        class="x-tag-platform-ios"
-                        style="margin-right: 5px; margin-top: 5px"
-                        >iOS</el-tag
-                    >
-                    <el-tag
+                    </Badge>
+
+                    <TooltipWrapper v-if="userDialog.ref.$platform === 'standalonewindows'" side="top" content="PC">
+                        <Badge variant="outline" class="x-tag-platform-pc" style="margin-right: 5px; margin-top: 5px">
+                            <i class="ri-computer-line"></i>
+                        </Badge>
+                    </TooltipWrapper>
+                    <TooltipWrapper v-else-if="userDialog.ref.$platform === 'android'" side="top" content="Android">
+                        <Badge
+                            variant="outline"
+                            class="x-tag-platform-quest"
+                            style="margin-right: 5px; margin-top: 5px">
+                            <i class="ri-android-line"></i>
+                        </Badge>
+                    </TooltipWrapper>
+                    <TooltipWrapper v-else-if="userDialog.ref.$platform === 'ios'" side="top" content="iOS">
+                        <Badge variant="outline" class="x-tag-platform-ios" style="margin-right: 5px; margin-top: 5px"
+                            ><i class="ri-apple-line"></i
+                        ></Badge>
+                    </TooltipWrapper>
+                    <Badge
                         v-else-if="userDialog.ref.$platform"
-                        type="info"
-                        effect="plain"
-                        size="small"
+                        variant="outline"
                         class="x-tag-platform-other"
                         style="margin-right: 5px; margin-top: 5px">
                         {{ userDialog.ref.$platform }}
-                    </el-tag>
-                    <el-tag
-                        v-if="userDialog.ref.ageVerified && userDialog.ref.ageVerificationStatus"
-                        type="info"
-                        effect="plain"
-                        size="small"
-                        class="x-tag-age-verification"
-                        style="margin-right: 5px; margin-top: 5px">
-                        <template v-if="userDialog.ref.ageVerificationStatus === '18+'">
-                            {{ t('dialog.user.tags.18_plus_verified') }}
-                        </template>
-                        <template v-else>
-                            {{ t('dialog.user.tags.age_verified') }}
-                        </template>
-                    </el-tag>
-                    <el-tag
+                    </Badge>
+
+                    <Badge
                         v-if="userDialog.ref.$customTag"
-                        type="info"
-                        effect="plain"
-                        size="small"
+                        variant="outline"
                         class="name"
                         :style="{
                             color: userDialog.ref.$customTagColour,
                             'border-color': userDialog.ref.$customTagColour
                         }"
                         style="margin-right: 5px; margin-top: 5px"
-                        >{{ userDialog.ref.$customTag }}</el-tag
+                        >{{ userDialog.ref.$customTag }}</Badge
                     >
                     <br />
-                    <el-tooltip v-for="badge in userDialog.ref.badges" :key="badge.badgeId" placement="top">
+                    <TooltipWrapper v-for="badge in userDialog.ref.badges" :key="badge.badgeId" side="top">
                         <template #content>
                             <span>{{ badge.badgeName }}</span>
                             <span v-if="badge.hidden">&nbsp;(Hidden)</span>
                         </template>
                         <div style="display: inline-block">
-                            <el-popover placement="bottom" :width="300" trigger="click">
-                                <template #reference>
+                            <Popover>
+                                <PopoverTrigger asChild>
                                     <img
                                         class="x-link x-user-badge"
                                         :src="badge.badgeImageUrl"
@@ -205,42 +198,47 @@
                                         "
                                         :class="{ 'x-user-badge-hidden': badge.hidden }"
                                         loading="lazy" />
-                                </template>
-                                <img
-                                    :src="badge.badgeImageUrl"
-                                    :class="['x-link', 'x-popover-image']"
-                                    @click="showFullscreenImageDialog(badge.badgeImageUrl)"
-                                    loading="lazy" />
-                                <br />
-                                <div style="display: block; width: 300px; word-break: normal">
-                                    <span>{{ badge.badgeName }}</span>
+                                </PopoverTrigger>
+                                <PopoverContent side="bottom" class="w-75">
+                                    <img
+                                        :src="badge.badgeImageUrl"
+                                        :class="['x-link', 'x-popover-image']"
+                                        @click="showFullscreenImageDialog(badge.badgeImageUrl)"
+                                        loading="lazy" />
                                     <br />
-                                    <span class="x-grey" style="font-size: 12px">{{ badge.badgeDescription }}</span>
-                                    <br />
-                                    <span
-                                        v-if="badge.assignedAt"
-                                        class="x-grey"
-                                        style="font-family: monospace; font-size: 12px">
-                                        {{ t('dialog.user.badges.assigned') }}:
-                                        {{ formatDateFilter(badge.assignedAt, 'long') }}
-                                    </span>
-                                    <template v-if="userDialog.id === currentUser.id">
+                                    <div style="display: block; width: 275px; word-break: normal">
+                                        <span>{{ badge.badgeName }}</span>
                                         <br />
-                                        <el-checkbox
-                                            v-model="badge.hidden"
-                                            style="margin-top: 5px"
-                                            @change="toggleBadgeVisibility(badge)">
-                                            {{ t('dialog.user.badges.hidden') }}
-                                        </el-checkbox>
+                                        <span class="x-grey" style="font-size: 12px">{{ badge.badgeDescription }}</span>
                                         <br />
-                                        <el-checkbox v-model="badge.showcased" @change="toggleBadgeShowcased(badge)">
-                                            {{ t('dialog.user.badges.showcased') }}
-                                        </el-checkbox>
-                                    </template>
-                                </div>
-                            </el-popover>
+                                        <span
+                                            v-if="badge.assignedAt"
+                                            class="x-grey"
+                                            style="font-family: monospace; font-size: 12px">
+                                            {{ t('dialog.user.badges.assigned') }}:
+                                            {{ formatDateFilter(badge.assignedAt, 'long') }}
+                                        </span>
+                                        <template v-if="userDialog.id === currentUser.id">
+                                            <br />
+                                            <label class="inline-flex items-center gap-2" style="margin-top: 5px">
+                                                <Checkbox
+                                                    v-model="badge.hidden"
+                                                    @update:modelValue="toggleBadgeVisibility(badge)" />
+                                                <span>{{ t('dialog.user.badges.hidden') }}</span>
+                                            </label>
+                                            <br />
+                                            <label class="inline-flex items-center gap-2">
+                                                <Checkbox
+                                                    v-model="badge.showcased"
+                                                    @update:modelValue="toggleBadgeShowcased(badge)" />
+                                                <span>{{ t('dialog.user.badges.showcased') }}</span>
+                                            </label>
+                                        </template>
+                                    </div>
+                                </PopoverContent>
+                            </Popover>
                         </div>
-                    </el-tooltip>
+                    </TooltipWrapper>
                 </div>
                 <div style="margin-top: 5px">
                     <span style="font-size: 12px" v-text="userDialog.ref.statusDescription"></span>
@@ -267,7 +265,10 @@
     import { useI18n } from 'vue-i18n';
 
     import { formatDateFilter, languageClass, userImage, userStatusClass } from '../../../shared/utils';
+    import { Popover, PopoverContent, PopoverTrigger } from '../../ui/popover';
     import { useGalleryStore, useUserStore } from '../../../stores';
+    import { Badge } from '../../ui/badge';
+    import { Checkbox } from '../../ui/checkbox';
 
     import UserActionDropdown from './UserActionDropdown.vue';
 

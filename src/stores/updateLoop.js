@@ -73,7 +73,11 @@ export const useUpdateLoopStore = defineStore('UpdateLoop', () => {
                     state.nextFriendsRefresh = 3600; // 1hour
                     friendStore.refreshFriendsList();
                     authStore.updateStoredUser(userStore.currentUser);
-                    if (gameStore.isGameRunning) {
+                    if (
+                        userStore.currentUser.last_activity &&
+                        new Date(userStore.currentUser.last_activity) >
+                            new Date(Date.now() - 3600 * 1000) // 1hour
+                    ) {
                         moderationStore.refreshPlayerModerations();
                     }
                 }
@@ -127,14 +131,13 @@ export const useUpdateLoopStore = defineStore('UpdateLoop', () => {
                     state.nextGameRunningCheck = 1;
                     gameStore.updateIsGameRunning(
                         await AppApi.IsGameRunning(),
-                        await AppApi.IsSteamVRRunning(),
-                        false
+                        await AppApi.IsSteamVRRunning()
                     );
                     vrStore.vrInit(); // TODO: make this event based
                 }
                 if (--state.nextDatabaseOptimize <= 0) {
                     state.nextDatabaseOptimize = 86400; // 1 day
-                    database.optimize();
+                    database.optimize().catch(console.error);
                 }
             }
         } catch (err) {

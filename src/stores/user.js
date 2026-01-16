@@ -1,12 +1,12 @@
-import { computed, reactive, ref, watch } from 'vue';
-import { ElMessage } from 'element-plus';
+import { computed, reactive, ref, shallowReactive, watch } from 'vue';
 import { defineStore } from 'pinia';
+import { toast } from 'vue-sonner';
 
 import Noty from 'noty';
 
 import {
     arraysMatch,
-    buildTreeData,
+    compareByCreatedAt,
     compareByDisplayName,
     compareByLocationAt,
     compareByName,
@@ -30,6 +30,7 @@ import {
 import { processBulk, request } from '../service/request';
 import { AppDebug } from '../service/appConfig';
 import { database } from '../service/database';
+import { formatJsonVars } from '../shared/utils/base/ui';
 import { useAppearanceSettingsStore } from './settings/appearance';
 import { useAuthStore } from './auth';
 import { useAvatarStore } from './avatar';
@@ -99,6 +100,7 @@ export const useUserStore = defineStore('User', () => {
         hasEmail: false,
         hasLoggedInFromClient: false,
         hasPendingEmail: false,
+        hasSharedConnectionsOptOut: false,
         hideContentFilterSettings: false,
         homeLocation: '',
         id: '',
@@ -182,7 +184,6 @@ export const useUserStore = defineStore('User', () => {
         friend: {},
         isFriend: false,
         note: '',
-        noteSaving: false,
         incomingRequest: false,
         outgoingRequest: false,
         isBlock: false,
@@ -223,9 +224,13 @@ export const useUserStore = defineStore('User', () => {
             name: 'dialog.user.groups.sorting.alphabetical',
             value: 'alphabetical'
         },
+        mutualFriendSorting: {
+            name: 'dialog.user.mutual_friends.sorting.alphabetical',
+            value: 'alphabetical'
+        },
         avatarSorting: 'update',
         avatarReleaseStatus: 'all',
-        treeData: [],
+        treeData: {},
         memo: '',
         $avatarInfo: {
             ownerId: '',
@@ -258,10 +263,14 @@ export const useUserStore = defineStore('User', () => {
         previousDisplayNames: [],
         dateFriended: '',
         unFriended: false,
-        dateFriendedInfo: []
+        dateFriendedInfo: [],
+        mutualFriendCount: 0,
+        mutualGroupCount: 0,
+        mutualFriends: [],
+        isMutualFriendsLoading: false
     });
 
-    const currentTravelers = ref(new Map());
+    const currentTravelers = reactive(new Map());
     const subsetOfLanguages = ref([]);
     const languageDialog = ref({
         visible: false,
@@ -273,19 +282,8 @@ export const useUserStore = defineStore('User', () => {
         visible: false,
         userId: ''
     });
-    const pastDisplayNameTable = ref({
-        data: [],
-        tableProps: {
-            stripe: true,
-            size: 'small',
-            defaultSort: {
-                prop: 'updated_at',
-                order: 'descending'
-            }
-        }
-    });
-    const showUserDialogHistory = ref(new Set());
-    const customUserTags = ref(new Map());
+    const showUserDialogHistory = reactive(new Set());
+    const customUserTags = reactive(new Map());
 
     const state = reactive({
         instancePlayerCount: new Map(),
@@ -294,7 +292,7 @@ export const useUserStore = defineStore('User', () => {
         notes: new Map()
     });
 
-    const cachedUsers = new Map();
+    const cachedUsers = shallowReactive(new Map());
 
     const isLocalUserVrcPlusSupporter = computed(
         () => currentUser.value.$isVRCPlus || AppDebug.debugVrcPlus
@@ -304,12 +302,11 @@ export const useUserStore = defineStore('User', () => {
         () => watchState.isLoggedIn,
         (isLoggedIn) => {
             if (!isLoggedIn) {
-                currentTravelers.value.clear();
-                showUserDialogHistory.value.clear();
+                currentTravelers.clear();
+                showUserDialogHistory.clear();
                 state.instancePlayerCount.clear();
-                customUserTags.value.clear();
+                customUserTags.clear();
                 state.notes.clear();
-                pastDisplayNameTable.value.data = [];
                 subsetOfLanguages.value = [];
             }
         },
@@ -402,6 +399,49 @@ export const useUserStore = defineStore('User', () => {
     }
 
     const robotUrl = `${AppDebug.endpointDomain}/file/file_0e8c4e32-7444-44ea-ade4-313c010d4bae/1/file`;
+
+    /**
+     *
+     * @param {Map<string, any>} userCache
+     * @param {Map<string, any>} friendMap
+     */
+    function cleanupUserCache(userCache, friendMap) {
+        const bufferSize = 200;
+
+        const currentFriendCount = friendMap.size;
+        const currentTotalSize = userCache.size;
+
+        const effectiveMaxSize = currentFriendCount + bufferSize;
+
+        if (currentTotalSize <= effectiveMaxSize) {
+            return;
+        }
+
+        const targetDeleteCount = currentTotalSize - effectiveMaxSize;
+        let deletedCount = 0;
+        const keysToDelete = [];
+
+        for (const userId of userCache.keys()) {
+            if (friendMap.has(userId)) {
+                continue;
+            }
+
+            if (deletedCount >= targetDeleteCount) {
+                break;
+            }
+
+            keysToDelete.push(userId);
+            deletedCount++;
+        }
+
+        for (const id of keysToDelete) {
+            userCache.delete(id);
+        }
+
+        console.log(
+            `User cache cleanup: Deleted ${deletedCount}. Current cache size: ${userCache.size}`
+        );
+    }
     /**
      *
      * @param {import('../types/api/user').GetUserResponse} json
@@ -484,6 +524,7 @@ export const useUserStore = defineStore('User', () => {
                 $joinCount: 0,
                 $timeSpent: 0,
                 $lastSeen: '',
+                $mutualCount: 0,
                 $nickName: '',
                 $previousLocation: '',
                 $customTag: '',
@@ -511,7 +552,7 @@ export const useUserStore = defineStore('User', () => {
                 newCount++;
                 state.instancePlayerCount.set(ref.location, newCount);
             }
-            const tag = customUserTags.value.get(json.id);
+            const tag = customUserTags.get(json.id);
             if (tag) {
                 ref.$customTag = tag.tag;
                 ref.$customTagColour = tag.colour;
@@ -519,6 +560,7 @@ export const useUserStore = defineStore('User', () => {
                 ref.$customTag = '';
                 ref.$customTagColour = '';
             }
+            cleanupUserCache(cachedUsers, friendStore.friends);
             cachedUsers.set(ref.id, ref);
             friendStore.updateFriend(ref.id);
         } else {
@@ -582,23 +624,20 @@ export const useUserStore = defineStore('User', () => {
         // traveling
         if (ref.location === 'traveling') {
             ref.$location = parseLocation(ref.travelingToLocation);
-            if (
-                !currentTravelers.value.has(ref.id) &&
-                ref.travelingToLocation
-            ) {
+            if (!currentTravelers.has(ref.id) && ref.travelingToLocation) {
                 const travelRef = reactive({
                     created_at: new Date().toJSON(),
                     ...ref
                 });
-                currentTravelers.value.set(ref.id, travelRef);
+                currentTravelers.set(ref.id, travelRef);
                 sharedFeedStore.sharedFeed.pendingUpdate = true;
                 sharedFeedStore.updateSharedFeed(false);
                 onPlayerTraveling(travelRef);
             }
         } else {
             ref.$location = parseLocation(ref.location);
-            if (currentTravelers.value.has(ref.id)) {
-                currentTravelers.value.delete(ref.id);
+            if (currentTravelers.has(ref.id)) {
+                currentTravelers.delete(ref.id);
                 sharedFeedStore.sharedFeed.pendingUpdate = true;
                 sharedFeedStore.updateSharedFeed(false);
             }
@@ -685,7 +724,6 @@ export const useUserStore = defineStore('User', () => {
         if (D.visible && D.id === ref.id) {
             D.ref = ref;
             D.note = String(ref.note || '');
-            D.noteSaving = false;
             D.incomingRequest = false;
             D.outgoingRequest = false;
             if (D.ref.friendRequestStatus === 'incoming') {
@@ -722,15 +760,18 @@ export const useUserStore = defineStore('User', () => {
      * @param {string} userId
      */
     function showUserDialog(userId) {
-        if (!userId) {
+        if (
+            !userId ||
+            typeof userId !== 'string' ||
+            userId === 'usr_00000000-0000-0000-0000-000000000000'
+        ) {
             return;
         }
         const D = userDialog.value;
         D.id = userId;
-        D.treeData = [];
+        D.treeData = {};
         D.memo = '';
         D.note = '';
-        D.noteSaving = false;
         getUserMemo(userId).then((memo) => {
             if (memo.userId === userId) {
                 D.memo = memo.memo;
@@ -787,6 +828,8 @@ export const useUserStore = defineStore('User', () => {
         D.dateFriended = '';
         D.unFriended = false;
         D.dateFriendedInfo = [];
+        D.mutualFriendCount = 0;
+        D.mutualGroupCount = 0;
         if (userId === currentUser.value.id) {
             getWorldName(currentUser.value.homeLocation).then((worldName) => {
                 D.$homeLocationName = worldName;
@@ -800,10 +843,7 @@ export const useUserStore = defineStore('User', () => {
             .catch((err) => {
                 D.loading = false;
                 D.visible = false;
-                ElMessage({
-                    message: 'Failed to load user',
-                    type: 'error'
-                });
+                toast.error('Failed to load user');
                 throw err;
             })
             .then((args) => {
@@ -836,7 +876,7 @@ export const useUserStore = defineStore('User', () => {
                             }
                         }
                         D.isFavorite =
-                            favoriteStore.cachedFavoritesByObjectId.has(D.id);
+                            favoriteStore.getCachedFavoritesByObjectId(D.id);
                         if (D.ref.friendRequestStatus === 'incoming') {
                             D.incomingRequest = true;
                         } else if (D.ref.friendRequestStatus === 'outgoing') {
@@ -905,13 +945,13 @@ export const useUserStore = defineStore('User', () => {
                                             }
                                         }
                                     );
-                                    const displayNameMapSorted = new Map(
-                                        [...displayNameMap.entries()].sort(
-                                            (a, b) => b[1] - a[1]
-                                        )
-                                    );
-                                    D.previousDisplayNames = Array.from(
-                                        displayNameMapSorted.keys()
+                                    displayNameMap.forEach(
+                                        (updated_at, displayName) => {
+                                            D.previousDisplayNames.push({
+                                                displayName,
+                                                updated_at
+                                            });
+                                        }
                                     );
                                 });
                             AppApi.GetVRChatUserModeration(
@@ -925,7 +965,25 @@ export const useUserStore = defineStore('User', () => {
                                     D.isShowAvatar = true;
                                 }
                             });
+                            if (!currentUser.value.hasSharedConnectionsOptOut) {
+                                try {
+                                    userRequest
+                                        .getMutualCounts({ userId })
+                                        .then((args) => {
+                                            if (args.params.userId === D.id) {
+                                                D.mutualFriendCount =
+                                                    args.json.friends;
+                                                D.mutualGroupCount =
+                                                    args.json.groups;
+                                            }
+                                        });
+                                } catch (error) {
+                                    console.error(error);
+                                }
+                            }
                         } else {
+                            D.previousDisplayNames =
+                                currentUser.value.pastDisplayNames;
                             database
                                 .getUserStats(D.ref, inCurrentWorld)
                                 .then((ref1) => {
@@ -945,8 +1003,8 @@ export const useUserStore = defineStore('User', () => {
                     });
                 }
             });
-        showUserDialogHistory.value.delete(userId);
-        showUserDialogHistory.value.add(userId);
+        showUserDialogHistory.delete(userId);
+        showUserDialogHistory.add(userId);
         searchStore.quickSearchItems = searchStore.quickSearchUserHistory();
     }
 
@@ -1017,7 +1075,7 @@ export const useUserStore = defineStore('User', () => {
         let friendCount = 0;
         const playersInInstance = locationStore.lastLocation.playerList;
         const cachedCurrentUser = cachedUsers.get(currentUser.value.id);
-        const currentLocation = cachedCurrentUser.$location.tag;
+        const currentLocation = cachedCurrentUser?.$location?.tag;
         if (!L.isOffline && currentLocation === L.tag) {
             ref = cachedUsers.get(currentUser.value.id);
             if (typeof ref !== 'undefined') {
@@ -1105,6 +1163,8 @@ export const useUserStore = defineStore('User', () => {
         const D = userDialog.value;
         if (D.avatarSorting === 'update') {
             array.sort(compareByUpdatedAt);
+        } else if (D.avatarSorting === 'createdAt') {
+            array.sort(compareByCreatedAt);
         } else {
             array.sort(compareByName);
         }
@@ -1158,10 +1218,7 @@ export const useUserStore = defineStore('User', () => {
                             return;
                         }
                     }
-                    ElMessage({
-                        message: 'Own avatar not found',
-                        type: 'error'
-                    });
+                    toast.error('Own avatar not found');
                 }
             }
         });
@@ -1170,14 +1227,13 @@ export const useUserStore = defineStore('User', () => {
     function refreshUserDialogTreeData() {
         const D = userDialog.value;
         if (D.id === currentUser.value.id) {
-            const treeData = {
+            D.treeData = formatJsonVars({
                 ...currentUser.value,
                 ...D.ref
-            };
-            D.treeData = buildTreeData(treeData);
+            });
             return;
         }
-        D.treeData = buildTreeData(D.ref);
+        D.treeData = formatJsonVars(D.ref);
     }
 
     async function lookupUser(ref) {
@@ -1575,12 +1631,12 @@ export const useUserStore = defineStore('User', () => {
 
     function addCustomTag(data) {
         if (data.Tag) {
-            customUserTags.value.set(data.UserId, {
+            customUserTags.set(data.UserId, {
                 tag: data.Tag,
                 colour: data.TagColour
             });
         } else {
-            customUserTags.value.delete(data.UserId);
+            customUserTags.delete(data.UserId);
         }
         const feedUpdate = {
             userId: data.UserId,
@@ -1766,6 +1822,7 @@ export const useUserStore = defineStore('User', () => {
                 hasEmail: false,
                 hasLoggedInFromClient: false,
                 hasPendingEmail: false,
+                hasSharedConnectionsOptOut: false,
                 hideContentFilterSettings: false,
                 homeLocation: '',
                 id: '',
@@ -1869,9 +1926,6 @@ export const useUserStore = defineStore('User', () => {
                 );
             }
         }
-        if (ref.pastDisplayNames) {
-            pastDisplayNameTable.value.data = ref.pastDisplayNames;
-        }
 
         // when isGameRunning use gameLog instead of API
         const $location = parseLocation(locationStore.lastLocation.location);
@@ -1969,6 +2023,13 @@ export const useUserStore = defineStore('User', () => {
         sendBoopDialog.value.visible = true;
     }
 
+    function toggleSharedConnectionsOptOut() {
+        userRequest.saveCurrentUser({
+            hasSharedConnectionsOptOut:
+                !currentUser.value.hasSharedConnectionsOptOut
+        });
+    }
+
     return {
         state,
 
@@ -1978,7 +2039,6 @@ export const useUserStore = defineStore('User', () => {
         subsetOfLanguages,
         languageDialog,
         sendBoopDialog,
-        pastDisplayNameTable,
         showUserDialogHistory,
         customUserTags,
         cachedUsers,
@@ -1997,6 +2057,7 @@ export const useUserStore = defineStore('User', () => {
         getCurrentUser,
         handleConfig,
         showSendBoopDialog,
-        checkNote
+        checkNote,
+        toggleSharedConnectionsOptOut
     };
 });

@@ -3,25 +3,39 @@
         <div class="options-container" style="margin-top: 0">
             <span class="header">{{ t('view.settings.advanced.advanced.header') }}</span>
             <div class="options-container-item" style="margin-top: 15px">
-                <el-button-group>
-                    <el-button size="small" :icon="Operation" @click="showVRChatConfig()">VRChat config.json</el-button>
-                    <el-button size="small" :icon="Operation" @click="showLaunchOptions()">{{
-                        t('view.settings.advanced.advanced.launch_options')
-                    }}</el-button>
-                    <el-button size="small" :icon="Goods" @click="showRegistryBackupDialog()">{{
-                        t('view.settings.advanced.advanced.vrc_registry_backup')
-                    }}</el-button>
-                </el-button-group>
+                <ButtonGroup>
+                    <Button variant="outline" size="sm" @click="showVRChatConfig()">
+                        <Operation />
+                        VRChat config.json
+                    </Button>
+                    <Button variant="outline" size="sm" @click="showLaunchOptions()">
+                        <Operation />
+                        {{ t('view.settings.advanced.advanced.launch_options') }}
+                    </Button>
+                    <Button variant="outline" size="sm" @click="showRegistryBackupDialog()">
+                        <Goods />
+                        {{ t('view.settings.advanced.advanced.vrc_registry_backup') }}
+                    </Button>
+                </ButtonGroup>
             </div>
         </div>
         <div class="options-container">
             <span class="header">{{ t('view.settings.advanced.advanced.common_folders') }}</span>
             <div class="options-container-item" style="margin-top: 15px">
-                <el-button-group>
-                    <el-button size="small" :icon="Folder" @click="openVrcxAppDataFolder()">VRCX Data</el-button>
-                    <el-button size="small" :icon="Folder" @click="openVrcAppDataFolder()">VRChat Data</el-button>
-                    <el-button size="small" :icon="Folder" @click="openCrashVrcCrashDumps()">Crash Dumps</el-button>
-                </el-button-group>
+                <ButtonGroup>
+                    <Button variant="outline" size="sm" @click="openVrcxAppDataFolder()">
+                        <Folder />
+                        VRCX Data
+                    </Button>
+                    <Button variant="outline" size="sm" @click="openVrcAppDataFolder()">
+                        <Folder />
+                        VRChat Data
+                    </Button>
+                    <Button variant="outline" size="sm" @click="openCrashVrcCrashDumps()">
+                        <Folder />
+                        Crash Dumps
+                    </Button>
+                </ButtonGroup>
             </div>
         </div>
         <div class="options-container">
@@ -38,40 +52,28 @@
                 :label="t('view.settings.advanced.advanced.relaunch_vrchat.description')"
                 :value="relaunchVRChatAfterCrash"
                 :long-label="true"
-                @change="
-                    setRelaunchVRChatAfterCrash();
-                    saveOpenVROption();
-                " />
+                @change="setRelaunchVRChatAfterCrash" />
 
             <span class="sub-header">{{ t('view.settings.advanced.advanced.vrchat_quit_fix.header') }}</span>
             <simple-switch
                 :label="t('view.settings.advanced.advanced.vrchat_quit_fix.description')"
                 :value="vrcQuitFix"
                 :long-label="true"
-                @change="
-                    setVrcQuitFix();
-                    saveOpenVROption();
-                " />
+                @change="setVrcQuitFix" />
 
             <span class="sub-header">{{ t('view.settings.advanced.advanced.auto_cache_management.header') }}</span>
             <simple-switch
                 :label="t('view.settings.advanced.advanced.auto_cache_management.description')"
                 :value="autoSweepVRChatCache"
                 :long-label="true"
-                @change="
-                    setAutoSweepVRChatCache();
-                    saveOpenVROption();
-                " />
+                @change="setAutoSweepVRChatCache" />
 
             <span class="sub-header">{{ t('view.settings.advanced.advanced.self_invite.header') }}</span>
             <simple-switch
                 :label="t('view.settings.advanced.advanced.self_invite.description')"
                 :value="selfInviteOverride"
                 :long-label="true"
-                @change="
-                    setSelfInviteOverride();
-                    saveOpenVROption();
-                " />
+                @change="setSelfInviteOverride" />
 
             <div v-if="branch === 'Nightly'">
                 <span class="sub-header">Anonymous Error Reporting (Nightly Only)</span>
@@ -83,28 +85,39 @@
             </div>
         </div>
         <div class="options-container">
+            <span class="header">{{ t('view.profile.game_info.header') }}</span>
+            <div class="x-friend-list" style="margin-top: 10px">
+                <div class="x-friend-item">
+                    <div class="detail" @click="getVisits">
+                        <span class="name">{{ t('view.profile.game_info.online_users') }}</span>
+                        <span v-if="visits" class="extra">{{
+                            t('view.profile.game_info.user_online', { count: visits })
+                        }}</span>
+                        <span v-else class="extra">{{ t('view.profile.game_info.refresh') }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="options-container">
             <span class="header">{{ t('view.settings.advanced.advanced.remote_database.header') }}</span>
             <simple-switch
                 :label="t('view.settings.advanced.advanced.remote_database.enable')"
                 :value="avatarRemoteDatabase"
                 :long-label="true"
-                @change="
-                    setAvatarRemoteDatabase(!avatarRemoteDatabase);
-                    saveOpenVROption();
-                " />
+                @change="setAvatarRemoteDatabase(!avatarRemoteDatabase)" />
             <div class="options-container-item">
-                <el-button size="small" :icon="User" @click="showAvatarProviderDialog">{{
+                <Button size="sm" variant="outline" @click="showAvatarProviderDialog">{{
                     t('view.settings.advanced.advanced.remote_database.avatar_database_provider')
-                }}</el-button>
+                }}</Button>
             </div>
         </div>
         <template v-if="!isLinux">
             <div class="options-container">
                 <span class="header">{{ t('view.settings.advanced.advanced.app_launcher.header') }}</span>
                 <br />
-                <el-button size="small" :icon="Folder" style="margin-top: 5px" @click="openShortcutFolder()">{{
+                <Button size="sm" variant="outline" style="margin-top: 5px" @click="openShortcutFolder()">{{
                     t('view.settings.advanced.advanced.app_launcher.folder')
-                }}</el-button>
+                }}</Button>
                 <simple-switch
                     :label="t('view.settings.advanced.advanced.remote_database.enable')"
                     :value="enableAppLauncher"
@@ -132,9 +145,9 @@
                 :long-label="true"
                 @change="changeYouTubeApi('VRCX_youtubeAPI')" />
             <div class="options-container-item">
-                <el-button size="small" :icon="CaretRight" @click="showYouTubeApiDialog">{{
+                <Button size="sm" variant="outline" @click="showYouTubeApiDialog">{{
                     t('view.settings.advanced.advanced.youtube_api.youtube_api_key')
-                }}</el-button>
+                }}</Button>
             </div>
         </div>
         <div class="options-container">
@@ -146,9 +159,9 @@
                 :long-label="true"
                 @change="changeTranslationAPI('VRCX_translationAPI')" />
             <div class="options-container-item">
-                <el-button size="small" @click="showTranslationApiDialog"
+                <Button size="sm" variant="outline" @click="showTranslationApiDialog"
                     ><i class="ri-translate-2" style="margin-right: 5px"></i
-                    >{{ t('view.settings.advanced.advanced.translation_api.translation_api_key') }}</el-button
+                    >{{ t('view.settings.advanced.advanced.translation_api.translation_api_key') }}</Button
                 >
             </div>
         </div>
@@ -179,17 +192,18 @@
                 :long-label="true"
                 @change="setShowConfirmationOnSwitchAvatar" />
             <div class="options-container-item">
-                <el-button
-                    size="small"
-                    :icon="Paperclip"
+                <Button
+                    size="sm"
+                    variant="outline"
+                    class="mr-2"
                     @click="openExternalLink('https://github.com/vrcx-team/VRCX/wiki/Launch-parameters-&-VRCX.json')"
-                    >{{ t('view.settings.advanced.advanced.launch_commands.docs') }}</el-button
+                    >{{ t('view.settings.advanced.advanced.launch_commands.docs') }}</Button
                 >
-                <el-button
-                    size="small"
-                    :icon="Paperclip"
+                <Button
+                    size="sm"
+                    variant="outline"
                     @click="openExternalLink('https://github.com/Myrkie/open-in-vrcx')"
-                    >{{ t('view.settings.advanced.advanced.launch_commands.website_userscript') }}</el-button
+                    >{{ t('view.settings.advanced.advanced.launch_commands.website_userscript') }}</Button
                 >
             </div>
         </div>
@@ -197,15 +211,15 @@
             <span class="header">{{ t('view.settings.advanced.advanced.cache_debug.header') }}</span>
             <br />
             <div class="options-container-item">
-                <el-button size="small" :icon="DeleteFilled" @click="clearVRCXCache">{{
+                <Button size="sm" variant="outline" class="mr-2" @click="clearVRCXCache">{{
                     t('view.settings.advanced.advanced.cache_debug.clear_cache')
-                }}</el-button>
-                <el-button size="small" :icon="Timer" @click="promptAutoClearVRCXCacheFrequency">{{
+                }}</Button>
+                <Button size="sm" variant="outline" class="mr-2" @click="promptAutoClearVRCXCacheFrequency">{{
                     t('view.settings.advanced.advanced.cache_debug.auto_clear_cache')
-                }}</el-button>
-                <el-button size="small" :icon="Refresh" @click="refreshCacheSize">{{
+                }}</Button>
+                <Button size="sm" variant="outline" @click="refreshCacheSize">{{
                     t('view.settings.advanced.advanced.cache_debug.refresh_cache')
-                }}</el-button>
+                }}</Button>
             </div>
 
             <simple-switch
@@ -250,17 +264,17 @@
                 </span>
             </div>
             <div class="options-container-item">
-                <el-button size="small" :icon="Tickets" @click="showConsole">{{
+                <Button size="sm" variant="outline" @click="showConsole">{{
                     t('view.settings.advanced.advanced.cache_debug.show_console')
-                }}</el-button>
+                }}</Button>
             </div>
         </div>
         <div class="options-container">
             <span class="sub-header">{{ t('view.settings.advanced.advanced.sqlite_table_size.header') }}</span>
             <div class="options-container-item">
-                <el-button size="small" :icon="Refresh" @click="getSqliteTableSizes">{{
+                <Button size="sm" variant="outline" @click="getSqliteTableSizes">{{
                     t('view.settings.advanced.advanced.sqlite_table_size.refresh')
-                }}</el-button>
+                }}</Button>
             </div>
             <div class="options-container-item">
                 <span class="name">
@@ -336,6 +350,31 @@
             </div>
         </div>
 
+        <div class="options-container">
+            <div class="header-bar">
+                <span class="header">{{ t('view.profile.config_json') }}</span>
+                <TooltipWrapper side="top" :content="t('view.profile.refresh_tooltip')">
+                    <Button class="rounded-full mr-2" size="icon-sm" variant="outline" @click="refreshConfigTreeData()">
+                        <RefreshCcw />
+                    </Button>
+                </TooltipWrapper>
+                <TooltipWrapper side="top" :content="t('view.profile.clear_results_tooltip')">
+                    <Button class="rounded-full" size="icon-sm" variant="outline" @click="configTreeData = {}">
+                        <Trash2
+                    /></Button>
+                </TooltipWrapper>
+            </div>
+            <vue-json-pretty
+                v-if="Object.keys(configTreeData).length > 0"
+                :data="configTreeData"
+                :deep="2"
+                :theme="isDarkMode ? 'dark' : 'light'"
+                :height="800"
+                :dynamic-height="false"
+                virtual
+                show-icon />
+        </div>
+
         <RegistryBackupDialog />
         <YouTubeApiDialog v-model:isYouTubeApiDialogVisible="isYouTubeApiDialogVisible" />
         <TranslationApiDialog v-model:isTranslationApiDialogVisible="isTranslationApiDialogVisible" />
@@ -345,25 +384,20 @@
 </template>
 
 <script setup>
-    import {
-        CaretRight,
-        DeleteFilled,
-        Folder,
-        Goods,
-        Operation,
-        Paperclip,
-        Refresh,
-        Tickets,
-        Timer,
-        User
-    } from '@element-plus/icons-vue';
+    import { Folder, Goods, Operation } from '@element-plus/icons-vue';
     import { computed, reactive, ref } from 'vue';
-    import { ElMessage } from 'element-plus';
+    import { RefreshCcw, Trash2 } from 'lucide-vue-next';
+    import { Button } from '@/components/ui/button';
+    import { ButtonGroup } from '@/components/ui/button-group';
     import { storeToRefs } from 'pinia';
+    import { toast } from 'vue-sonner';
     import { useI18n } from 'vue-i18n';
+
+    import VueJsonPretty from 'vue-json-pretty';
 
     import {
         useAdvancedSettingsStore,
+        useAppearanceSettingsStore,
         useAuthStore,
         useAvatarProviderStore,
         useAvatarStore,
@@ -373,12 +407,14 @@
         useLaunchStore,
         useNotificationsSettingsStore,
         usePhotonStore,
+        useUiStore,
         useUserStore,
         useVRCXUpdaterStore,
         useVrStore,
         useVrcxStore,
         useWorldStore
     } from '../../../../stores';
+    import { authRequest, miscRequest } from '../../../../api';
     import { openExternalLink } from '../../../../shared/utils';
 
     import AvatarProviderDialog from '../../dialogs/AvatarProviderDialog.vue';
@@ -392,10 +428,12 @@
 
     const advancedSettingsStore = useAdvancedSettingsStore();
     const notificationsSettingsStore = useNotificationsSettingsStore();
-    const { saveOpenVROption, updateVRLastLocation, updateOpenVR } = useVrStore();
+    const { updateVRLastLocation, updateOpenVR } = useVrStore();
     const { showLaunchOptions } = useLaunchStore();
     const { enablePrimaryPasswordChange } = useAuthStore();
-    const { showConsole, clearVRCXCache, showRegistryBackupDialog } = useVrcxStore();
+    const { cachedConfig } = storeToRefs(useAuthStore());
+    const { clearVRCXCache, showRegistryBackupDialog } = useVrcxStore();
+    const { showConsole } = useUiStore();
     const { disableGameLogDialog } = useGameLogStore();
 
     const { cachedUsers } = useUserStore();
@@ -407,6 +445,8 @@
     const { photonLoggingEnabled } = storeToRefs(usePhotonStore());
     const { branch } = storeToRefs(useVRCXUpdaterStore());
     const { openVR } = storeToRefs(notificationsSettingsStore);
+
+    const { isDarkMode } = storeToRefs(useAppearanceSettingsStore());
 
     const {
         enablePrimaryPassword,
@@ -449,6 +489,8 @@
 
     const isYouTubeApiDialogVisible = ref(false);
     const isTranslationApiDialogVisible = ref(false);
+    const configTreeData = ref({});
+    const visits = ref(0);
 
     const cacheSize = reactive({
         cachedUsers: 0,
@@ -464,15 +506,9 @@
     function openVrcxAppDataFolder() {
         AppApi.OpenVrcxAppDataFolder().then((result) => {
             if (result) {
-                ElMessage({
-                    message: 'Folder opened',
-                    type: 'success'
-                });
+                toast.success('Folder opened');
             } else {
-                ElMessage({
-                    message: "Folder dosn't exist",
-                    type: 'error'
-                });
+                toast.error("Folder dosn't exist");
             }
         });
     }
@@ -480,15 +516,9 @@
     function openVrcAppDataFolder() {
         AppApi.OpenVrcAppDataFolder().then((result) => {
             if (result) {
-                ElMessage({
-                    message: 'Folder opened',
-                    type: 'success'
-                });
+                toast.success('Folder opened');
             } else {
-                ElMessage({
-                    message: "Folder dosn't exist",
-                    type: 'error'
-                });
+                toast.error("Folder dosn't exist");
             }
         });
     }
@@ -496,15 +526,9 @@
     function openCrashVrcCrashDumps() {
         AppApi.OpenCrashVrcCrashDumps().then((result) => {
             if (result) {
-                ElMessage({
-                    message: 'Folder opened',
-                    type: 'success'
-                });
+                toast.success('Folder opened');
             } else {
-                ElMessage({
-                    message: "Folder dosn't exist",
-                    type: 'error'
-                });
+                toast.error("Folder dosn't exist");
             }
         });
     }
@@ -546,5 +570,16 @@
         if (configKey === 'VRCX_translationAPI') {
             advancedSettingsStore.setTranslationApi();
         }
+    }
+
+    async function refreshConfigTreeData() {
+        await authRequest.getConfig();
+        configTreeData.value = cachedConfig.value;
+    }
+
+    function getVisits() {
+        miscRequest.getVisits().then((args) => {
+            visits.value = args.json;
+        });
     }
 </script>

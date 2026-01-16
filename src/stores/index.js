@@ -1,11 +1,13 @@
 import { createPinia } from 'pinia';
-import { createSentryPiniaPlugin } from '@sentry/vue';
 
+import { getSentry, isSentryOptedIn } from '../plugin';
+import { createPiniaActionTrailPlugin } from '../plugin/piniaActionTrail';
 import { useAdvancedSettingsStore } from './settings/advanced';
 import { useAppearanceSettingsStore } from './settings/appearance';
 import { useAuthStore } from './auth';
 import { useAvatarProviderStore } from './avatarProvider';
 import { useAvatarStore } from './avatar';
+import { useChartsStore } from './charts';
 import { useDiscordPresenceSettingsStore } from './settings/discordPresence';
 import { useFavoriteStore } from './favorite';
 import { useFeedStore } from './feed';
@@ -19,6 +21,7 @@ import { useInstanceStore } from './instance';
 import { useInviteStore } from './invite';
 import { useLaunchStore } from './launch';
 import { useLocationStore } from './location';
+import { useModalStore } from './modal';
 import { useModerationStore } from './moderation';
 import { useNotificationStore } from './notification';
 import { useNotificationsSettingsStore } from './settings/notifications';
@@ -37,44 +40,93 @@ import { useWristOverlaySettingsStore } from './settings/wristOverlay';
 
 export const pinia = createPinia();
 
-pinia.use(
-    createSentryPiniaPlugin({
-        stateTransformer: (state) => ({
-            ...state,
-            Auth: null,
-            Feed: null,
-            Favorite: null,
-            Friend: null,
-            User: {
-                // @ts-ignore
-                ...state.User,
-                currentUser: null,
-                subsetOfLanguages: null
-            },
-            GameLog: {
-                // @ts-ignore
-                ...state.GameLog,
-                gameLogTable: null
-            },
-            Notification: {
-                // @ts-ignore
-                ...state.Notification,
-                notificationTable: null
-            },
-            Moderation: {
-                // @ts-ignore
-                ...state.Moderation,
-                playerModerationTable: null
-            },
-            Photon: null,
-            SharedFeed: {
-                // @ts-ignore
-                ...state.SharedFeed,
-                sharedFeed: null
-            }
+function registerPiniaActionTrailPlugin() {
+    if (!NIGHTLY) return;
+    pinia.use(createPiniaActionTrailPlugin({ maxEntries: 200 }));
+}
+
+async function registerSentryPiniaPlugin() {
+    if (!NIGHTLY) return;
+    if (!(await isSentryOptedIn())) return;
+
+    const Sentry = await getSentry();
+
+    pinia.use(
+        Sentry.createSentryPiniaPlugin({
+            stateTransformer: (state) => ({
+                ...state,
+                Auth: null,
+                Feed: null,
+                Favorite: null,
+                Friend: null,
+                User: {
+                    // @ts-ignore
+                    ...state.User,
+                    currentUser: null,
+                    subsetOfLanguages: null,
+                    languageDialog: {
+                        // @ts-ignore
+                        ...state.User.languageDialog,
+                        languages: null
+                    }
+                },
+                GameLog: {
+                    // @ts-ignore
+                    ...state.GameLog,
+                    gameLogTable: null,
+                    gameLogSessionTable: null
+                },
+                Notification: {
+                    // @ts-ignore
+                    ...state.Notification,
+                    notificationTable: null
+                },
+                Moderation: {
+                    // @ts-ignore
+                    ...state.Moderation,
+                    playerModerationTable: null,
+                    cachedPlayerModerations: null,
+                    cachedPlayerModerationsUserIds: null
+                },
+                Photon: null,
+                SharedFeed: {
+                    // @ts-ignore
+                    ...state.SharedFeed,
+                    sharedFeed: null
+                },
+                Group: {
+                    // @ts-ignore
+                    ...state.Group,
+                    groupInstances: null,
+                    inGameGroupOrder: null
+                },
+                Avatar: {
+                    // @ts-ignore
+                    ...state.Avatar,
+                    avatarHistory: null
+                },
+                Gallery: {
+                    // @ts-ignore
+                    ...state.Gallery,
+                    emojiTable: null,
+                    galleryTable: null,
+                    instanceStickersCache: null,
+                    inventoryTable: null,
+                    printTable: null,
+                    stickerTable: null,
+                    VRCPlusIconsTable: null
+                }
+            })
         })
-    })
-);
+    );
+}
+
+export async function initPiniaPlugins() {
+    await registerSentryPiniaPlugin();
+    setTimeout(() => {
+        registerPiniaActionTrailPlugin();
+    }, 60000);
+}
 
 export function createGlobalStores() {
     return {
@@ -110,7 +162,9 @@ export function createGlobalStores() {
         sharedFeed: useSharedFeedStore(),
         updateLoop: useUpdateLoopStore(),
         auth: useAuthStore(),
-        vrcStatus: useVrcStatusStore()
+        vrcStatus: useVrcStatusStore(),
+        charts: useChartsStore(),
+        modal: useModalStore()
     };
 }
 
@@ -133,6 +187,7 @@ export {
     useNotificationStore,
     usePhotonStore,
     useSearchStore,
+    useChartsStore,
     useAdvancedSettingsStore,
     useAppearanceSettingsStore,
     useDiscordPresenceSettingsStore,
@@ -147,5 +202,6 @@ export {
     useWorldStore,
     useSharedFeedStore,
     useUpdateLoopStore,
-    useVrcStatusStore
+    useVrcStatusStore,
+    useModalStore
 };

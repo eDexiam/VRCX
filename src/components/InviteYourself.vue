@@ -1,27 +1,40 @@
 <template>
     <div v-if="isVisible" :class="['inline-block']">
-        <el-tooltip
-            v-if="!canOpenInstanceInGame()"
-            placement="top"
-            :content="t('dialog.user.info.self_invite_tooltip')">
-            <el-button v-show="isVisible" @click="confirmInvite" size="small" :icon="Message" circle />
-        </el-tooltip>
-        <el-tooltip v-else placement="top" :content="t('dialog.user.info.open_in_vrchat_tooltip')">
-            <el-button v-if="isOpeningInstance" size="small" circle>
-                <el-icon class="is-loading">
-                    <Loading />
-                </el-icon>
-            </el-button>
-            <el-button v-else @click="openInstance" size="small" :icon="Message" circle />
-        </el-tooltip>
+        <TooltipWrapper v-if="!canOpenInstanceInGame" side="top" :content="t('dialog.user.info.self_invite_tooltip')">
+            <Button
+                class="rounded-full h-6 w-6 text-xs text-muted-foreground hover:text-foreground"
+                size="icon-sm"
+                variant="outline"
+                v-show="isVisible"
+                @click="confirmInvite"
+                ><i class="ri-mail-line"></i
+            ></Button>
+        </TooltipWrapper>
+        <TooltipWrapper v-else side="top" :content="t('dialog.user.info.open_in_vrchat_tooltip')">
+            <Button
+                class="rounded-full h-6 w-6 text-xs text-muted-foreground hover:text-foreground"
+                size="icon-sm"
+                variant="outline"
+                v-if="isOpeningInstance">
+                <i class="ri-loader-line"></i>
+            </Button>
+            <Button
+                class="rounded-full h-6 w-6 text-xs text-muted-foreground hover:text-foreground"
+                size="icon-sm"
+                variant="outline"
+                v-else
+                @click="openInstance"
+                ><i class="ri-mail-line"></i
+            ></Button>
+        </TooltipWrapper>
     </div>
 </template>
 
 <script setup>
-    import { Loading, Message } from '@element-plus/icons-vue';
-    import { ElMessage } from 'element-plus';
+    import { Button } from '@/components/ui/button';
     import { computed } from 'vue';
     import { storeToRefs } from 'pinia';
+    import { toast } from 'vue-sonner';
     import { useI18n } from 'vue-i18n';
 
     import { checkCanInviteSelf, parseLocation } from '../shared/utils';
@@ -35,7 +48,7 @@
 
     const { t } = useI18n();
 
-    const { canOpenInstanceInGame } = useInviteStore();
+    const { canOpenInstanceInGame } = storeToRefs(useInviteStore());
     const { tryOpenInstanceInVrc } = useLaunchStore();
 
     const { isOpeningInstance } = storeToRefs(useLaunchStore());
@@ -55,7 +68,7 @@
                 shortName: props.shortname
             })
             .then((args) => {
-                ElMessage({ message: 'Self invite sent', type: 'success' });
+                toast.success('Self invite sent');
                 return args;
             });
     }

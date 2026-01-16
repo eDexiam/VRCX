@@ -1,7 +1,11 @@
 <template>
-    <div class="x-container" style="padding-top: 5px">
-        <div style="display: flex; flex-direction: column; height: 100%">
-            <div v-if="currentInstanceWorld.ref.id" style="display: flex">
+    <div class="x-container" ref="playerListRef">
+        <div class="flex h-full min-h-0 flex-col">
+            <div
+                v-if="currentInstanceWorld.ref.id"
+                ref="playerListHeaderRef"
+                style="display: flex; height: 120px"
+                class="mb-7">
                 <img
                     :src="currentInstanceWorld.ref.thumbnailImageUrl"
                     class="x-link"
@@ -40,88 +44,60 @@
                             v-text="currentInstanceWorld.ref.authorName"></span>
                     </div>
                     <div style="margin-top: 5px">
-                        <el-tag
-                            v-if="currentInstanceWorld.ref.$isLabs"
-                            type="primary"
-                            effect="plain"
-                            size="small"
-                            style="margin-right: 5px"
-                            >{{ t('dialog.world.tags.labs') }}</el-tag
-                        >
-                        <el-tag
+                        <Badge v-if="currentInstanceWorld.ref.$isLabs" variant="outline" style="margin-right: 5px">
+                            {{ t('dialog.world.tags.labs') }}
+                        </Badge>
+                        <Badge
                             v-else-if="currentInstanceWorld.ref.releaseStatus === 'public'"
-                            type="success"
-                            effect="plain"
-                            size="small"
-                            style="margin-right: 5px"
-                            >{{ t('dialog.world.tags.public') }}</el-tag
-                        >
-                        <el-tag
-                            v-else-if="currentInstanceWorld.ref.releaseStatus === 'private'"
-                            type="danger"
-                            effect="plain"
-                            size="small"
-                            style="margin-right: 5px"
-                            >{{ t('dialog.world.tags.private') }}</el-tag
-                        >
-                        <el-tag
-                            v-if="currentInstanceWorld.isPC"
-                            class="x-tag-platform-pc"
-                            type="info"
-                            effect="plain"
-                            size="small"
-                            style="margin-right: 5px"
-                            >PC
-                            <span
-                                v-if="currentInstanceWorld.bundleSizes['standalonewindows']"
-                                :class="['x-grey', 'x-tag-platform-pc', 'x-tag-border-left']"
-                                >{{ currentInstanceWorld.bundleSizes['standalonewindows'].fileSize }}</span
-                            >
-                        </el-tag>
-                        <el-tag
-                            v-if="currentInstanceWorld.isQuest"
-                            class="x-tag-platform-quest"
-                            type="info"
-                            effect="plain"
-                            size="small"
-                            style="margin-right: 5px"
-                            >Android
-                            <span
-                                v-if="currentInstanceWorld.bundleSizes['android']"
-                                :class="['x-grey', 'x-tag-platform-quest', 'x-tag-border-left']"
-                                >{{ currentInstanceWorld.bundleSizes['android'].fileSize }}</span
-                            >
-                        </el-tag>
-                        <el-tag
-                            v-if="currentInstanceWorld.isIos"
-                            class="x-tag-platform-ios"
-                            type="info"
-                            effect="plain"
-                            size="small"
-                            style="margin-right: 5px"
-                            >iOS
-                            <span
-                                v-if="currentInstanceWorld.bundleSizes['ios']"
-                                :class="['x-grey', 'x-tag-platform-ios', 'x-tag-border-left']"
-                                >{{ currentInstanceWorld.bundleSizes['ios'].fileSize }}</span
-                            >
-                        </el-tag>
-                        <el-tag
-                            v-if="currentInstanceWorld.avatarScalingDisabled"
-                            type="warning"
-                            effect="plain"
-                            size="small"
-                            style="margin-right: 5px; margin-top: 5px"
-                            >{{ t('dialog.world.tags.avatar_scaling_disabled') }}</el-tag
-                        >
-                        <el-tag
-                            v-if="currentInstanceWorld.inCache"
-                            type="info"
-                            effect="plain"
-                            size="small"
+                            variant="outline"
                             style="margin-right: 5px">
+                            {{ t('dialog.world.tags.public') }}
+                        </Badge>
+                        <Badge
+                            v-else-if="currentInstanceWorld.ref.releaseStatus === 'private'"
+                            variant="outline"
+                            style="margin-right: 5px">
+                            {{ t('dialog.world.tags.private') }}
+                        </Badge>
+                        <TooltipWrapper v-if="currentInstanceWorld.isPC" side="top" content="PC">
+                            <Badge class="x-tag-platform-pc" variant="outline" style="margin-right: 5px"
+                                ><i class="ri-computer-line"></i>
+                                <span
+                                    v-if="currentInstanceWorld.bundleSizes['standalonewindows']"
+                                    :class="['x-grey', 'x-tag-platform-pc', 'x-tag-border-left']"
+                                    >{{ currentInstanceWorld.bundleSizes['standalonewindows'].fileSize }}</span
+                                >
+                            </Badge>
+                        </TooltipWrapper>
+                        <TooltipWrapper v-if="currentInstanceWorld.isQuest" side="top" content="Android">
+                            <Badge class="x-tag-platform-quest" variant="outline" style="margin-right: 5px"
+                                ><i class="ri-android-line"></i>
+                                <span
+                                    v-if="currentInstanceWorld.bundleSizes['android']"
+                                    :class="['x-grey', 'x-tag-platform-quest', 'x-tag-border-left']"
+                                    >{{ currentInstanceWorld.bundleSizes['android'].fileSize }}</span
+                                >
+                            </Badge>
+                        </TooltipWrapper>
+                        <TooltipWrapper v-if="currentInstanceWorld.isIos" side="top" content="iOS">
+                            <Badge class="x-tag-platform-ios" variant="outline" style="margin-right: 5px"
+                                ><i class="ri-apple-line"></i>
+                                <span
+                                    v-if="currentInstanceWorld.bundleSizes['ios']"
+                                    :class="['x-grey', 'x-tag-platform-ios', 'x-tag-border-left']"
+                                    >{{ currentInstanceWorld.bundleSizes['ios'].fileSize }}</span
+                                >
+                            </Badge>
+                        </TooltipWrapper>
+                        <Badge
+                            v-if="currentInstanceWorld.avatarScalingDisabled"
+                            variant="outline"
+                            style="margin-right: 5px; margin-top: 5px">
+                            {{ t('dialog.world.tags.avatar_scaling_disabled') }}
+                        </Badge>
+                        <Badge v-if="currentInstanceWorld.inCache" variant="outline" style="margin-right: 5px">
                             <span>{{ currentInstanceWorld.cacheSize }} {{ t('dialog.world.tags.cache') }}</span>
-                        </el-tag>
+                        </Badge>
                     </div>
                     <div style="margin-top: 5px">
                         <LocationWorld :locationobject="currentInstanceLocation" :currentuserid="currentUser.id" />
@@ -136,27 +112,8 @@
                     <div style="margin-top: 5px">
                         <span
                             v-show="currentInstanceWorld.ref.name !== currentInstanceWorld.ref.description"
-                            :style="{
-                                fontSize: '12px',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                display: '-webkit-box',
-                                WebkitBoxOrient: 'vertical',
-                                WebkitLineClamp: currentInstanceWorldDescriptionExpanded ? 'none' : '2'
-                            }"
+                            class="description"
                             v-text="currentInstanceWorld.ref.description"></span>
-                        <div style="display: flex; justify-content: end">
-                            <el-button
-                                v-if="
-                                    currentInstanceWorld.ref.description.length > 50 &&
-                                    !currentInstanceWorldDescriptionExpanded
-                                "
-                                type="text"
-                                size="small"
-                                @click="currentInstanceWorldDescriptionExpanded = true"
-                                >{{ !currentInstanceWorldDescriptionExpanded && 'Show more' }}</el-button
-                            >
-                        </div>
                     </div>
                 </div>
                 <div style="display: flex; flex-direction: column; margin-left: 20px">
@@ -187,214 +144,21 @@
                 </div>
             </div>
 
-            <div v-if="photonLoggingEnabled" style="margin-bottom: 10px">
+            <div v-if="photonLoggingEnabled" ref="playerListPhotonRef" style="margin-bottom: 10px">
                 <PhotonEventTable @show-chatbox-blacklist="showChatboxBlacklistDialog" />
             </div>
 
-            <div class="current-instance-table">
-                <DataTable
-                    v-bind="currentInstanceUsersTable"
-                    style="margin-top: 10px; cursor: pointer"
-                    @row-click="selectCurrentInstanceRow">
-                    <el-table-column :label="t('table.playerList.avatar')" width="70" prop="photo">
-                        <template #default="scope">
-                            <template v-if="userImage(scope.row.ref)">
-                                <el-popover placement="right" :width="500" trigger="hover">
-                                    <template #reference>
-                                        <img
-                                            :src="userImage(scope.row.ref)"
-                                            class="friends-list-avatar"
-                                            loading="lazy" />
-                                    </template>
-                                    <img
-                                        :src="userImageFull(scope.row.ref)"
-                                        :class="['friends-list-avatar', 'x-popover-image']"
-                                        style="cursor: pointer"
-                                        @click="showFullscreenImageDialog(userImageFull(scope.row.ref))"
-                                        loading="lazy" />
-                                </el-popover>
-                            </template>
-                        </template>
-                    </el-table-column>
-                    <el-table-column :label="t('table.playerList.timer')" width="90" prop="timer" sortable>
-                        <template #default="scope">
-                            <Timer :epoch="scope.row.timer" />
-                        </template>
-                    </el-table-column>
-                    <el-table-column
-                        v-if="photonLoggingEnabled"
-                        :label="t('table.playerList.photonId')"
-                        width="110"
-                        prop="photonId"
-                        sortable>
-                        <template #default="scope">
-                            <template v-if="chatboxUserBlacklist.has(scope.row.ref.id)">
-                                <el-tooltip placement="left" content="Unblock chatbox messages">
-                                    <el-button
-                                        type="text"
-                                        :icon="Mute"
-                                        size="small"
-                                        style="color: red; margin-right: 5px"
-                                        @click.stop="deleteChatboxUserBlacklist(scope.row.ref.id)"></el-button>
-                                </el-tooltip>
-                            </template>
-                            <template v-else>
-                                <el-tooltip placement="left" content="Block chatbox messages">
-                                    <el-button
-                                        type="text"
-                                        :icon="Microphone"
-                                        size="small"
-                                        style="margin-right: 5px"
-                                        @click.stop="addChatboxUserBlacklist(scope.row.ref)"></el-button>
-                                </el-tooltip>
-                            </template>
-                            <span v-text="scope.row.photonId"></span>
-                        </template>
-                    </el-table-column>
-                    <el-table-column
-                        :label="t('table.playerList.icon')"
-                        prop="isMaster"
-                        width="90"
-                        align="center"
-                        sortable
-                        :sort-method="sortInstanceIcon">
-                        <template #default="scope">
-                            <el-tooltip v-if="scope.row.isMaster" placement="left" content="Instance Master">
-                                <span>👑</span>
-                            </el-tooltip>
-                            <el-tooltip v-else-if="scope.row.isModerator" placement="left" content="Moderator">
-                                <span>⚔️</span>
-                            </el-tooltip>
-                            <el-tooltip v-else-if="scope.row.isFriend" placement="left" content="Friend">
-                                <span>💚</span>
-                            </el-tooltip>
-                            <el-tooltip v-else-if="scope.row.isBlocked" placement="left" content="Blocked">
-                                <el-icon style="color: red"><CircleClose /></el-icon>
-                            </el-tooltip>
-                            <el-tooltip v-else-if="scope.row.isMuted" placement="left" content="Muted">
-                                <el-icon style="color: orange"><Mute /></el-icon>
-                            </el-tooltip>
-                            <el-tooltip
-                                v-else-if="scope.row.isAvatarInteractionDisabled"
-                                placement="left"
-                                content="Avatar Interaction Disabled
-                                    ">
-                                <el-icon style="color: orange"><Pointer /></el-icon>
-                            </el-tooltip>
-                            <el-tooltip v-else-if="scope.row.isChatBoxMuted" placement="left" content="Chatbox Muted">
-                                <el-icon style="color: orange"><ChatLineRound /></el-icon>
-                            </el-tooltip>
-                            <el-tooltip v-else-if="scope.row.timeoutTime" placement="left" content="Timeout">
-                                <span style="color: red">🔴{{ scope.row.timeoutTime }}s</span>
-                            </el-tooltip>
-                            <span v-else></span>
-                        </template>
-                    </el-table-column>
-                    <el-table-column :label="t('table.playerList.platform')" prop="inVRMode" width="90">
-                        <template #default="scope">
-                            <template v-if="scope.row.ref.$platform">
-                                <span v-if="scope.row.ref.$platform === 'standalonewindows'" style="color: #409eff"
-                                    >PC</span
-                                >
-                                <span v-else-if="scope.row.ref.$platform === 'android'" style="color: #67c23a">A</span>
-                                <span v-else-if="scope.row.ref.$platform === 'ios'" style="color: #c7c7ce">iOS</span>
-                                <span v-else>{{ scope.row.ref.$platform }}</span>
-                            </template>
-                            <template v-if="scope.row.inVRMode !== null">
-                                <span v-if="scope.row.inVRMode">VR</span>
-                                <span
-                                    v-else-if="
-                                        scope.row.ref.last_platform === 'android' ||
-                                        scope.row.ref.last_platform === 'ios'
-                                    "
-                                    >M</span
-                                >
-                                <span v-else>D</span>
-                            </template>
-                        </template>
-                    </el-table-column>
-                    <el-table-column
-                        :label="t('table.playerList.displayName')"
-                        min-width="140"
-                        prop="displayName"
-                        :sortable="true">
-                        <template #default="scope">
-                            <span
-                                v-if="randomUserColours"
-                                :style="{ color: scope.row.ref.$userColour }"
-                                v-text="scope.row.ref.displayName"></span>
-                            <span v-else v-text="scope.row.ref.displayName"></span>
-                        </template>
-                    </el-table-column>
-                    <el-table-column :label="t('table.playerList.status')" min-width="180" prop="ref.status">
-                        <template #default="scope">
-                            <template v-if="scope.row.ref.status">
-                                <i
-                                    class="x-user-status"
-                                    :class="statusClass(scope.row.ref.status)"
-                                    style="margin-right: 3px"></i>
-                                <span v-text="scope.row.ref.statusDescription"></span>
-                                <!--//- el-table-column(label="Group" min-width="180" prop="groupOnNameplate" sortable)-->
-                                <!--//-     template(v-once #default="scope")-->
-                                <!--//-         span(v-text="scope.row.groupOnNameplate")-->
-                            </template>
-                        </template>
-                    </el-table-column>
-                    <el-table-column
-                        :label="t('table.playerList.rank')"
-                        width="110"
-                        prop="$trustSortNum"
-                        :sortable="true">
-                        <template #default="scope">
-                            <span
-                                class="name"
-                                :class="scope.row.ref.$trustClass"
-                                v-text="scope.row.ref.$trustLevel"></span>
-                        </template>
-                    </el-table-column>
-                    <el-table-column :label="t('table.playerList.language')" width="100" prop="ref.$languages">
-                        <template #default="scope">
-                            <el-tooltip v-for="item in scope.row.ref.$languages" :key="item.key" placement="top">
-                                <template #content>
-                                    <span>{{ item.value }} ({{ item.key }})</span>
-                                </template>
-                                <span
-                                    class="flags"
-                                    :class="languageClass(item.key)"
-                                    style="display: inline-block; margin-right: 5px"></span>
-                            </el-tooltip>
-                        </template>
-                    </el-table-column>
-                    <el-table-column :label="t('table.playerList.bioLink')" width="100" prop="ref.bioLinks">
-                        <template #default="scope">
-                            <div style="display: flex; align-items: center">
-                                <el-tooltip
-                                    v-for="(link, index) in scope.row.ref.bioLinks?.filter(Boolean)"
-                                    :key="index">
-                                    <template #content>
-                                        <span v-text="link"></span>
-                                    </template>
-                                    <img
-                                        :src="getFaviconUrl(link)"
-                                        style="
-                                            width: 16px;
-                                            height: 16px;
-                                            vertical-align: middle;
-                                            margin-right: 5px;
-                                            cursor: pointer;
-                                        "
-                                        @click.stop="openExternalLink(link)"
-                                        loading="lazy" />
-                                </el-tooltip>
-                            </div>
-                        </template>
-                    </el-table-column>
-                    <el-table-column :label="t('table.playerList.note')" width="150" prop="ref.note">
-                        <template #default="scope">
-                            <span v-text="scope.row.ref.note"></span>
-                        </template>
-                    </el-table-column>
-                </DataTable>
+            <div class="current-instance-table flex min-h-0 min-w-0 flex-1">
+                <DataTableLayout
+                    class="min-w-0 w-full [&_th]:px-2.5! [&_th]:py-0.75! [&_td]:px-2.5! [&_td]:py-0.75! [&_tr]:h-7!"
+                    :table="playerListTable"
+                    table-class="min-w-max w-max"
+                    :use-table-min-width="true"
+                    :table-style="playerListTableStyle"
+                    :loading="false"
+                    :total-items="playerListTotalItems"
+                    :show-pagination="false"
+                    :on-row-click="handlePlayerListRowClick" />
             </div>
         </div>
         <ChatboxBlacklistDialog
@@ -404,33 +168,29 @@
 </template>
 
 <script setup>
-    import { ChatLineRound, CircleClose, HomeFilled, Microphone, Mute, Pointer } from '@element-plus/icons-vue';
-    import { defineAsyncComponent, ref } from 'vue';
+    import { computed, defineAsyncComponent, onActivated, onMounted, ref, watch } from 'vue';
+    import { HomeFilled } from '@element-plus/icons-vue';
     import { storeToRefs } from 'pinia';
     import { useI18n } from 'vue-i18n';
 
-    import {
-        commaNumber,
-        formatDateFilter,
-        getFaviconUrl,
-        languageClass,
-        openExternalLink,
-        statusClass,
-        userImage,
-        userImageFull
-    } from '../../shared/utils';
     import {
         useAppearanceSettingsStore,
         useGalleryStore,
         useInstanceStore,
         useLocationStore,
         usePhotonStore,
-        useUiStore,
         useUserStore,
         useWorldStore
     } from '../../stores';
+    import { commaNumber, formatDateFilter } from '../../shared/utils';
+    import { Badge } from '../../components/ui/badge';
+    import { DataTableLayout } from '../../components/ui/data-table';
+    import { createColumns } from './columns.jsx';
+    import { useDataTableScrollHeight } from '../../composables/useDataTableScrollHeight';
+    import { useVrcxVueTable } from '../../lib/table/useVrcxVueTable';
 
     import ChatboxBlacklistDialog from './dialogs/ChatboxBlacklistDialog.vue';
+    import Timer from '../../components/Timer.vue';
 
     const PhotonEventTable = defineAsyncComponent(() => import('./components/PhotonEventTable.vue'));
 
@@ -441,11 +201,20 @@
     const { showUserDialog, lookupUser } = useUserStore();
     const { showWorldDialog } = useWorldStore();
     const { lastLocation } = storeToRefs(useLocationStore());
-    const { currentInstanceLocation, currentInstanceWorld } = storeToRefs(useInstanceStore());
+    const { currentInstanceLocation, currentInstanceWorld, currentInstanceUsersData } = storeToRefs(useInstanceStore());
     const { getCurrentInstanceUserList } = useInstanceStore();
-    const { currentInstanceUsersTable } = storeToRefs(useInstanceStore());
     const { showFullscreenImageDialog } = useGalleryStore();
     const { currentUser } = storeToRefs(useUserStore());
+
+    const playerListRef = ref(null);
+    const playerListHeaderRef = ref(null);
+    const playerListPhotonRef = ref(null);
+    const { tableStyle: playerListTableStyle } = useDataTableScrollHeight(playerListRef, {
+        offset: 30,
+        paginationHeight: 0,
+        subtractContainerPadding: true,
+        extraOffsetRefs: [playerListHeaderRef, playerListPhotonRef]
+    });
 
     const { t } = useI18n();
 
@@ -453,8 +222,6 @@
         visible: false,
         loading: false
     });
-
-    const currentInstanceWorldDescriptionExpanded = ref(false);
 
     function showChatboxBlacklistDialog() {
         const D = chatboxBlacklistDialog.value;
@@ -485,18 +252,74 @@
         getCurrentInstanceUserList();
     }
 
-    function sortInstanceIcon(a, b) {
-        const getValue = (item) => {
-            let value = 0;
-            if (item.isMaster) value += 1000;
-            if (item.isModerator) value += 500;
-            if (item.isFriend) value += 200;
-            if (item.isBlocked) value -= 100;
-            if (item.isMuted) value -= 50;
-            if (item.isAvatarInteractionDisabled) value -= 20;
-            if (item.isChatBoxMuted) value -= 10;
-            return value;
-        };
-        return getValue(b) - getValue(a);
+    function sortAlphabetically(a, b, field) {
+        if (!a[field] || !b[field]) return 0;
+        return a[field].toLowerCase().localeCompare(b[field].toLowerCase());
     }
+
+    const initialColumnPinning = {
+        left: ['avatar', 'timer', 'displayName'],
+        right: []
+    };
+
+    const playerListColumns = computed(() =>
+        createColumns({
+            randomUserColours,
+            photonLoggingEnabled,
+            chatboxUserBlacklist,
+            onBlockChatbox: addChatboxUserBlacklist,
+            onUnblockChatbox: deleteChatboxUserBlacklist,
+            sortAlphabetically
+        })
+    );
+
+    const { table: playerListTable } = useVrcxVueTable({
+        persistKey: 'playerList',
+        data: currentInstanceUsersData,
+        columns: playerListColumns.value,
+        getRowId: (row) => `${row?.ref?.id ?? ''}:${row?.displayName ?? ''}`,
+        enablePinning: true,
+        initialColumnPinning,
+        initialPagination: {
+            pageIndex: 0,
+            pageSize: 500
+        }
+    });
+
+    watch(
+        playerListColumns,
+        (next) => {
+            playerListTable.setOptions((prev) => ({
+                ...prev,
+                columns: next
+            }));
+        },
+        { immediate: true }
+    );
+
+    const playerListTotalItems = computed(() => playerListTable.getRowModel().rows.length);
+
+    const handlePlayerListRowClick = (row) => {
+        selectCurrentInstanceRow(row?.original ?? null);
+    };
+
+    onMounted(() => {
+        getCurrentInstanceUserList();
+    });
+
+    onActivated(() => {
+        getCurrentInstanceUserList();
+    });
 </script>
+
+<style>
+    .description {
+        font-size: 12px;
+        display: inline-block;
+        max-width: 100%;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        vertical-align: middle;
+    }
+</style>

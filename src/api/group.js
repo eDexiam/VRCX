@@ -702,30 +702,78 @@ const groupReq = {
     getGroupCalendar(groupId) {
         return request(`calendar/${groupId}`, {
             method: 'GET'
+        }).then((json) => {
+            const args = {
+                json,
+                params: {
+                    groupId
+                }
+            };
+            return args;
+        });
+    },
+
+    /**
+     * @param {{
+     groupId: string,
+     eventId: string
+     }} params
+     * @return { Promise<{json: any, params}> }
+     */
+    getGroupCalendarEvent(params) {
+        return request(`calendar/${params.groupId}/${params.eventId}`, {
+            method: 'GET'
+        }).then((json) => {
+            const args = {
+                json,
+                params
+            };
+            return args;
         });
     },
 
     /**
      * @type {import('../types/api/group').GetCalendars}
      */
-    getGroupCalendars(date) {
-        return request(`calendar?date=${date}`, {
-            method: 'GET'
+    getGroupCalendars(params) {
+        return request('calendar', {
+            method: 'GET',
+            params
         });
     },
 
     /**
      * @type {import('../types/api/group').GetFollowingCalendars}
      */
-    getFollowingGroupCalendars(date) {
-        return request(`calendar/following?date=${date}`, {
-            method: 'GET'
+    getFollowingGroupCalendars(params) {
+        return request('calendar/following', {
+            method: 'GET',
+            params
         });
     },
 
-    getFeaturedGroupCalendars(date) {
-        return request(`calendar/featured?date=${date}`, {
-            method: 'GET'
+    /**
+     * @type {import('../types/api/group').GetFeaturedCalendars}
+     */
+    getFeaturedGroupCalendars(params) {
+        return request('calendar/featured', {
+            method: 'GET',
+            params
+        });
+    },
+
+    followGroupEvent(params) {
+        return request(`calendar/${params.groupId}/${params.eventId}/follow`, {
+            method: 'POST',
+            params: {
+                isFollowing: params.isFollowing
+            }
+        }).then((json) => {
+            const args = {
+                json,
+                params
+            };
+            return args;
         });
     }
 

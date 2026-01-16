@@ -6,26 +6,25 @@
         width="600px"
         append-to-body>
         <div v-loading="pronounsDialog.loading">
-            <el-input
-                type="textarea"
+            <InputGroupTextareaField
                 v-model="pronounsDialog.pronouns"
-                size="small"
-                maxlength="32"
-                show-word-limit
-                :autosize="{ minRows: 2, maxRows: 5 }"
-                :placeholder="t('dialog.pronouns.pronouns_placeholder')">
-            </el-input>
+                :maxlength="32"
+                :rows="2"
+                :placeholder="t('dialog.pronouns.pronouns_placeholder')"
+                show-count />
         </div>
         <template #footer>
-            <el-button type="primary" :disabled="pronounsDialog.loading" @click="savePronouns">
+            <Button :disabled="pronounsDialog.loading" @click="savePronouns">
                 {{ t('dialog.pronouns.update') }}
-            </el-button>
+            </Button>
         </template>
     </el-dialog>
 </template>
 
 <script setup>
-    import { ElMessage } from 'element-plus';
+    import { Button } from '@/components/ui/button';
+    import { InputGroupTextareaField } from '@/components/ui/input-group';
+    import { toast } from 'vue-sonner';
     import { useI18n } from 'vue-i18n';
 
     import { userRequest } from '../../../api';
@@ -53,10 +52,7 @@
             })
             .then((args) => {
                 D.visible = false;
-                ElMessage({
-                    message: 'Pronouns updated',
-                    type: 'success'
-                });
+                toast.success('Pronouns updated');
                 return args;
             });
     }

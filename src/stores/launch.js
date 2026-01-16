@@ -1,6 +1,6 @@
 import { nextTick, ref, watch } from 'vue';
-import { ElMessage } from 'element-plus';
 import { defineStore } from 'pinia';
+import { toast } from 'vue-sonner';
 
 import { instanceRequest } from '../api';
 import { parseLocation } from '../shared/utils';
@@ -103,11 +103,9 @@ export const useLaunchStore = defineStore('Launch', () => {
         }
         console.log('Attach Game', launchUrl, result);
         if (!result) {
-            ElMessage({
-                message:
-                    'Failed open instance in VRChat, falling back to self invite',
-                type: 'warning'
-            });
+            toast.warning(
+                'Failed open instance in VRChat, falling back to self invite'
+            );
             // self invite fallback
             try {
                 const L = parseLocation(location);
@@ -116,10 +114,7 @@ export const useLaunchStore = defineStore('Launch', () => {
                     worldId: L.worldId,
                     shortName
                 });
-                ElMessage({
-                    message: 'Self invite sent',
-                    type: 'success'
-                });
+                toast.success('Self invite sent');
             } catch (e) {
                 console.error(e);
             }
@@ -150,39 +145,32 @@ export const useLaunchStore = defineStore('Launch', () => {
         if (desktopMode) {
             args.push('--no-vr');
         }
-        if (vrcLaunchPathOverride && !LINUX) {
-            AppApi.StartGameFromPath(
-                vrcLaunchPathOverride,
-                args.join(' ')
-            ).then((result) => {
+        try {
+            if (vrcLaunchPathOverride && !LINUX) {
+                const result = await AppApi.StartGameFromPath(
+                    vrcLaunchPathOverride,
+                    args.join(' ')
+                );
                 if (!result) {
-                    ElMessage({
-                        message:
-                            'Failed to launch VRChat, invalid custom path set',
-                        type: 'error'
-                    });
+                    toast.error(
+                        'Failed to launch VRChat, invalid custom path set'
+                    );
                 } else {
-                    ElMessage({
-                        message: 'VRChat launched',
-                        type: 'success'
-                    });
+                    toast.success('VRChat launched');
                 }
-            });
-        } else {
-            AppApi.StartGame(args.join(' ')).then((result) => {
+            } else {
+                const result = await AppApi.StartGame(args.join(' '));
                 if (!result) {
-                    ElMessage({
-                        message:
-                            'Failed to find VRChat, set a custom path in launch options',
-                        type: 'error'
-                    });
+                    toast.error(
+                        'Failed to find VRChat, set a custom path in launch options'
+                    );
                 } else {
-                    ElMessage({
-                        message: 'VRChat launched',
-                        type: 'success'
-                    });
+                    toast.success('VRChat launched');
                 }
-            });
+            }
+        } catch (e) {
+            console.error(e);
+            toast.error(`Failed to launch VRChat: ${e.message}`);
         }
         console.log('Launch Game', args.join(' '), desktopMode);
     }
@@ -193,6 +181,7 @@ export const useLaunchStore = defineStore('Launch', () => {
         launchDialogData,
         showLaunchOptions,
         showLaunchDialog,
+        getLaunchUrl,
         launchGame,
         tryOpenInstanceInVrc
     };

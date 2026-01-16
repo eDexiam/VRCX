@@ -6,30 +6,34 @@
         destroy-on-close
         append-to-body>
         <div>
-            <el-input
+            <InputGroupAction
                 v-for="(domain, index) in urlList"
                 :key="index"
                 v-model="urlList[index]"
-                size="small"
+                size="sm"
                 style="margin-top: 5px">
-                <el-button :icon="Delete" @click="urlList.splice(index, 1)"></el-button>
-            </el-input>
-            <el-button size="small" style="margin-top: 5px" @click="urlList.push('')">
+                <template #actions>
+                    <Button variant="ghost" @click="urlList.splice(index, 1)"><Trash2 /></Button>
+                </template>
+            </InputGroupAction>
+            <Button size="sm" variant="outline" style="margin-top: 5px" @click="urlList.push('')">
                 {{ t('dialog.allowed_video_player_domains.add_domain') }}
-            </el-button>
+            </Button>
         </div>
         <template #footer>
-            <el-button type="primary" :disabled="!worldAllowedDomainsDialog.worldId" @click="saveWorldAllowedDomains">
+            <Button :disabled="!worldAllowedDomainsDialog.worldId" @click="saveWorldAllowedDomains">
                 {{ t('dialog.allowed_video_player_domains.save') }}
-            </el-button>
+            </Button>
         </template>
     </el-dialog>
 </template>
 
 <script setup>
     import { computed, ref, watch } from 'vue';
-    import { Delete } from '@element-plus/icons-vue';
-    import { ElMessage } from 'element-plus';
+    import { Button } from '@/components/ui/button';
+    import { InputGroupAction } from '@/components/ui/input-group';
+    import { Trash2 } from 'lucide-vue-next';
+    import { toast } from 'vue-sonner';
     import { useI18n } from 'vue-i18n';
 
     import { worldRequest } from '../../../api';
@@ -76,10 +80,7 @@
                 urlList: urlList.value
             })
             .then((args) => {
-                ElMessage({
-                    message: 'Allowed Video Player Domains updated',
-                    type: 'success'
-                });
+                toast.success('Allowed Video Player Domains updated');
                 return args;
             });
         D.visible = false;

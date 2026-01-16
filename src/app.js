@@ -1,9 +1,3 @@
-// Copyright(c) 2019-2025 pypy, Natsumi and individual contributors.
-// All rights reserved.
-//
-// This work is licensed under the terms of the MIT license.
-// For a copy, see <https://opensource.org/licenses/MIT>.
-
 import { createApp } from 'vue';
 
 import ElementPlus from 'element-plus';
@@ -15,11 +9,12 @@ import {
     initRouter,
     initSentry
 } from './plugin';
-import { pinia } from './stores';
+import { initPiniaPlugins, pinia } from './stores';
 
 import App from './App.vue';
 
 await initPlugins();
+await initPiniaPlugins();
 
 // #region | Hey look it's most of VRCX!
 
@@ -31,5 +26,3 @@ initRouter(app);
 await initSentry(app);
 
 app.mount('#root');
-
-window.$app = app;

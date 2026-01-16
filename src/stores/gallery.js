@@ -1,23 +1,26 @@
-import { reactive, ref, watch } from 'vue';
+import { reactive, ref, shallowReactive, watch } from 'vue';
 import { defineStore } from 'pinia';
 import { useI18n } from 'vue-i18n';
 
 import Noty from 'noty';
 
 import {
+    getEmojiFileName,
+    getPrintFileName,
+    getPrintLocalDate,
+    openExternalLink
+} from '../shared/utils';
+import {
     inventoryRequest,
     userRequest,
     vrcPlusIconRequest,
     vrcPlusImageRequest
 } from '../api';
-import {
-    getEmojiFileName,
-    getPrintFileName,
-    getPrintLocalDate
-} from '../shared/utils';
 import { AppDebug } from '../service/appConfig';
 import { handleImageUploadInput } from '../shared/utils/imageUpload';
+import { router } from '../plugin/router';
 import { useAdvancedSettingsStore } from './settings/advanced';
+import { useModalStore } from './modal';
 import { watchState } from '../service/watchState';
 
 import miscReq from '../api/misc';
@@ -27,6 +30,7 @@ import * as workerTimers from 'worker-timers';
 export const useGalleryStore = defineStore('Gallery', () => {
     const advancedSettingsStore = useAdvancedSettingsStore();
     const { t } = useI18n();
+    const modalStore = useModalStore();
 
     const state = reactive({
         printCache: [],
@@ -37,7 +41,7 @@ export const useGalleryStore = defineStore('Gallery', () => {
         instanceInventoryQueueWorker: null
     });
 
-    const cachedEmoji = new Map();
+    const cachedEmoji = shallowReactive(new Map());
 
     const galleryTable = ref([]);
 
@@ -120,8 +124,16 @@ export const useGalleryStore = defineStore('Gallery', () => {
         }
     }
 
-    function showGalleryDialog() {
+    function showGalleryPage() {
         galleryDialogVisible.value = true;
+        if (router.currentRoute.value?.name === 'gallery') {
+            loadGalleryData();
+            return;
+        }
+        router.push({ name: 'gallery' });
+    }
+
+    function loadGalleryData() {
         refreshGalleryTable();
         refreshVRCPlusIconsTable();
         refreshEmojiTable();
@@ -217,7 +229,7 @@ export const useGalleryStore = defineStore('Gallery', () => {
             return;
         }
         instanceStickersCache.value.push(inventoryId);
-        if (instanceStickersCache.value.size > 100) {
+        if (instanceStickersCache.value.length > 100) {
             instanceStickersCache.value.shift();
         }
         const args = await inventoryRequest.getUserInventoryItem({
@@ -259,7 +271,10 @@ export const useGalleryStore = defineStore('Gallery', () => {
         try {
             const args = await vrcPlusImageRequest.getPrints(params);
             args.json.sort((a, b) => {
-                return new Date(b.timestamp) - new Date(a.timestamp);
+                return (
+                    new Date(b.timestamp).getTime() -
+                    new Date(a.timestamp).getTime()
+                );
             });
             printTable.value = args.json;
         } catch (error) {
@@ -487,16 +502,36 @@ export const useGalleryStore = defineStore('Gallery', () => {
         const createdAt = args.json.created_at;
         const monthFolder = createdAt.slice(0, 7);
 
-        const filePath = await AppApi.SaveEmojiToFile(
-            imageUrl,
-            advancedSettingsStore.ugcFolderPath,
-            monthFolder,
-            emojiFileName
-        );
-        if (filePath) {
-            console.log(
-                `Emoji saved to file: ${monthFolder}\\${emojiFileName}`
+        try {
+            const filePath = await AppApi.SaveEmojiToFile(
+                imageUrl,
+                advancedSettingsStore.ugcFolderPath,
+                monthFolder,
+                emojiFileName
             );
+            if (filePath) {
+                console.log(
+                    `Emoji saved to file: ${monthFolder}\\${emojiFileName}`
+                );
+            }
+        } catch (e) {
+            if (e.message.includes('Could not find file')) {
+                modalStore
+                    .confirm({
+                        description:
+                            'Windows has blocked VRCX from creating files on your system. Please allow VRCX to create files to save emojis, would you like to see instructions on how to fix this?',
+                        title: 'Failed to create emoji folder',
+                        cancelText: 'Ignore'
+                    })
+                    .then(({ ok }) => {
+                        if (!ok) return;
+                        openExternalLink(
+                            'https://www.youtube.com/watch?v=1mwmmCdA4D8&t=213s'
+                        );
+                    })
+                    .catch(() => {});
+            }
+            console.error('Failed to save emoji to file:', e);
         }
 
         if (state.instanceInventoryQueue.length === 0) {
@@ -545,7 +580,8 @@ export const useGalleryStore = defineStore('Gallery', () => {
         fullscreenImageDialog,
         cachedEmoji,
 
-        showGalleryDialog,
+        showGalleryPage,
+        loadGalleryData,
         refreshGalleryTable,
         refreshVRCPlusIconsTable,
         inviteImageUpload,

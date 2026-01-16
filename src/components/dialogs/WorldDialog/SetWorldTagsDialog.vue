@@ -5,80 +5,97 @@
         width="400px"
         destroy-on-close
         append-to-body>
-        <el-checkbox v-model="setWorldTagsDialog.avatarScalingDisabled">
-            {{ t('dialog.set_world_tags.avatar_scaling_disabled') }}
-        </el-checkbox>
+        <label class="inline-flex items-center gap-2">
+            <Checkbox v-model="setWorldTagsDialog.avatarScalingDisabled" />
+            <span>{{ t('dialog.set_world_tags.avatar_scaling_disabled') }}</span>
+        </label>
         <br />
-        <el-checkbox v-model="setWorldTagsDialog.focusViewDisabled">
-            {{ t('dialog.set_world_tags.focus_view_disabled') }}
-        </el-checkbox>
+        <label class="inline-flex items-center gap-2">
+            <Checkbox v-model="setWorldTagsDialog.focusViewDisabled" />
+            <span>{{ t('dialog.set_world_tags.focus_view_disabled') }}</span>
+        </label>
         <br />
-        <el-checkbox v-model="setWorldTagsDialog.debugAllowed">
-            {{ t('dialog.set_world_tags.enable_debugging') }}
-        </el-checkbox>
+        <label class="inline-flex items-center gap-2">
+            <Checkbox v-model="setWorldTagsDialog.debugAllowed" />
+            <span>{{ t('dialog.set_world_tags.enable_debugging') }}</span>
+        </label>
         <div style="font-size: 12px; margin-top: 10px">{{ t('dialog.set_world_tags.author_tags') }}<br /></div>
-        <el-input
+        <InputGroupTextareaField
             v-model="setWorldTagsDialog.authorTags"
-            type="textarea"
-            size="small"
-            show-word-limit
-            :autosize="{ minRows: 2, maxRows: 5 }"
+            :rows="2"
             placeholder=""
-            style="margin-top: 10px"></el-input>
+            style="margin-top: 10px"
+            input-class="resize-none" />
         <div style="font-size: 12px; margin-top: 10px">{{ t('dialog.set_world_tags.content_tags') }}<br /></div>
-        <el-checkbox v-model="setWorldTagsDialog.contentHorror">
-            {{ t('dialog.set_world_tags.content_horror') }}
-        </el-checkbox>
+        <label class="inline-flex items-center gap-2">
+            <Checkbox v-model="setWorldTagsDialog.contentHorror" />
+            <span>{{ t('dialog.set_world_tags.content_horror') }}</span>
+        </label>
         <br />
-        <el-checkbox v-model="setWorldTagsDialog.contentGore">
-            {{ t('dialog.set_world_tags.content_gore') }}
-        </el-checkbox>
+        <label class="inline-flex items-center gap-2">
+            <Checkbox v-model="setWorldTagsDialog.contentGore" />
+            <span>{{ t('dialog.set_world_tags.content_gore') }}</span>
+        </label>
         <br />
-        <el-checkbox v-model="setWorldTagsDialog.contentViolence">
-            {{ t('dialog.set_world_tags.content_violence') }}
-        </el-checkbox>
+        <label class="inline-flex items-center gap-2">
+            <Checkbox v-model="setWorldTagsDialog.contentViolence" />
+            <span>{{ t('dialog.set_world_tags.content_violence') }}</span>
+        </label>
         <br />
-        <el-checkbox v-model="setWorldTagsDialog.contentAdult">
-            {{ t('dialog.set_world_tags.content_adult') }}
-        </el-checkbox>
+        <label class="inline-flex items-center gap-2">
+            <Checkbox v-model="setWorldTagsDialog.contentAdult" />
+            <span>{{ t('dialog.set_world_tags.content_adult') }}</span>
+        </label>
         <br />
-        <el-checkbox v-model="setWorldTagsDialog.contentSex">
-            {{ t('dialog.set_world_tags.content_sex') }}
-        </el-checkbox>
+        <label class="inline-flex items-center gap-2">
+            <Checkbox v-model="setWorldTagsDialog.contentSex" />
+            <span>{{ t('dialog.set_world_tags.content_sex') }}</span>
+        </label>
         <div style="font-size: 12px; margin-top: 10px">
             {{ t('dialog.set_world_tags.default_content_settings') }}<br />
         </div>
-        <el-checkbox v-model="setWorldTagsDialog.emoji">
-            {{ t('dialog.new_instance.content_emoji') }}
-        </el-checkbox>
+        <label class="inline-flex items-center gap-2">
+            <Checkbox v-model="setWorldTagsDialog.emoji" />
+            <span>{{ t('dialog.new_instance.content_emoji') }}</span>
+        </label>
         <br />
-        <el-checkbox v-model="setWorldTagsDialog.stickers">
-            {{ t('dialog.new_instance.content_stickers') }}
-        </el-checkbox>
+        <label class="inline-flex items-center gap-2">
+            <Checkbox v-model="setWorldTagsDialog.stickers" />
+            <span>{{ t('dialog.new_instance.content_stickers') }}</span>
+        </label>
         <br />
-        <el-checkbox v-model="setWorldTagsDialog.pedestals">
-            {{ t('dialog.new_instance.content_pedestals') }}
-        </el-checkbox>
+        <label class="inline-flex items-center gap-2">
+            <Checkbox v-model="setWorldTagsDialog.pedestals" />
+            <span>{{ t('dialog.new_instance.content_pedestals') }}</span>
+        </label>
         <br />
-        <el-checkbox v-model="setWorldTagsDialog.prints">
-            {{ t('dialog.new_instance.content_prints') }}
-        </el-checkbox>
+        <label class="inline-flex items-center gap-2">
+            <Checkbox v-model="setWorldTagsDialog.prints" />
+            <span>{{ t('dialog.new_instance.content_prints') }}</span>
+        </label>
         <br />
-        <el-checkbox v-model="setWorldTagsDialog.drones">
-            {{ t('dialog.new_instance.content_drones') }}
-        </el-checkbox>
+        <label class="inline-flex items-center gap-2">
+            <Checkbox v-model="setWorldTagsDialog.drones" />
+            <span>{{ t('dialog.new_instance.content_drones') }}</span>
+        </label>
         <br />
-        <el-checkbox v-model="setWorldTagsDialog.props">
-            {{ t('dialog.new_instance.content_items') }}
-        </el-checkbox>
+        <label class="inline-flex items-center gap-2">
+            <Checkbox v-model="setWorldTagsDialog.props" />
+            <span>{{ t('dialog.new_instance.content_items') }}</span>
+        </label>
+        <br />
+        <label class="inline-flex items-center gap-2">
+            <Checkbox v-model="setWorldTagsDialog.thirdPerson" />
+            <span>{{ t('dialog.new_instance.content_third_person') }}</span>
+        </label>
         <template #footer>
-            <div style="display: flex">
-                <el-button @click="isVisible = false">
+            <div class="flex gap-2">
+                <Button variant="secondary" @click="isVisible = false">
                     {{ t('dialog.set_world_tags.cancel') }}
-                </el-button>
-                <el-button type="primary" @click="saveSetWorldTagsDialog">
+                </Button>
+                <Button @click="saveSetWorldTagsDialog">
                     {{ t('dialog.set_world_tags.save') }}
-                </el-button>
+                </Button>
             </div>
         </template>
     </el-dialog>
@@ -86,7 +103,10 @@
 
 <script setup>
     import { computed, ref, watch } from 'vue';
-    import { ElMessage } from 'element-plus';
+    import { Button } from '@/components/ui/button';
+    import { Checkbox } from '@/components/ui/checkbox';
+    import { InputGroupTextareaField } from '@/components/ui/input-group';
+    import { toast } from 'vue-sonner';
     import { useI18n } from 'vue-i18n';
 
     import { useWorldStore } from '../../../stores';
@@ -133,7 +153,8 @@
         pedestals: true,
         prints: true,
         drones: true,
-        props: true
+        props: true,
+        thirdPerson: true
     });
 
     const isVisible = computed({
@@ -217,6 +238,8 @@
                 case 'feature_props_disabled':
                     D.props = false;
                     break;
+                case 'feature_third_person_view_disabled':
+                    D.thirdPerson = false;
             }
         });
         D.authorTags = authorTags.toString();
@@ -290,16 +313,16 @@
         if (!D.props) {
             tags.unshift('feature_props_disabled');
         }
+        if (!D.thirdPerson) {
+            tags.unshift('feature_third_person_view_disabled');
+        }
         worldRequest
             .saveWorld({
                 id: props.worldId,
                 tags
             })
             .then((args) => {
-                ElMessage({
-                    message: 'Tags updated',
-                    type: 'success'
-                });
+                toast.success('Tags updated');
                 emit('update:isSetWorldTagsDialogVisible', false);
                 if (props.isWorldDialogVisible) {
                     showWorldDialog(args.json.id);

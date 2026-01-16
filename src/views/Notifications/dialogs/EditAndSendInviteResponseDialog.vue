@@ -9,30 +9,29 @@
         <div style="font-size: 12px">
             <span>{{ t('dialog.edit_send_invite_response_message.description') }}</span>
         </div>
-        <el-input
+        <InputGroupTextareaField
             v-model="editAndSendInviteResponseDialog.newMessage"
-            type="textarea"
-            size="small"
-            maxlength="64"
-            show-word-limit
-            :autosize="{ minRows: 2, maxRows: 5 }"
+            :maxlength="64"
+            :rows="2"
+            class="mt-2.5"
             placeholder=""
-            style="margin-top: 10px">
-        </el-input>
+            show-count />
         <template #footer>
-            <el-button @click="cancelEditAndSendInviteResponse">{{
+            <Button variant="secondary" class="mr-2" @click="cancelEditAndSendInviteResponse">{{
                 t('dialog.edit_send_invite_response_message.cancel')
-            }}</el-button>
-            <el-button type="primary" @click="saveEditAndSendInviteResponse">{{
+            }}</Button>
+            <Button @click="saveEditAndSendInviteResponse" :disabled="!editAndSendInviteResponseDialog.newMessage">{{
                 t('dialog.edit_send_invite_response_message.send')
-            }}</el-button>
+            }}</Button>
         </template>
     </el-dialog>
 </template>
 
 <script setup>
-    import { ElMessage } from 'element-plus';
+    import { Button } from '@/components/ui/button';
+    import { InputGroupTextareaField } from '@/components/ui/input-group';
     import { storeToRefs } from 'pinia';
+    import { toast } from 'vue-sonner';
     import { useI18n } from 'vue-i18n';
 
     import { inviteMessagesRequest, notificationRequest } from '../../../api';
@@ -76,13 +75,10 @@
                 })
                 .then((args) => {
                     if (args.json[slot].message === I.messageSlot.message) {
-                        ElMessage({
-                            message: "VRChat API didn't update message, try again",
-                            type: 'error'
-                        });
+                        toast.error("VRChat API didn't update message, try again");
                         throw new Error("VRChat API didn't update message, try again");
                     } else {
-                        ElMessage('Invite message updated');
+                        toast('Invite message updated');
                     }
                     return args;
                 });
@@ -101,10 +97,7 @@
                     notificationRequest.hideNotification({
                         notificationId: I.invite.id
                     });
-                    ElMessage({
-                        message: 'Invite response message sent',
-                        type: 'success'
-                    });
+                    toast.success('Invite response message sent');
                     return args;
                 })
                 .finally(() => {
@@ -120,10 +113,7 @@
                     notificationRequest.hideNotification({
                         notificationId: I.invite.id
                     });
-                    ElMessage({
-                        message: 'Invite response message sent',
-                        type: 'success'
-                    });
+                    toast.success('Invite response message sent');
                     return args;
                 })
                 .finally(() => {

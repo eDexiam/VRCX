@@ -6,16 +6,20 @@
         width="90vw"
         height="80vh"
         @close="closeDialog">
-        <template #title>
+        <template #header>
             <div class="dialog-title-container">
                 <span>{{ t('dialog.group_calendar.header') }}</span>
-                <el-button @click="toggleViewMode" type="primary" size="small" class="view-toggle-btn">
+                <Button size="sm" variant="outline" @click="toggleViewMode" class="view-toggle-btn">
                     {{
                         viewMode === 'timeline'
                             ? t('dialog.group_calendar.list_view')
                             : t('dialog.group_calendar.calendar_view')
                     }}
-                </el-button>
+                </Button>
+            </div>
+            <div class="featured-switch">
+                <span class="featured-switch-text">{{ t('dialog.group_calendar.featured_events') }}</span>
+                <Switch v-model="showFeaturedEvents" @update:modelValue="toggleFeaturedEvents" />
             </div>
         </template>
         <div class="top-content">
@@ -35,7 +39,9 @@
                                         :event="value"
                                         mode="timeline"
                                         :is-following="isEventFollowing(value.id)"
-                                        :card-class="{ 'grouped-card': timeGroup.events.length > 1 }" />
+                                        :card-class="{ 'grouped-card': timeGroup.events.length > 1 }"
+                                        @update-following-calendar-data="updateFollowingCalendarData"
+                                        @click-action="showGroupDialog(value.ownerId)" />
                                 </div>
                             </el-timeline-item>
                         </el-timeline>
@@ -70,12 +76,10 @@
                 </div>
                 <div v-else key="grid" class="grid-view">
                     <div class="search-container">
-                        <el-input
+                        <InputGroupSearch
                             v-model="searchQuery"
+                            size="sm"
                             :placeholder="t('dialog.group_calendar.search_placeholder')"
-                            clearable
-                            size="small"
-                            prefix-:icon="Search"
                             class="search-input" />
                     </div>
 
@@ -97,6 +101,8 @@
                                         :event="event"
                                         mode="grid"
                                         :is-following="isEventFollowing(event.id)"
+                                        @update-following-calendar-data="updateFollowingCalendarData"
+                                        @click-action="showGroupDialog(event.ownerId)"
                                         card-class="grid-card" />
                                 </div>
                             </div>
@@ -116,19 +122,24 @@
 </template>
 
 <script setup>
-    import { computed, ref, watch } from 'vue';
+    import { computed, onMounted, ref, watch } from 'vue';
     import { ArrowRight } from '@element-plus/icons-vue';
+    import { Button } from '@/components/ui/button';
+    import { InputGroupSearch } from '@/components/ui/input-group';
     import { useI18n } from 'vue-i18n';
 
     import dayjs from 'dayjs';
 
+    import { formatDateFilter, getGroupName, replaceBioSymbols } from '../../../shared/utils';
+    import { Switch } from '../../../components/ui/switch';
     import { groupRequest } from '../../../api';
-    import { replaceBioSymbols } from '../../../shared/utils';
+    import { processBulk } from '../../../service/request';
     import { useGroupStore } from '../../../stores';
 
     import GroupCalendarEventCard from '../components/GroupCalendarEventCard.vue';
+    import configRepository from '../../../service/config';
 
-    const { cachedGroups } = useGroupStore();
+    const { applyGroupEvent, showGroupDialog } = useGroupStore();
 
     const { t } = useI18n();
 
@@ -143,25 +154,30 @@
 
     const calendar = ref([]);
     const followingCalendar = ref([]);
+    const featuredCalendar = ref([]);
     const selectedDay = ref(new Date());
     const isLoading = ref(false);
     const viewMode = ref('timeline');
     const searchQuery = ref('');
     const groupCollapsed = ref({});
+    const showFeaturedEvents = ref(false);
+    const groupNamesCache = new Map();
+
+    onMounted(async () => {
+        showFeaturedEvents.value = await configRepository.getBool('VRCX_groupCalendarShowFeaturedEvents', false);
+    });
+
+    function toggleFeaturedEvents() {
+        configRepository.setBool('VRCX_groupCalendarShowFeaturedEvents', showFeaturedEvents.value);
+        updateCalenderData();
+    }
 
     watch(
         () => props.visible,
         async (newVisible) => {
             if (newVisible) {
                 selectedDay.value = new Date();
-                isLoading.value = true;
-                await Promise.all([getCalendarData(), getFollowingCalendarData()])
-                    .catch((error) => {
-                        console.error('Error fetching calendar data:', error);
-                    })
-                    .finally(() => {
-                        isLoading.value = false;
-                    });
+                updateCalenderData();
             }
         }
     );
@@ -174,27 +190,42 @@
                 const oldMonth = dayjs(oldDate).format('YYYY-MM');
 
                 if (newMonth !== oldMonth) {
-                    isLoading.value = true;
-                    await Promise.all([getCalendarData(), getFollowingCalendarData()])
-                        .catch((error) => {
-                            console.error('Error fetching calendar data:', error);
-                        })
-                        .finally(() => {
-                            isLoading.value = false;
-                        });
+                    updateCalenderData();
                 }
             }
         }
     );
 
+    async function updateCalenderData() {
+        isLoading.value = true;
+        let fetchPromises = [getCalendarData(), getFollowingCalendarData()];
+        if (showFeaturedEvents.value) {
+            fetchPromises.push(getFeaturedCalendarData());
+        }
+        await Promise.all(fetchPromises)
+            .catch((error) => {
+                console.error('Error fetching calendar data:', error);
+            })
+            .finally(() => {
+                isLoading.value = false;
+            });
+    }
+
     const groupedByGroupEvents = computed(() => {
         const currentMonth = dayjs(selectedDay.value).month();
         const currentYear = dayjs(selectedDay.value).year();
 
-        const currentMonthEvents = calendar.value.filter((event) => {
+        let currentMonthEvents = calendar.value.filter((event) => {
             const eventDate = dayjs(event.startsAt);
             return eventDate.month() === currentMonth && eventDate.year() === currentYear;
         });
+        if (showFeaturedEvents.value) {
+            const featuredMonthEvents = featuredCalendar.value.filter((event) => {
+                const eventDate = dayjs(event.startsAt);
+                return eventDate.month() === currentMonth && eventDate.year() === currentYear;
+            });
+            currentMonthEvents = currentMonthEvents.concat(featuredMonthEvents);
+        }
 
         const groupMap = new Map();
         currentMonthEvents.forEach((event) => {
@@ -211,7 +242,7 @@
 
         return Array.from(groupMap.entries()).map(([groupId, events]) => ({
             groupId,
-            groupName: getGroupName(events[0]),
+            groupName: groupNamesCache.get(groupId),
             events: events
         }));
     });
@@ -264,6 +295,15 @@
             }
             result[currentDate].push(item);
         });
+        if (showFeaturedEvents.value) {
+            featuredCalendar.value.forEach((item) => {
+                const currentDate = formatDateKey(item.startsAt);
+                if (!Array.isArray(result[currentDate])) {
+                    result[currentDate] = [];
+                }
+                result[currentDate].push(item);
+            });
+        }
 
         Object.values(result).forEach((events) => {
             events.sort((a, b) => dayjs(a.startsAt).diff(dayjs(b.startsAt)));
@@ -297,7 +337,7 @@
         const timeGroups = {};
 
         eventsForDay.forEach((event) => {
-            const startTimeKey = dayjs(event.startsAt).format('HH:mm');
+            const startTimeKey = formatDateFilter(event.startsAt, 'time');
             if (!timeGroups[startTimeKey]) {
                 timeGroups[startTimeKey] = [];
             }
@@ -314,36 +354,97 @@
             .sort((a, b) => dayjs(a.startsAt).diff(dayjs(b.startsAt)));
     });
 
-    const formatDateKey = (date) => dayjs(date).format('YYYY-MM-DD');
+    const formatDateKey = (date) => formatDateFilter(date, 'date');
 
-    function getGroupName(event) {
-        if (!event) return '';
-        return cachedGroups.get(event.ownerId)?.name || '';
+    function getGroupNameFromCache(groupId) {
+        if (!groupNamesCache.has(groupId)) {
+            getGroupName(groupId).then((name) => {
+                groupNamesCache.set(groupId, name);
+            });
+        }
     }
 
     async function getCalendarData() {
+        calendar.value = [];
         try {
-            const response = await groupRequest.getGroupCalendars(dayjs(selectedDay.value).toISOString());
-            response.results.forEach((event) => {
-                event.title = replaceBioSymbols(event.title);
-                event.description = replaceBioSymbols(event.description);
+            await processBulk({
+                fn: groupRequest.getGroupCalendars,
+                N: -1,
+                params: {
+                    n: 100,
+                    offset: 0,
+                    date: dayjs(selectedDay.value).format('YYYY-MM-DDTHH:mm:ss[Z]') // this need to be local time because UTC time may cause month shift
+                },
+                handle(args) {
+                    args.results.forEach((event) => {
+                        event.title = replaceBioSymbols(event.title);
+                        event.description = replaceBioSymbols(event.description);
+                        applyGroupEvent(event);
+                        getGroupNameFromCache(event.ownerId);
+                    });
+                    calendar.value.push(...args.results);
+                }
             });
-            calendar.value = response.results;
         } catch (error) {
             console.error('Error fetching calendars:', error);
         }
     }
 
     async function getFollowingCalendarData() {
+        followingCalendar.value = [];
         try {
-            const response = await groupRequest.getFollowingGroupCalendars(dayjs(selectedDay.value).toISOString());
-            response.results.forEach((event) => {
-                event.title = replaceBioSymbols(event.title);
-                event.description = replaceBioSymbols(event.description);
+            await processBulk({
+                fn: groupRequest.getFollowingGroupCalendars,
+                N: -1,
+                params: {
+                    n: 100,
+                    offset: 0,
+                    date: dayjs(selectedDay.value).format('YYYY-MM-DDTHH:mm:ss[Z]')
+                },
+                handle(args) {
+                    args.results.forEach((event) => {
+                        applyGroupEvent(event);
+                        getGroupNameFromCache(event.ownerId);
+                    });
+                    followingCalendar.value.push(...args.results);
+                }
             });
-            followingCalendar.value = response.results;
         } catch (error) {
             console.error('Error fetching following calendars:', error);
+        }
+    }
+
+    async function getFeaturedCalendarData() {
+        featuredCalendar.value = [];
+        try {
+            await processBulk({
+                fn: groupRequest.getFeaturedGroupCalendars,
+                N: -1,
+                params: {
+                    n: 100,
+                    offset: 0,
+                    date: dayjs(selectedDay.value).format('YYYY-MM-DDTHH:mm:ss[Z]')
+                },
+                handle(args) {
+                    args.results.forEach((event) => {
+                        applyGroupEvent(event);
+                        getGroupNameFromCache(event.ownerId);
+                    });
+                    featuredCalendar.value.push(...args.results);
+                }
+            });
+        } catch (error) {
+            console.error('Error fetching featured calendars:', error);
+        }
+    }
+
+    function updateFollowingCalendarData(updatedEvent) {
+        const index = followingCalendar.value.findIndex((item) => item.id === updatedEvent.id);
+        if (index !== -1) {
+            followingCalendar.value.splice(index, 1);
+        }
+        if (updatedEvent.userInterest?.isFollowing) {
+            followingCalendar.value.push(updatedEvent);
         }
     }
 
@@ -367,7 +468,7 @@
     }
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
     .x-dialog {
         :deep(.el-dialog) {
             max-height: 750px;
@@ -419,7 +520,10 @@
                             position: relative;
 
                             &.has-events {
-                                background-color: var(--group-calendar-event-bg, rgba(25, 102, 154, 0.05));
+                                background-color: var(
+                                    --group-calendar-event-bg,
+                                    color-mix(in oklch, var(--el-color-primary) 10%, transparent)
+                                );
                             }
                             .calendar-event-badge {
                                 position: absolute;
@@ -428,21 +532,21 @@
                                 min-width: 16px;
                                 height: 16px;
                                 border-radius: 8px;
-                                color: #ffffff;
+                                color: var(--el-color-white, #fff);
                                 display: flex;
                                 align-items: center;
                                 justify-content: center;
                                 font-size: 10px;
                                 font-weight: bold;
-                                box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+                                box-shadow: var(--el-box-shadow-lighter);
                                 z-index: 10;
                                 padding: 0 4px;
                                 line-height: 16px;
                                 &.has-following {
-                                    background-color: var(--group-calendar-badge-following, #67c23a);
+                                    background-color: var(--group-calendar-badge-following, var(--el-color-success));
                                 }
                                 &.no-following {
-                                    background-color: var(--group-calendar-badge-normal, #409eff);
+                                    background-color: var(--group-calendar-badge-normal, var(--el-color-primary));
                                 }
                             }
                         }
@@ -460,6 +564,16 @@
         .view-toggle-btn {
             font-size: 12px;
             padding: 8px 12px;
+        }
+    }
+
+    .featured-switch {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 10px;
+        .featured-switch-text {
+            font-size: 13px;
+            margin-right: 5px;
         }
     }
 
@@ -496,7 +610,7 @@
         flex-direction: column;
         .search-container {
             padding: 2px 20px 12px 20px;
-            border-bottom: 1px solid #ebeef5;
+            border-bottom: 1px solid var(--el-border-color-lighter);
             display: flex;
             justify-content: flex-end;
             .search-input {

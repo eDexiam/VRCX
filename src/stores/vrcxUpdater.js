@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue';
-import { ElMessage } from 'element-plus';
 import { defineStore } from 'pinia';
+import { toast } from 'vue-sonner';
 import { useI18n } from 'vue-i18n';
 
 import { AppDebug } from '../service/appConfig';
@@ -17,6 +17,7 @@ export const useVRCXUpdaterStore = defineStore('VRCXUpdater', () => {
     const { t } = useI18n();
 
     const arch = ref('x64');
+    const noUpdater = ref(false);
 
     const appVersion = ref('');
     const autoUpdateVRCX = ref('Auto Download');
@@ -43,9 +44,9 @@ export const useVRCXUpdaterStore = defineStore('VRCXUpdater', () => {
 
     async function initVRCXUpdaterSettings() {
         if (!WINDOWS) {
-            const archResult = await window.electron.getArch();
-            console.log('Architecture:', archResult);
-            arch.value = archResult;
+            arch.value = await window.electron.getArch();
+            noUpdater.value = await window.electron.getNoUpdater();
+            console.log('Architecture:', arch.value);
         }
 
         const [VRCX_autoUpdateVRCX, VRCX_id] = await Promise.all([
@@ -57,6 +58,9 @@ export const useVRCXUpdaterStore = defineStore('VRCXUpdater', () => {
             autoUpdateVRCX.value = 'Auto Download';
         } else {
             autoUpdateVRCX.value = VRCX_autoUpdateVRCX;
+        }
+        if (noUpdater.value) {
+            autoUpdateVRCX.value = 'Off';
         }
 
         appVersion.value = await AppApi.GetVersion();
@@ -190,6 +194,7 @@ export const useVRCXUpdaterStore = defineStore('VRCXUpdater', () => {
         const url = branches[branch.value].urlLatest;
         checkingForVRCXUpdate.value = true;
         let response;
+        let json;
         try {
             response = await webApiService.execute({
                 url,
@@ -198,20 +203,22 @@ export const useVRCXUpdaterStore = defineStore('VRCXUpdater', () => {
                     'VRCX-ID': vrcxId.value
                 }
             });
+            json = JSON.parse(response.data);
+        } catch (error) {
+            console.error('Failed to check for VRCX update', error);
+            return;
         } finally {
             checkingForVRCXUpdate.value = false;
         }
         if (response.status !== 200) {
-            ElMessage({
-                message: t('message.vrcx_updater.failed', {
+            toast.error(
+                t('message.vrcx_updater.failed', {
                     message: `${response.status} ${response.data}`
-                }),
-                type: 'error'
-            });
+                })
+            );
             return;
         }
         pendingVRCXUpdate.value = false;
-        const json = JSON.parse(response.data);
         if (AppDebug.debugWebRequests) {
             console.log(json, response);
         }
@@ -221,6 +228,9 @@ export const useVRCXUpdaterStore = defineStore('VRCXUpdater', () => {
             const releaseName = json.name;
             setLatestAppVersion(releaseName);
             VRCXUpdateDialog.value.updatePendingIsLatest = false;
+            if (autoUpdateVRCX.value === 'Off') {
+                return;
+            }
             if (releaseName === pendingVRCXInstall.value) {
                 // update already downloaded
                 VRCXUpdateDialog.value.updatePendingIsLatest = true;
@@ -262,6 +272,7 @@ export const useVRCXUpdaterStore = defineStore('VRCXUpdater', () => {
         const url = branches[branch.value].urlReleases;
         checkingForVRCXUpdate.value = true;
         let response;
+        let json;
         try {
             response = await webApiService.execute({
                 url,
@@ -270,30 +281,31 @@ export const useVRCXUpdaterStore = defineStore('VRCXUpdater', () => {
                     'VRCX-ID': vrcxId.value
                 }
             });
+            json = JSON.parse(response.data);
+        } catch (error) {
+            console.error('Failed to check for VRCX update', error);
+            return;
         } finally {
             checkingForVRCXUpdate.value = false;
         }
         if (response.status !== 200) {
-            ElMessage({
-                message: t('message.vrcx_updater.failed', {
+            toast.error(
+                t('message.vrcx_updater.failed', {
                     message: `${response.status} ${response.data}`
-                }),
-                type: 'error'
-            });
+                })
+            );
             return;
         }
-        const json = JSON.parse(response.data);
         if (AppDebug.debugWebRequests) {
             console.log(json, response);
         }
         const releases = [];
         if (typeof json !== 'object' || json.message) {
-            ElMessage({
-                message: t('message.vrcx_updater.failed', {
+            toast.error(
+                t('message.vrcx_updater.failed', {
                     message: json.message
-                }),
-                type: 'error'
-            });
+                })
+            );
             return;
         }
         for (const release of json) {
@@ -332,10 +344,7 @@ export const useVRCXUpdaterStore = defineStore('VRCXUpdater', () => {
             pendingVRCXInstall.value = releaseName;
         } catch (err) {
             console.error(err);
-            ElMessage({
-                message: `${t('message.vrcx_updater.failed_install')} ${err}`,
-                type: 'error'
-            });
+            toast.error(`${t('message.vrcx_updater.failed_install')} ${err}`);
         } finally {
             updateInProgress.value = false;
             updateProgress.value = 0;
@@ -402,6 +411,7 @@ export const useVRCXUpdaterStore = defineStore('VRCXUpdater', () => {
         pendingVRCXInstall,
         updateInProgress,
         updateProgress,
+        noUpdater,
 
         setAutoUpdateVRCX,
         setBranch,

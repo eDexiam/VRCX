@@ -1,6 +1,7 @@
 import { computed, ref, watch } from 'vue';
-import { ElMessage, ElMessageBox } from 'element-plus';
+import { ElMessageBox } from 'element-plus';
 import { defineStore } from 'pinia';
+import { toast } from 'vue-sonner';
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 
@@ -30,6 +31,8 @@ export const useSearchStore = defineStore('Search', () => {
     const searchUserResults = ref([]);
     const quickSearchItems = ref([]);
     const friendsListSearch = ref('');
+
+    const directAccessPrompt = ref(null);
 
     const stringComparer = computed(() =>
         Intl.Collator(appearanceSettingsStore.appLanguage.replace('_', '-'), {
@@ -188,7 +191,7 @@ export const useSearchStore = defineStore('Search', () => {
             const searchTerm = value.slice(7);
             if (quickSearchItems.value.length > 1 && searchTerm.length) {
                 friendsListSearch.value = searchTerm;
-                router.push({ name: 'friendList' });
+                router.push({ name: 'friend-list' });
             } else {
                 router.push({ name: 'search' });
                 searchText.value = searchTerm;
@@ -217,12 +220,21 @@ export const useSearchStore = defineStore('Search', () => {
         return results;
     }
 
-    function directAccessPaste() {
-        AppApi.GetClipboard().then((clipboard) => {
-            if (!directAccessParse(clipboard.trim())) {
-                promptOmniDirectDialog();
-            }
-        });
+    async function directAccessPaste() {
+        let cbText = '';
+        if (LINUX) {
+            cbText = await window.electron.getClipboardText();
+        } else {
+            cbText = await AppApi.GetClipboard().catch((e) => {
+                console.log(e);
+                return '';
+            });
+        }
+
+        let trimemd = cbText.trim();
+        if (!directAccessParse(trimemd)) {
+            promptOmniDirectDialog();
+        }
     }
 
     function directAccessParse(input) {
@@ -266,7 +278,10 @@ export const useSearchStore = defineStore('Search', () => {
         ) {
             userStore.showUserDialog(input);
             return true;
-        } else if (input.substring(0, 5) === 'avtr_') {
+        } else if (
+            input.substring(0, 5) === 'avtr_' ||
+            input.substring(0, 2) === 'b_'
+        ) {
             avatarStore.showAvatarDialog(input);
             return true;
         } else if (input.substring(0, 4) === 'grp_') {
@@ -316,7 +331,11 @@ export const useSearchStore = defineStore('Search', () => {
                     return true;
                 }
             }
-        } else if (input.substring(0, 5) === 'wrld_') {
+        } else if (
+            input.substring(0, 5) === 'wrld_' ||
+            input.substring(0, 4) === 'wld_' ||
+            input.substring(0, 2) === 'o_'
+        ) {
             // a bit hacky, but supports weird malformed inputs cut out from url, why not
             if (input.indexOf('&instanceId=') >= 0) {
                 input = `https://vrchat.com/home/launch?worldId=${input}`;
@@ -328,8 +347,10 @@ export const useSearchStore = defineStore('Search', () => {
         return false;
     }
 
-    function promptOmniDirectDialog() {
-        ElMessageBox.prompt(
+    async function promptOmniDirectDialog() {
+        if (directAccessPrompt.value) return;
+
+        directAccessPrompt.value = ElMessageBox.prompt(
             t('prompt.direct_access_omni.description'),
             t('prompt.direct_access_omni.header'),
             {
@@ -339,21 +360,22 @@ export const useSearchStore = defineStore('Search', () => {
                 inputPattern: /\S+/,
                 inputErrorMessage: t('prompt.direct_access_omni.input_error')
             }
-        )
-            .then(({ value, action }) => {
-                if (action === 'confirm' && value) {
-                    const input = value.trim();
-                    if (!directAccessParse(input)) {
-                        ElMessage({
-                            message: t(
-                                'prompt.direct_access_omni.message.error'
-                            ),
-                            type: 'error'
-                        });
-                    }
+        );
+
+        try {
+            const { value, action } = await directAccessPrompt.value;
+
+            if (action === 'confirm' && value) {
+                const input = value.trim();
+                if (!directAccessParse(input)) {
+                    toast.error(t('prompt.direct_access_omni.message.error'));
                 }
-            })
-            .catch(() => {});
+            }
+        } catch (error) {
+            console.log(error);
+        } finally {
+            directAccessPrompt.value = null;
+        }
     }
 
     function showGroupDialogShortCode(shortCode) {

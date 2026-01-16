@@ -16,164 +16,153 @@
             <span>/</span>
             <span v-text="totalCacheSize"></span>
             <span>GB</span>
-            <el-tooltip placement="top" :content="t('dialog.config_json.refresh')">
-                <el-button
-                    type="default"
-                    :loading="VRChatCacheSizeLoading"
-                    size="small"
-                    :icon="Refresh"
-                    circle
+            <TooltipWrapper side="top" :content="t('dialog.config_json.refresh')">
+                <Button
+                    class="rounded-full"
+                    variant="outline"
+                    size="icon-sm"
+                    :disabled="VRChatCacheSizeLoading"
                     style="margin-left: 5px"
-                    @click="getVRChatCacheSize"></el-button>
-            </el-tooltip>
+                    @click="getVRChatCacheSize">
+                    <Spinner v-if="VRChatCacheSizeLoading" />
+                    <Refresh v-else />
+                </Button>
+            </TooltipWrapper>
 
             <div style="margin-top: 10px">
                 <span style="margin-right: 5px">{{ t('dialog.config_json.delete_all_cache') }}</span>
-                <el-button
-                    size="small"
-                    style="margin-left: 5px"
-                    :icon="Delete"
-                    @click="showDeleteAllVRChatCacheConfirm"
-                    >{{ t('dialog.config_json.delete_cache') }}</el-button
-                >
+                <Button size="sm" variant="outline" style="margin-left: 5px" @click="showDeleteAllVRChatCacheConfirm">{{
+                    t('dialog.config_json.delete_cache')
+                }}</Button>
             </div>
 
             <div style="margin-top: 10px">
                 <span style="margin-right: 5px">{{ t('dialog.config_json.delete_old_cache') }}</span>
-                <el-button size="small" style="margin-left: 5px" :icon="FolderDelete" @click="sweepVRChatCache">{{
+                <Button size="sm" variant="outline" style="margin-left: 5px" @click="sweepVRChatCache">{{
                     t('dialog.config_json.sweep_cache')
-                }}</el-button>
+                }}</Button>
             </div>
 
             <div v-for="(item, value) in VRChatConfigList" :key="value" style="display: block; margin-top: 10px">
                 <span style="word-break: keep-all">{{ item.name }}:</span>
                 <div style="display: flex">
-                    <el-input
+                    <InputGroupAction
                         v-model="VRChatConfigFile[value]"
                         :placeholder="item.default"
-                        size="small"
+                        size="sm"
                         :type="item.type ? item.type : 'text'"
                         :min="item.min"
                         :max="item.max"
                         @input="refreshDialogValues"
                         style="flex: 1; margin-top: 5px">
-                        <template #append>
-                            <el-button
+                        <template #actions>
+                            <Button
+                                size="sm"
+                                variant="outline"
                                 v-if="item.folderBrowser"
-                                size="small"
-                                :icon="FolderOpened"
-                                @click="openConfigFolderBrowser(value)"></el-button>
+                                @click="openConfigFolderBrowser(value)">
+                            </Button>
                         </template>
-                    </el-input>
+                    </InputGroupAction>
                 </div>
             </div>
 
             <div style="display: inline-block; margin-top: 10px">
                 <span>{{ t('dialog.config_json.camera_resolution') }}</span>
                 <br />
-                <el-dropdown
-                    size="small"
-                    trigger="click"
-                    style="margin-top: 5px"
-                    @command="(command) => setVRChatCameraResolution(command)">
-                    <el-button size="small">
-                        <span>
-                            <span v-text="getVRChatCameraResolution()"></span>
-                            <el-icon class="el-icon--right"><ArrowDown /></el-icon>
-                        </span>
-                    </el-button>
-                    <template #dropdown>
-                        <el-dropdown-menu>
-                            <el-dropdown-item v-for="row in VRChatCameraResolutions" :key="row.index" :command="row">{{
-                                row.name
-                            }}</el-dropdown-item>
-                        </el-dropdown-menu>
-                    </template>
-                </el-dropdown>
+                <Select
+                    :model-value="vrchatCameraResolutionKey"
+                    @update:modelValue="(v) => (vrchatCameraResolutionKey = v)">
+                    <SelectTrigger size="sm" style="margin-top: 5px">
+                        <SelectValue :placeholder="getVRChatCameraResolution()" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectGroup>
+                            <SelectItem
+                                v-for="row in VRChatCameraResolutions"
+                                :key="row.name"
+                                :value="getVRChatResolutionKey(row)">
+                                {{ row.name }}
+                            </SelectItem>
+                        </SelectGroup>
+                    </SelectContent>
+                </Select>
             </div>
             <br />
 
             <div style="display: inline-block; margin-top: 10px">
                 <span>{{ t('dialog.config_json.spout_resolution') }}</span>
                 <br />
-                <el-dropdown
-                    size="small"
-                    trigger="click"
-                    style="margin-top: 5px"
-                    @command="(command) => setVRChatSpoutResolution(command)">
-                    <el-button size="small">
-                        <span>
-                            <span v-text="getVRChatSpoutResolution()"></span>
-                            <el-icon class="el-icon--right"><ArrowDown /></el-icon>
-                        </span>
-                    </el-button>
-                    <template #dropdown>
-                        <el-dropdown-menu>
-                            <el-dropdown-item
+                <Select
+                    :model-value="vrchatSpoutResolutionKey"
+                    @update:modelValue="(v) => (vrchatSpoutResolutionKey = v)">
+                    <SelectTrigger size="sm" style="margin-top: 5px">
+                        <SelectValue :placeholder="getVRChatSpoutResolution()" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectGroup>
+                            <SelectItem
                                 v-for="row in VRChatScreenshotResolutions"
-                                :key="row.index"
-                                :command="row"
-                                >{{ row.name }}</el-dropdown-item
-                            >
-                        </el-dropdown-menu>
-                    </template>
-                </el-dropdown>
+                                :key="row.name"
+                                :value="getVRChatResolutionKey(row)">
+                                {{ row.name }}
+                            </SelectItem>
+                        </SelectGroup>
+                    </SelectContent>
+                </Select>
             </div>
             <br />
 
             <div style="display: inline-block; margin-top: 10px">
                 <span>{{ t('dialog.config_json.screenshot_resolution') }}</span>
                 <br />
-                <el-dropdown
-                    size="small"
-                    trigger="click"
-                    style="margin-top: 5px"
-                    @command="(command) => setVRChatScreenshotResolution(command)">
-                    <el-button size="small">
-                        <span>
-                            <span v-text="getVRChatScreenshotResolution()"></span>
-                            <el-icon class="el-icon--right"><ArrowDown /></el-icon>
-                        </span>
-                    </el-button>
-                    <template #dropdown>
-                        <el-dropdown-menu>
-                            <el-dropdown-item
+                <Select
+                    :model-value="vrchatScreenshotResolutionKey"
+                    @update:modelValue="(v) => (vrchatScreenshotResolutionKey = v)">
+                    <SelectTrigger size="sm" style="margin-top: 5px">
+                        <SelectValue :placeholder="getVRChatScreenshotResolution()" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectGroup>
+                            <SelectItem
                                 v-for="row in VRChatScreenshotResolutions"
-                                :key="row.index"
-                                :command="row"
-                                >{{ row.name }}</el-dropdown-item
-                            >
-                        </el-dropdown-menu>
-                    </template>
-                </el-dropdown>
+                                :key="row.name"
+                                :value="getVRChatResolutionKey(row)">
+                                {{ row.name }}
+                            </SelectItem>
+                        </SelectGroup>
+                    </SelectContent>
+                </Select>
             </div>
             <br />
 
-            <el-checkbox
-                v-model="VRChatConfigFile.picture_output_split_by_date"
-                @change="refreshDialogValues"
-                style="margin-top: 5px; display: block">
-                {{ t('dialog.config_json.picture_sort_by_date') }}
-            </el-checkbox>
-            <el-checkbox
-                v-model="VRChatConfigFile.disableRichPresence"
-                @change="refreshDialogValues"
-                style="margin-top: 5px; display: block">
-                {{ t('dialog.config_json.disable_discord_presence') }}
-            </el-checkbox>
+            <label class="inline-flex items-center gap-2" style="margin-top: 5px; display: block">
+                <Checkbox
+                    v-model="VRChatConfigFile.picture_output_split_by_date"
+                    @update:modelValue="refreshDialogValues" />
+                <span>{{ t('dialog.config_json.picture_sort_by_date') }}</span>
+            </label>
+            <label class="inline-flex items-center gap-2" style="margin-top: 5px; display: block">
+                <Checkbox v-model="VRChatConfigFile.disableRichPresence" @update:modelValue="refreshDialogValues" />
+                <span>{{ t('dialog.config_json.disable_discord_presence') }}</span>
+            </label>
         </div>
         <template #footer>
             <div style="display: flex; align-items: center; justify-content: space-between">
                 <div>
-                    <el-button @click="openExternalLink('https://docs.vrchat.com/docs/configuration-file')">{{
-                        t('dialog.config_json.vrchat_docs')
-                    }}</el-button>
+                    <Button
+                        variant="ghost"
+                        @click="openExternalLink('https://docs.vrchat.com/docs/configuration-file')"
+                        >{{ t('dialog.config_json.vrchat_docs') }}</Button
+                    >
                 </div>
                 <div>
-                    <el-button @click="closeDialog">{{ t('dialog.config_json.cancel') }}</el-button>
-                    <el-button type="primary" :disabled="loading" @click="saveVRChatConfigFile">{{
+                    <Button variant="secondary" class="mr-2" @click="closeDialog">{{
+                        t('dialog.config_json.cancel')
+                    }}</Button>
+                    <Button :disabled="loading" @click="saveVRChatConfigFile">{{
                         t('dialog.config_json.save')
-                    }}</el-button>
+                    }}</Button>
                 </div>
             </div>
         </template>
@@ -181,69 +170,77 @@
 </template>
 
 <script setup>
-    import { ArrowDown, Delete, FolderDelete, FolderOpened, Refresh } from '@element-plus/icons-vue';
+    import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
     import { computed, ref, watch } from 'vue';
-    import { ElMessage, ElMessageBox } from 'element-plus';
+    import { Button } from '@/components/ui/button';
+    import { Checkbox } from '@/components/ui/checkbox';
+    import { InputGroupAction } from '@/components/ui/input-group';
+    import { Refresh } from '@element-plus/icons-vue';
+    import { Spinner } from '@/components/ui/spinner';
     import { storeToRefs } from 'pinia';
+    import { toast } from 'vue-sonner';
     import { useI18n } from 'vue-i18n';
 
+    import { useAdvancedSettingsStore, useGameStore, useModalStore } from '../../../stores';
     import { VRChatCameraResolutions, VRChatScreenshotResolutions } from '../../../shared/constants';
     import { getVRChatResolution, openExternalLink } from '../../../shared/utils';
-    import { useAdvancedSettingsStore, useGameStore } from '../../../stores';
 
     const { VRChatUsedCacheSize, VRChatTotalCacheSize, VRChatCacheSizeLoading } = storeToRefs(useGameStore());
     const { sweepVRChatCache, getVRChatCacheSize } = useGameStore();
     const { folderSelectorDialog } = useAdvancedSettingsStore();
     const { isVRChatConfigDialogVisible } = storeToRefs(useAdvancedSettingsStore());
+    const modalStore = useModalStore();
 
     const { t } = useI18n();
 
-    const VRChatConfigFile = ref({});
+    const VRChatConfigFile = ref(/** @type {Record<string, any>} */ ({}));
     // it's a object
-    const VRChatConfigList = ref({
-        cache_size: {
-            name: t('dialog.config_json.max_cache_size'),
-            default: '30',
-            type: 'number',
-            min: 30
-        },
-        cache_expiry_delay: {
-            name: t('dialog.config_json.cache_expiry_delay'),
-            default: '30',
-            type: 'number',
-            min: 30
-        },
-        cache_directory: {
-            name: t('dialog.config_json.cache_directory'),
-            default: '%AppData%\\..\\LocalLow\\VRChat\\VRChat',
-            folderBrowser: true
-        },
-        picture_output_folder: {
-            name: t('dialog.config_json.picture_directory'),
-            // my pictures folder
-            default: `%UserProfile%\\Pictures\\VRChat`,
-            folderBrowser: true
-        },
-        // dynamic_bone_max_affected_transform_count: {
-        //     name: 'Dynamic Bones Limit Max Transforms (0 disable all transforms)',
-        //     default: '32',
-        //     type: 'number',
-        //     min: 0
-        // },
-        // dynamic_bone_max_collider_check_count: {
-        //     name: 'Dynamic Bones Limit Max Collider Collisions (0 disable all colliders)',
-        //     default: '8',
-        //     type: 'number',
-        //     min: 0
-        // },
-        fpv_steadycam_fov: {
-            name: t('dialog.config_json.fpv_steadycam_fov'),
-            default: '50',
-            type: 'number',
-            min: 30,
-            max: 110
-        }
-    });
+    const VRChatConfigList = ref(
+        /** @type {Record<string, any>} */ ({
+            cache_size: {
+                name: t('dialog.config_json.max_cache_size'),
+                default: '30',
+                type: 'number',
+                min: 30
+            },
+            cache_expiry_delay: {
+                name: t('dialog.config_json.cache_expiry_delay'),
+                default: '30',
+                type: 'number',
+                min: 30
+            },
+            cache_directory: {
+                name: t('dialog.config_json.cache_directory'),
+                default: '%AppData%\\..\\LocalLow\\VRChat\\VRChat',
+                folderBrowser: true
+            },
+            picture_output_folder: {
+                name: t('dialog.config_json.picture_directory'),
+                // my pictures folder
+                default: `%UserProfile%\\Pictures\\VRChat`,
+                folderBrowser: true
+            },
+            // dynamic_bone_max_affected_transform_count: {
+            //     name: 'Dynamic Bones Limit Max Transforms (0 disable all transforms)',
+            //     default: '32',
+            //     type: 'number',
+            //     min: 0
+            // },
+            // dynamic_bone_max_collider_check_count: {
+            //     name: 'Dynamic Bones Limit Max Collider Collisions (0 disable all colliders)',
+            //     default: '8',
+            //     type: 'number',
+            //     min: 0
+            // },
+            fpv_steadycam_fov: {
+                name: t('dialog.config_json.fpv_steadycam_fov'),
+                default: '50',
+                type: 'number',
+                min: 30,
+                max: 110
+            }
+        })
+    );
 
     const loading = ref(false);
 
@@ -262,14 +259,76 @@
         return VRChatConfigFile.value.cache_size || VRChatTotalCacheSize.value;
     });
 
+    const VRCHAT_RESOLUTION_DEFAULT_KEY = '__default__';
+
+    function getVRChatResolutionKey(row) {
+        const width = Number(row?.width);
+        const height = Number(row?.height);
+        if (width > 0 && height > 0) {
+            return `${width}x${height}`;
+        }
+        return VRCHAT_RESOLUTION_DEFAULT_KEY;
+    }
+
+    const vrchatCameraResolutionKey = computed({
+        get: () => {
+            const width = Number(VRChatConfigFile.value.camera_res_width);
+            const height = Number(VRChatConfigFile.value.camera_res_height);
+            if (width > 0 && height > 0) {
+                return `${width}x${height}`;
+            }
+            return VRCHAT_RESOLUTION_DEFAULT_KEY;
+        },
+        set: (value) => {
+            const row = VRChatCameraResolutions.find((r) => getVRChatResolutionKey(r) === value);
+            if (row) {
+                setVRChatCameraResolution(row);
+            }
+        }
+    });
+
+    const vrchatSpoutResolutionKey = computed({
+        get: () => {
+            const width = Number(VRChatConfigFile.value.camera_spout_res_width);
+            const height = Number(VRChatConfigFile.value.camera_spout_res_height);
+            if (width > 0 && height > 0) {
+                return `${width}x${height}`;
+            }
+            return VRCHAT_RESOLUTION_DEFAULT_KEY;
+        },
+        set: (value) => {
+            const row = VRChatScreenshotResolutions.find((r) => getVRChatResolutionKey(r) === value);
+            if (row) {
+                setVRChatSpoutResolution(row);
+            }
+        }
+    });
+
+    const vrchatScreenshotResolutionKey = computed({
+        get: () => {
+            const width = Number(VRChatConfigFile.value.screenshot_res_width);
+            const height = Number(VRChatConfigFile.value.screenshot_res_height);
+            if (width > 0 && height > 0) {
+                return `${width}x${height}`;
+            }
+            return VRCHAT_RESOLUTION_DEFAULT_KEY;
+        },
+        set: (value) => {
+            const row = VRChatScreenshotResolutions.find((r) => getVRChatResolutionKey(r) === value);
+            if (row) {
+                setVRChatScreenshotResolution(row);
+            }
+        }
+    });
+
     function showDeleteAllVRChatCacheConfirm() {
-        ElMessageBox.confirm(`Continue? Delete all VRChat cache`, 'Confirm', {
-            confirmButtonText: 'Confirm',
-            cancelButtonText: 'Cancel',
-            type: 'info'
-        })
-            .then((action) => {
-                if (action === 'confirm') {
+        modalStore
+            .confirm({
+                description: 'Continue? Delete all VRChat cache',
+                title: 'Confirm'
+            })
+            .then(({ ok }) => {
+                if (ok) {
                     deleteAllVRChatCache();
                 }
             })
@@ -277,7 +336,12 @@
     }
 
     async function deleteAllVRChatCache() {
-        await AssetBundleManager.DeleteAllCache();
+        try {
+            await AssetBundleManager.DeleteAllCache();
+            toast.success('All VRChat cache deleted');
+        } catch (error) {
+            toast.error(`Error deleting VRChat cache: ${error.message}`);
+        }
         getVRChatCacheSize();
     }
 
@@ -348,8 +412,11 @@
                 delete VRChatConfigFile.value[item];
             } else if (typeof VRChatConfigFile.value[item] === 'boolean' && VRChatConfigFile.value[item] === false) {
                 delete VRChatConfigFile.value[item];
-            } else if (typeof VRChatConfigFile.value[item] === 'string' && !isNaN(VRChatConfigFile.value[item])) {
-                VRChatConfigFile.value[item] = parseInt(VRChatConfigFile.value[item], 10);
+            } else if (typeof VRChatConfigFile.value[item] === 'string') {
+                const parsed = parseInt(VRChatConfigFile.value[item], 10);
+                if (!Number.isNaN(parsed)) {
+                    VRChatConfigFile.value[item] = parsed;
+                }
             }
         }
         WriteVRChatConfigFile();
@@ -368,10 +435,7 @@
                 const parsedConfig = JSON.parse(config);
                 VRChatConfigFile.value = { ...VRChatConfigFile.value, ...parsedConfig };
             } catch {
-                ElMessage({
-                    message: 'Invalid JSON in config.json',
-                    type: 'error'
-                });
+                toast.error('Invalid JSON in config.json');
                 throw new Error('Invalid JSON in config.json');
             }
         }

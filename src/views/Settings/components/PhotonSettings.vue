@@ -12,48 +12,52 @@
         </div>
         <div class="options-container-item">
             <span class="name">{{ t('view.settings.advanced.photon.event_hud.filter') }}</span>
-            <el-radio-group
+            <ToggleGroup
+                type="single"
+                required
+                variant="outline"
+                size="sm"
                 :model-value="photonEventOverlayFilter"
-                size="small"
                 :disabled="!openVR || !photonEventOverlay"
-                @change="
+                @update:model-value="
                     setPhotonEventOverlayFilter($event);
                     saveEventOverlay();
                 ">
-                <el-radio-button label="VIP">{{
+                <ToggleGroupItem value="VIP">{{
                     t('view.settings.advanced.photon.event_hud.filter_favorites')
-                }}</el-radio-button>
-                <el-radio-button label="Friends">{{
+                }}</ToggleGroupItem>
+                <ToggleGroupItem value="Friends">{{
                     t('view.settings.advanced.photon.event_hud.filter_friends')
-                }}</el-radio-button>
-                <el-radio-button label="Everyone">{{
+                }}</ToggleGroupItem>
+                <ToggleGroupItem value="Everyone">{{
                     t('view.settings.advanced.photon.event_hud.filter_everyone')
-                }}</el-radio-button>
-            </el-radio-group>
+                }}</ToggleGroupItem>
+            </ToggleGroup>
         </div>
         <div class="options-container-item">
-            <el-button size="small" :icon="Timer" :disabled="!openVR" @click="promptPhotonOverlayMessageTimeout">{{
+            <Button size="sm" variant="outline" :disabled="!openVR" @click="promptPhotonOverlayMessageTimeout">{{
                 t('view.settings.advanced.photon.event_hud.message_timeout')
-            }}</el-button>
+            }}</Button>
         </div>
         <div class="options-container-item">
-            <el-select
+            <Select
                 :model-value="photonEventTableTypeOverlayFilter"
                 multiple
-                clearable
-                collapse-tags
-                style="flex: 1"
-                placeholder="Filter"
-                @change="
-                    setPhotonEventTableTypeOverlayFilter($event);
-                    photonEventTableFilterChange();
+                @update:modelValue="
+                    (v) => {
+                        setPhotonEventTableTypeOverlayFilter(v);
+                        photonEventTableFilterChange();
+                    }
                 ">
-                <el-option
-                    v-for="type in photonEventTableTypeFilterList"
-                    :key="type"
-                    :label="type"
-                    :value="type"></el-option>
-            </el-select>
+                <SelectTrigger style="flex: 1">
+                    <SelectValue placeholder="Filter" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem v-for="type in photonEventTableTypeFilterList" :key="type" :value="type">{{
+                        type
+                    }}</SelectItem>
+                </SelectContent>
+            </Select>
         </div>
         <br />
         <span class="sub-header">{{ t('view.settings.advanced.photon.timeout_hud.header') }}</span>
@@ -65,38 +69,43 @@
             @change="saveEventOverlay('VRCX_TimeoutHudOverlay')"></simple-switch>
         <div class="options-container-item">
             <span class="name">{{ t('view.settings.advanced.photon.timeout_hud.filter') }}</span>
-            <el-radio-group
+            <ToggleGroup
+                type="single"
+                required
+                variant="outline"
+                size="sm"
                 :model-value="timeoutHudOverlayFilter"
-                size="small"
                 :disabled="!openVR || !timeoutHudOverlay"
-                @change="
+                @update:model-value="
                     setTimeoutHudOverlayFilter($event);
                     saveEventOverlay();
                 ">
-                <el-radio-button label="VIP">{{
+                <ToggleGroupItem value="VIP">{{
                     t('view.settings.advanced.photon.timeout_hud.filter_favorites')
-                }}</el-radio-button>
-                <el-radio-button label="Friends">{{
+                }}</ToggleGroupItem>
+                <ToggleGroupItem value="Friends">{{
                     t('view.settings.advanced.photon.timeout_hud.filter_friends')
-                }}</el-radio-button>
-                <el-radio-button label="Everyone">{{
+                }}</ToggleGroupItem>
+                <ToggleGroupItem value="Everyone">{{
                     t('view.settings.advanced.photon.timeout_hud.filter_everyone')
-                }}</el-radio-button>
-            </el-radio-group>
+                }}</ToggleGroupItem>
+            </ToggleGroup>
         </div>
         <div class="options-container-item">
-            <el-button size="small" :icon="Timer" :disabled="!openVR" @click="promptPhotonLobbyTimeoutThreshold">{{
+            <Button size="sm" variant="outline" :disabled="!openVR" @click="promptPhotonLobbyTimeoutThreshold">{{
                 t('view.settings.advanced.photon.timeout_hud.timeout_threshold')
-            }}</el-button>
+            }}</Button>
         </div>
     </div>
 </template>
 
 <script setup>
-    import { Timer } from '@element-plus/icons-vue';
+    import { Button } from '@/components/ui/button';
     import { storeToRefs } from 'pinia';
     import { useI18n } from 'vue-i18n';
 
+    import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
+    import { ToggleGroup, ToggleGroupItem } from '../../../components/ui/toggle-group';
     import { useNotificationsSettingsStore, usePhotonStore } from '../../../stores';
     import { photonEventTableTypeFilterList } from '../../../shared/constants/photon';
 

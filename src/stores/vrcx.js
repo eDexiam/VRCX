@@ -1,25 +1,31 @@
 import { reactive, ref, watch } from 'vue';
-import { ElMessage, ElMessageBox } from 'element-plus';
 import { defineStore } from 'pinia';
+import { toast } from 'vue-sonner';
 import { useI18n } from 'vue-i18n';
 
 import Noty from 'noty';
 
+import {
+    clearPiniaActionTrail,
+    getPiniaActionTrail
+} from '../plugin/piniaActionTrail';
 import { debounce, parseLocation } from '../shared/utils';
 import { AppDebug } from '../service/appConfig';
 import { database } from '../service/database';
 import { failedGetRequests } from '../service/request';
-import { refreshCustomCss } from '../shared/utils/base/ui';
+import { refreshCustomScript } from '../shared/utils/base/ui';
 import { useAdvancedSettingsStore } from './settings/advanced';
 import { useAvatarProviderStore } from './avatarProvider';
 import { useAvatarStore } from './avatar';
 import { useFavoriteStore } from './favorite';
 import { useFriendStore } from './friend';
+import { useGalleryStore } from './gallery';
 import { useGameLogStore } from './gameLog';
 import { useGameStore } from './game';
 import { useGroupStore } from './group';
 import { useInstanceStore } from './instance';
 import { useLocationStore } from './location';
+import { useModalStore } from './modal';
 import { useNotificationStore } from './notification';
 import { usePhotonStore } from './photon';
 import { useSearchStore } from './search';
@@ -50,7 +56,9 @@ export const useVrcxStore = defineStore('Vrcx', () => {
     const gameLogStore = useGameLogStore();
     const updateLoopStore = useUpdateLoopStore();
     const vrcStatusStore = useVrcStatusStore();
+    const galleryStore = useGalleryStore();
     const { t } = useI18n();
+    const modalStore = useModalStore();
 
     const state = reactive({
         databaseVersion: 0,
@@ -146,51 +154,11 @@ export const useVrcxStore = defineStore('Vrcx', () => {
             maxTableSize.value = 1000;
         }
         database.setMaxTableSize(maxTableSize.value);
+
+        refreshCustomScript();
     }
 
     init();
-
-    // Make sure file drops outside of the screenshot manager don't navigate to the file path dropped.
-    // This issue persists on prompts created with prompt(), unfortunately. Not sure how to fix that.
-    document.body.addEventListener('drop', function (e) {
-        e.preventDefault();
-    });
-
-    document.addEventListener('keyup', function (e) {
-        if (e.ctrlKey) {
-            if (e.key === 'I') {
-                showConsole();
-            } else if (e.key === 'r') {
-                location.reload();
-            }
-        } else if (e.altKey && e.key === 'R') {
-            refreshCustomCss();
-            ElMessage({
-                message: 'Custom CSS refreshed',
-                type: 'success'
-            });
-        }
-    });
-
-    function showConsole() {
-        AppApi.ShowDevTools();
-        if (
-            AppDebug.debug ||
-            AppDebug.debugWebRequests ||
-            AppDebug.debugWebSocket ||
-            AppDebug.debugUserDiff
-        ) {
-            return;
-        }
-        console.log(
-            '%cCareful! This might not do what you think.',
-            'background-color: red; color: yellow; font-size: 32px; font-weight: bold'
-        );
-        console.log(
-            '%cIf someone told you to copy-paste something here, it can give them access to your account.',
-            'font-size: 20px;'
-        );
-    }
 
     async function updateDatabaseVersion() {
         // requires dbVars.userPrefix to be already set
@@ -198,12 +166,10 @@ export const useVrcxStore = defineStore('Vrcx', () => {
         let msgBox;
         if (state.databaseVersion < databaseVersion) {
             if (state.databaseVersion) {
-                msgBox = ElMessage({
-                    message:
-                        'DO NOT CLOSE VRCX, database upgrade in progress...',
-                    type: 'warning',
-                    duration: 0
-                });
+                msgBox = toast.warning(
+                    'DO NOT CLOSE VRCX, database upgrade in progress...',
+                    { duration: Infinity, position: 'bottom-right' }
+                );
             }
             console.log(
                 `Updating database from ${state.databaseVersion} to ${databaseVersion}...`
@@ -226,24 +192,19 @@ export const useVrcxStore = defineStore('Vrcx', () => {
                     databaseVersion
                 );
                 console.log('Database update complete.');
-                msgBox?.close();
+                toast.dismiss(msgBox);
                 if (state.databaseVersion) {
                     // only display when database exists
-                    ElMessage({
-                        message: 'Database upgrade complete',
-                        type: 'success'
-                    });
+                    toast.success('Database upgrade complete');
                 }
                 state.databaseVersion = databaseVersion;
             } catch (err) {
                 console.error(err);
-                msgBox?.close();
-                ElMessage({
-                    message:
-                        'Database upgrade failed, check console for details',
-                    type: 'error',
-                    duration: 120000
-                });
+                toast.dismiss(msgBox);
+                toast.error(
+                    'Database upgrade failed, check console for details',
+                    { duration: 120000 }
+                );
                 AppApi.ShowDevTools();
             }
         }
@@ -262,7 +223,7 @@ export const useVrcxStore = defineStore('Vrcx', () => {
         });
         worldStore.cachedWorlds.forEach((ref, id) => {
             if (
-                !favoriteStore.cachedFavoritesByObjectId.has(id) &&
+                !favoriteStore.getCachedFavoritesByObjectId(id) &&
                 ref.authorId !== userStore.currentUser.id &&
                 !favoriteStore.localWorldFavoritesList.includes(id)
             ) {
@@ -271,10 +232,10 @@ export const useVrcxStore = defineStore('Vrcx', () => {
         });
         avatarStore.cachedAvatars.forEach((ref, id) => {
             if (
-                !favoriteStore.cachedFavoritesByObjectId.has(id) &&
+                !favoriteStore.getCachedFavoritesByObjectId(id) &&
                 ref.authorId !== userStore.currentUser.id &&
                 !favoriteStore.localAvatarFavoritesList.includes(id) &&
-                !avatarStore.avatarHistory.has(id)
+                !avatarStore.avatarHistory.includes(id)
             ) {
                 avatarStore.cachedAvatars.delete(id);
             }
@@ -297,8 +258,9 @@ export const useVrcxStore = defineStore('Vrcx', () => {
                 instanceStore.cachedInstances.delete(id);
             }
         });
-        avatarStore.cachedAvatarNames = new Map();
-        userStore.customUserTags = new Map();
+        avatarStore.cachedAvatarNames.clear();
+        userStore.customUserTags.clear();
+        galleryStore.cachedEmoji.clear();
     }
 
     function eventVrcxMessage(data) {
@@ -392,12 +354,23 @@ export const useVrcxStore = defineStore('Vrcx', () => {
                     displayName: user.displayName
                 });
             }
-            newPath = await AppApi.AddScreenshotMetadata(
-                path,
-                JSON.stringify(metadata),
-                location.worldId,
-                advancedSettingsStore.screenshotHelperModifyFilename
-            );
+            try {
+                newPath = await AppApi.AddScreenshotMetadata(
+                    path,
+                    JSON.stringify(metadata),
+                    location.worldId,
+                    advancedSettingsStore.screenshotHelperModifyFilename
+                );
+            } catch (e) {
+                console.error('Failed to add screenshot metadata', e);
+                if (e.message?.includes('UnauthorizedAccessException')) {
+                    toast.error(
+                        'Failed to add screenshot metadata, access denied. Make sure VRCX has permission to access the screenshot folder.',
+                        { duration: 10000 }
+                    );
+                }
+                return;
+            }
             if (!newPath) {
                 console.error('Failed to add screenshot metadata', path);
                 return;
@@ -549,11 +522,50 @@ export const useVrcxStore = defineStore('Vrcx', () => {
 
     async function startupLaunchCommand() {
         const command = await AppApi.GetLaunchCommand();
-        if (command) {
-            eventLaunchCommand(command);
+        if (!command) {
+            return;
         }
+        if (command.startsWith('crash/')) {
+            const crashMessage = command.replace('crash/', '');
+            console.error('VRCX recovered from crash:', crashMessage);
+
+            if (advancedSettingsStore.sentryErrorReporting) {
+                try {
+                    import('@sentry/vue').then((Sentry) => {
+                        const trail = getPiniaActionTrail().filter((entry) => {
+                            if (!entry) return false;
+                            return (
+                                typeof entry.t === 'string' &&
+                                typeof entry.a === 'string'
+                            );
+                        });
+                        const trailText = JSON.stringify(trail);
+                        Sentry.withScope((scope) => {
+                            scope.setLevel('fatal');
+                            scope.setTag('reason', 'crash-recovery');
+                            scope.setContext('pinia_actions', {
+                                trailText,
+                                sessionTime: performance.now() / 1000 / 60
+                            });
+                            Sentry.captureMessage(
+                                `crash message: ${crashMessage}`
+                            );
+                        });
+
+                        clearPiniaActionTrail();
+                    });
+                } catch (error) {
+                    console.error('Error setting up Sentry feedback:', error);
+                }
+            }
+
+            toast.success(t('message.crash.vrcx_reload'));
+            return;
+        }
+        eventLaunchCommand(command);
     }
 
+    // called from C#
     function eventLaunchCommand(input) {
         if (!watchState.isLoggedIn) {
             return;
@@ -565,7 +577,12 @@ export const useVrcxStore = defineStore('Vrcx', () => {
         let shouldFocusWindow = true;
         switch (command) {
             case 'world':
-                searchStore.directAccessWorld(input.replace('world/', ''));
+                if (
+                    !searchStore.directAccessWorld(input.replace('world/', ''))
+                ) {
+                    // fallback for mangled world ids
+                    worldStore.showWorldDialog(commandArg);
+                }
                 break;
             case 'avatar':
                 avatarStore.showAvatarDialog(commandArg);
@@ -595,10 +612,7 @@ export const useVrcxStore = defineStore('Vrcx', () => {
                 const regexAvatarId =
                     /avtr_[0-9A-Fa-f]{8}-([0-9A-Fa-f]{4}-){3}[0-9A-Fa-f]{12}/g;
                 if (!avatarId.match(regexAvatarId) || avatarId.length !== 41) {
-                    ElMessage({
-                        message: 'Invalid Avatar ID',
-                        type: 'error'
-                    });
+                    toast.error('Invalid Avatar ID');
                     break;
                 }
                 if (advancedSettingsStore.showConfirmationOnSwitchAvatar) {
@@ -698,10 +712,10 @@ export const useVrcxStore = defineStore('Vrcx', () => {
                 return;
             }
             // popup message about auto restore
-            ElMessageBox.alert(
-                t('dialog.registry_backup.restore_prompt'),
-                t('dialog.registry_backup.header')
-            ).catch(() => {});
+            modalStore.alert({
+                description: t('dialog.registry_backup.restore_prompt'),
+                title: t('dialog.registry_backup.header')
+            });
             showRegistryBackupDialog();
             await AppApi.FocusWindow();
             await configRepository.setString(
@@ -770,7 +784,6 @@ export const useVrcxStore = defineStore('Vrcx', () => {
         ipcEnabled,
         clearVRCXCacheFrequency,
         maxTableSize,
-        showConsole,
         clearVRCXCache,
         eventVrcxMessage,
         eventLaunchCommand,

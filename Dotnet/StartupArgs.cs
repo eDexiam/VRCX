@@ -1,9 +1,3 @@
-// Copyright(c) 2019-2025 pypy, Natsumi and individual contributors.
-// All rights reserved.
-//
-// This work is licensed under the terms of the MIT license.
-// For a copy, see <https://opensource.org/licenses/MIT>.
-
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -55,7 +49,7 @@ namespace VRCX
 
 #if !LINUX
             var disableClosing = LaunchArguments.IsUpgrade || // we're upgrading, allow it
-                                  !string.IsNullOrEmpty(CommandLineArgsParser.GetArgumentValue(args, CefSharpArguments.SubProcessTypeArgument)); // we're launching a subprocess, allow it
+                                        !string.IsNullOrEmpty(CommandLineArgsParser.GetArgumentValue(args, CefSharpArguments.SubProcessTypeArgument)); // we're launching a subprocess, allow it
 
             // if we're launching a second instance with same config directory, focus the first instance then exit
             if (!disableClosing && IsDuplicateProcessRunning(LaunchArguments))
@@ -74,16 +68,19 @@ namespace VRCX
             {
                 if (arg == VrcxLaunchArguments.IsStartupPrefix)
                     arguments.IsStartup = true;
-                
+
                 if (arg == VrcxLaunchArguments.IsUpgradePrefix)
                     arguments.IsUpgrade = true;
 
                 if (arg.StartsWith(VrcxLaunchArguments.IsDebugPrefix))
                     arguments.IsDebug = true;
+                
+                if (arg == VrcxLaunchArguments.Overlay)
+                    arguments.IsOverlay = true;
 
                 if (arg.StartsWith(VrcxLaunchArguments.LaunchCommandPrefix) && arg.Length > VrcxLaunchArguments.LaunchCommandPrefix.Length)
                     arguments.LaunchCommand = arg.Substring(VrcxLaunchArguments.LaunchCommandPrefix.Length);
-                
+
                 if (arg.StartsWith(VrcxLaunchArguments.LinuxLaunchCommandPrefix) && arg.Length > VrcxLaunchArguments.LinuxLaunchCommandPrefix.Length)
                     arguments.LaunchCommand = arg.Substring(VrcxLaunchArguments.LinuxLaunchCommandPrefix.Length);
 
@@ -100,12 +97,15 @@ namespace VRCX
         {
             public const string IsStartupPrefix = "--startup";
             public bool IsStartup { get; set; } = false;
-            
+
             public const string IsUpgradePrefix = "/Upgrade";
             public bool IsUpgrade { get; set; } = false;
 
             public const string IsDebugPrefix = "--debug";
             public bool IsDebug { get; set; } = false;
+            
+            public const string Overlay = "--overlay";
+            public bool IsOverlay { get; set; } = false;
 
             public const string LaunchCommandPrefix = "/uri=vrcx://";
             public const string LinuxLaunchCommandPrefix = "vrcx://";
@@ -121,6 +121,7 @@ namespace VRCX
         private static bool IsDuplicateProcessRunning(VrcxLaunchArguments launchArguments)
         {
             var processes = Process.GetProcessesByName("VRCX");
+            var isDuplicateProcessRunning = false;
             foreach (var process in processes)
             {
                 if (process.Id == Environment.ProcessId)
@@ -143,12 +144,30 @@ namespace VRCX
                 if (commandLine.Contains(SubProcessTypeArgument)) // ignore subprocesses
                     continue;
 
+                if (launchArguments.IsOverlay)
+                {
+                    if (commandLine.Contains(VrcxLaunchArguments.Overlay))
+                    {
+                        Console.WriteLine(@"Another overlay instance is already running. Exiting this instance.");
+                        Environment.Exit(0);
+                    }
+                    continue; // we are an overlay, ignore non-overlay instances
+                }
+
+                if (commandLine.Contains(VrcxLaunchArguments.Overlay))
+                    continue; // we aren't an overlay, ignore overlay instances
+
                 var processArguments = ParseArgs(commandLine.Split(' '));
                 if (processArguments.ConfigDirectory == launchArguments.ConfigDirectory)
-                    return true;
+                {
+                    isDuplicateProcessRunning = true;
+                    break;
+                }
             }
+            foreach (var process in processes)
+                process.Dispose();
 
-            return false;
+            return isDuplicateProcessRunning;
         }
 
         private static void IPCToMain()

@@ -1,9 +1,6 @@
 <template>
-    <div
-        id="x-app"
-        class="x-app x-app-type"
-        :class="{ background: appType === 'wrist' && config && config.backgroundEnabled }">
-        <template v-if="appType === 'wrist'">
+    <div id="x-app" class="x-app x-app-type">
+        <div class="wrist" :class="{ background: config && config.backgroundEnabled }">
             <div class="x-container" style="flex: 1">
                 <div class="x-friend-list" ref="list" style="color: #aaa">
                     <template v-if="config && config.minimalFeed">
@@ -1166,13 +1163,13 @@
                             <img
                                 v-if="device[1] !== 'connected'"
                                 class="tracker-device"
-                                src="./images/headset_quest_status_off.png"
+                                src="/images/vr/headset_quest_status_off.png"
                                 :class="trackingResultToClass(device[4])" />
                             <img
                                 v-else-if="device[2] === 'charging'"
-                                src="./images/headset_quest_status_ready_charging.png" />
-                            <img v-else-if="device[3] < 20" src="./images/headset_quest_status_ready_low.png" />
-                            <img v-else src="./images/headset_quest_status_ready.png" />
+                                src="/images/vr/headset_quest_status_ready_charging.png" />
+                            <img v-else-if="device[3] < 20" src="/images/vr/headset_quest_status_ready_low.png" />
+                            <img v-else src="/images/vr/headset_quest_status_ready.png" />
                             <span>{{ device[3] }}%</span>
                         </div>
                         <div
@@ -1182,57 +1179,57 @@
                             <img
                                 v-if="device[1] !== 'connected'"
                                 class="tracker-device"
-                                src="./images/left_controller_status_off.png"
+                                src="/images/vr/left_controller_status_off.png"
                                 :class="trackingResultToClass(device[4])" />
                             <img
                                 v-else-if="device[2] === 'charging'"
-                                src="./images/left_controller_status_ready_charging.png" />
-                            <img v-else-if="device[3] < 20" src="./images/left_controller_status_ready_low.png" />
-                            <img v-else src="./images/left_controller_status_ready.png" />
+                                src="/images/vr/left_controller_status_ready_charging.png" />
+                            <img v-else-if="device[3] < 20" src="/images/vr/left_controller_status_ready_low.png" />
+                            <img v-else src="/images/vr/left_controller_status_ready.png" />
                             <span>{{ device[3] }}%</span>
                         </div>
                         <div
                             v-else-if="device[0] === 'rightController'"
                             class="tracker-device"
                             :class="trackingResultToClass(device[4])">
-                            <img v-if="device[1] !== 'connected'" src="./images/right_controller_status_off.png" />
+                            <img v-if="device[1] !== 'connected'" src="/images/vr/right_controller_status_off.png" />
                             <img
                                 v-else-if="device[2] === 'charging'"
-                                src="./images/right_controller_status_ready_charging.png" />
-                            <img v-else-if="device[3] < 20" src="./images/right_controller_status_ready_low.png" />
-                            <img v-else src="./images/right_controller_status_ready.png" />
+                                src="/images/vr/right_controller_status_ready_charging.png" />
+                            <img v-else-if="device[3] < 20" src="/images/vr/right_controller_status_ready_low.png" />
+                            <img v-else src="/images/vr/right_controller_status_ready.png" />
                             <span>{{ device[3] }}%</span>
                         </div>
                         <div
                             v-else-if="device[0] === 'controller'"
                             class="tracker-device"
                             :class="trackingResultToClass(device[4])">
-                            <img v-if="device[1] !== 'connected'" src="./images/controller_status_off.png" />
+                            <img v-if="device[1] !== 'connected'" src="/images/vr/controller_status_off.png" />
                             <img
                                 v-else-if="device[2] === 'charging'"
-                                src="./images/controller_status_ready_charging.png" />
-                            <img v-else-if="device[3] < 20" src="./images/controller_status_ready_low.png" />
-                            <img v-else src="./images/controller_status_ready.png" />
+                                src="/images/vr/controller_status_ready_charging.png" />
+                            <img v-else-if="device[3] < 20" src="/images/vr/controller_status_ready_low.png" />
+                            <img v-else src="/images/vr/controller_status_ready.png" />
                             <span>{{ device[3] }}%</span>
                         </div>
                         <div
                             v-else-if="device[0] === 'tracker'"
                             class="tracker-device"
                             :class="trackingResultToClass(device[4])">
-                            <img v-if="device[1] !== 'connected'" src="./images/tracker_status_off.png" />
+                            <img v-if="device[1] !== 'connected'" src="/images/vr/tracker_status_off.png" />
                             <img
                                 v-else-if="device[2] === 'charging'"
-                                src="./images/tracker_status_ready_charging.png" />
-                            <img v-else-if="device[3] < 20" src="./images/tracker_status_ready_low.png" />
-                            <img v-else src="./images/tracker_status_ready.png" />
+                                src="/images/vr/tracker_status_ready_charging.png" />
+                            <img v-else-if="device[3] < 20" src="/images/vr/tracker_status_ready_low.png" />
+                            <img v-else src="/images/vr/tracker_status_ready.png" />
                             <span>{{ device[3] }}%</span>
                         </div>
                         <div
                             v-else-if="device[0] === 'base'"
                             class="tracker-device"
                             :class="trackingResultToClass(device[4])">
-                            <img v-if="device[1] !== 'connected'" src="./images/base_status_off.png" />
-                            <img v-else src="./images/base_status_ready.png" />
+                            <img v-if="device[1] !== 'connected'" src="/images/vr/base_status_off.png" />
+                            <img v-else src="/images/vr/base_status_ready.png" />
                             <span v-if="device[3] !== 100">{{ device[3] }}x</span>
                         </div>
                     </div>
@@ -1248,7 +1245,9 @@
                         :style="{ width: nowPlaying.percentage + '%' }"></div>
                 </template>
                 <div style="float: right">
-                    <span v-if="!config?.minimalFeed" style="display: inline-block">{{ t('vr.status.timer') }}</span>
+                    <span v-if="!config?.minimalFeed" style="display: inline-block; margin-right: 5px">{{
+                        t('vr.status.timer')
+                    }}</span>
                     <span v-if="lastLocationTimer" style="display: inline-block; margin-right: 5px">{{
                         lastLocationTimer
                     }}</span>
@@ -1262,7 +1261,9 @@
                     <span v-if="pcUptime" style="display: inline-block; margin-left: 5px">{{ pcUptime }}</span>
                 </div>
                 <template v-if="lastLocation.playerList.length">
-                    <span v-if="!config?.minimalFeed" style="display: inline-block">{{ t('vr.status.players') }}</span>
+                    <span v-if="!config?.minimalFeed" style="display: inline-block; margin-right: 5px">{{
+                        t('vr.status.players')
+                    }}</span>
                     <span style="display: inline-block">{{ lastLocation.playerList.length }}</span>
                 </template>
                 <span
@@ -1279,9 +1280,9 @@
                 <span style="display: inline-block">{{ t('vr.status.online') }} {{ onlineFriendCount }}</span>
                 <span style="display: inline-block; margin-left: 5px">{{ customInfo }}</span>
             </div>
-        </template>
+        </div>
         <!-- HMD Overlay -->
-        <template v-else>
+        <div class="hmd">
             <svg class="np-progress-circle">
                 <circle
                     class="np-progress-circle-stroke"
@@ -1358,7 +1359,7 @@
                             >
                             <span v-else-if="feed.platform === 'VR'" style="color: #409eff; margin-left: 10px">VR</span>
                             <span v-else-if="feed.platform === 'Quest'" style="color: #67c23a; margin-left: 10px"
-                                >Quest</span
+                                >Android</span
                             >
                             <span v-else-if="feed.platform === 'iOS'" style="color: #c7c7ce; margin-left: 10px"
                                 >iOS</span
@@ -1402,12 +1403,12 @@
                         d="M102.9,75l11.3-11.3c10.3-10.3,11.5-26.1,3.8-37.8l17.4-17.4L126.9,0l-17.4,17.4C97.9,9.7,82,11,71.8,21.2L60.5,32.5C102,74,60.8,32.9,102.9,75z"></path>
                 </svg>
             </div>
-        </template>
+        </div>
     </div>
 </template>
 
 <script setup>
-    import { nextTick, onMounted, reactive, toRefs } from 'vue';
+    import { nextTick, onBeforeUnmount, onMounted, reactive, toRefs } from 'vue';
     import { useI18n } from 'vue-i18n';
 
     import MarqueeText from 'vue-marquee-text-component';
@@ -1416,6 +1417,7 @@
     import { escapeTag, escapeTagRecursive } from '../shared/utils/base/string';
     import { changeHtmlLangAttribute } from '../shared/utils/base/ui';
     import { displayLocation } from '../shared/utils/location';
+    import { loadLocalizedStrings } from '../plugin/i18n';
     import { removeFromArray } from '../shared/utils/base/array';
     import { timeToText } from '../shared/utils/base/format';
 
@@ -1423,20 +1425,17 @@
 
     import * as workerTimers from 'worker-timers';
 
-    import './vr.scss';
+    import './vr.css';
 
     defineOptions({
         name: 'vr'
     });
 
-    const i18n = useI18n();
-
-    const { t } = i18n;
+    const { t, locale } = useI18n();
 
     const vrState = reactive({
-        appType: new URLSearchParams(window.location.search).has('wrist') ? 'wrist' : 'hmd',
         appLanguage: 'en',
-        currentCulture: 'en-nz',
+        currentCulture: 'en-gb',
         currentTime: new Date().toJSON(),
         cpuUsageEnabled: false,
         cpuUsage: '0',
@@ -1472,8 +1471,15 @@
         notificationOpacity: 100,
         hudFeed: [],
         hudTimeout: [],
-        cleanHudFeedLoopStatus: false
+        cleanHudFeedLoopStatus: false,
+        isHmdDisabled: false,
+        isWristDisabled: false
     });
+
+    let isUnmounted = false;
+    let updateStatsLoopTimeoutId = null;
+    let updateVrElectronLoopTimeoutId = null;
+    let cleanHudFeedLoopTimeoutId = null;
 
     onMounted(() => {
         window.$vr = {};
@@ -1503,10 +1509,8 @@
         if (LINUX) {
             updateVrElectronLoop();
         }
-        if (vrState.appType === 'wrist') {
-            refreshCustomScript();
-            updateStatsLoop();
-        }
+        refreshCustomScript();
+        updateStatsLoop();
         setDatetimeFormat();
 
         nextTick(() => {
@@ -1514,8 +1518,71 @@
         });
     });
 
+    onBeforeUnmount(() => {
+        isUnmounted = true;
+
+        if (updateStatsLoopTimeoutId !== null) {
+            workerTimers.clearTimeout(updateStatsLoopTimeoutId);
+            updateStatsLoopTimeoutId = null;
+        }
+        if (updateVrElectronLoopTimeoutId !== null) {
+            workerTimers.clearTimeout(updateVrElectronLoopTimeoutId);
+            updateVrElectronLoopTimeoutId = null;
+        }
+        if (cleanHudFeedLoopTimeoutId !== null) {
+            workerTimers.clearTimeout(cleanHudFeedLoopTimeoutId);
+            cleanHudFeedLoopTimeoutId = null;
+        }
+
+        try {
+            Noty.closeAll();
+        } catch (err) {
+            console.error('Error closing Noty notifications:', err);
+        }
+
+        if (typeof window.$vr === 'object' && window.$vr) {
+            for (const key of Object.keys(window.$vr)) {
+                delete window.$vr[key];
+            }
+        }
+        try {
+            delete window.$vr;
+        } catch {
+            window.$vr = undefined;
+        }
+    });
+
+    /**
+     * VR overlay config payload (passed as JSON string).
+     * @typedef {Object} VrConfigVarsPayload
+     * @property {boolean} overlayNotifications
+     * @property {boolean} hideDevicesFromFeed
+     * @property {boolean} vrOverlayCpuUsage
+     * @property {boolean} minimalFeed
+     * @property {string} notificationPosition
+     * @property {number} notificationTimeout
+     * @property {number} photonOverlayMessageTimeout
+     * @property {string} notificationTheme
+     * @property {boolean} backgroundEnabled
+     * @property {boolean} dtHour12
+     * @property {boolean} pcUptimeOnFeed
+     * @property {string} appLanguage
+     * @property {number} notificationOpacity
+     * @property {boolean} isWristDisabled
+     */
+
+    /**
+     * @param {string} json
+     * @returns {void}
+     */
     function configUpdate(json) {
         vrState.config = JSON.parse(json);
+        if (vrState.config.isWristDisabled) {
+            vrState.isWristDisabled = true;
+        }
+        if (!vrState.config.overlayNotifications) {
+            vrState.isHmdDisabled = false;
+        }
         vrState.hudFeed = [];
         vrState.hudTimeout = [];
         setDatetimeFormat();
@@ -1541,19 +1608,17 @@
 
     function nowPlayingUpdate(json) {
         vrState.nowPlaying = JSON.parse(json);
-        if (vrState.appType === 'hmd') {
-            const circle = /** @type {SVGCircleElement} */ (document.querySelector('.np-progress-circle-stroke'));
+        const circle = /** @type {SVGCircleElement} */ (document.querySelector('.np-progress-circle-stroke'));
 
-            if (vrState.lastLocation.progressPie && vrState.nowPlaying.percentage !== 0) {
-                circle.style.opacity = (0.5).toString();
-                const circumference = circle.getTotalLength();
-                circle.style.strokeDashoffset = (
-                    circumference -
-                    (vrState.nowPlaying.percentage / 100) * circumference
-                ).toString();
-            } else {
-                circle.style.opacity = '0';
-            }
+        if (vrState.lastLocation.progressPie && vrState.nowPlaying.percentage !== 0) {
+            circle.style.opacity = (0.5).toString();
+            const circumference = circle.getTotalLength();
+            circle.style.strokeDashoffset = (
+                circumference -
+                (vrState.nowPlaying.percentage / 100) * circumference
+            ).toString();
+        } else {
+            circle.style.opacity = '0';
         }
         updateFeedLength();
     }
@@ -1568,7 +1633,7 @@
     }
 
     function updateFeedLength() {
-        if (vrState.appType === 'hmd' || vrState.wristFeed.length === 0) {
+        if (vrState.wristFeed.length === 0) {
             return;
         }
         let length = 16;
@@ -1700,46 +1765,35 @@
         } catch (err) {
             console.error(err);
         }
-        workerTimers.setTimeout(() => updateStatsLoop(), 500);
+        if (isUnmounted) {
+            return;
+        }
+        updateStatsLoopTimeoutId = workerTimers.setTimeout(() => updateStatsLoop(), 500);
     }
 
     async function updateVrElectronLoop() {
         try {
-            if (vrState.appType === 'wrist') {
-                const wristOverlayQueue = await AppApiVr.GetExecuteVrFeedFunctionQueue();
-                if (wristOverlayQueue) {
-                    wristOverlayQueue.forEach((item) => {
-                        // item[0] is the function name, item[1] is already an object
-                        const fullFunctionName = item[0];
-                        const jsonArg = item[1];
+            const overlayQueue = await AppApiVr.GetExecuteVrOverlayFunctionQueue();
+            if (overlayQueue) {
+                overlayQueue.forEach((item) => {
+                    // item[0] is the function name, item[1] is already an object
+                    const fullFunctionName = item[0];
+                    const jsonArg = item[1];
 
-                        if (typeof window.$app === 'object' && typeof window.$app[fullFunctionName] === 'function') {
-                            window.$app[fullFunctionName](jsonArg);
-                        } else {
-                            console.error(`$app.${fullFunctionName} is not defined or is not a function`);
-                        }
-                    });
-                }
-            } else {
-                const hmdOverlayQueue = await AppApiVr.GetExecuteVrOverlayFunctionQueue();
-                if (hmdOverlayQueue) {
-                    hmdOverlayQueue.forEach((item) => {
-                        // item[0] is the function name, item[1] is already an object
-                        const fullFunctionName = item[0];
-                        const jsonArg = item[1];
-
-                        if (typeof window.$app === 'object' && typeof window.$app[fullFunctionName] === 'function') {
-                            window.$app[fullFunctionName](jsonArg);
-                        } else {
-                            console.error(`$app.${fullFunctionName} is not defined or is not a function`);
-                        }
-                    });
-                }
+                    if (typeof window.$vr === 'object' && typeof window.$vr[fullFunctionName] === 'function') {
+                        window.$vr[fullFunctionName](jsonArg);
+                    } else {
+                        console.error(`$vr.${fullFunctionName} is not defined or is not a function`);
+                    }
+                });
             }
         } catch (err) {
             console.error(err);
         }
-        workerTimers.setTimeout(() => updateVrElectronLoop(), 500);
+        if (isUnmounted) {
+            return;
+        }
+        updateVrElectronLoopTimeoutId = workerTimers.setTimeout(() => updateVrElectronLoop(), 500);
     }
 
     function playNoty(json) {
@@ -1941,7 +1995,10 @@
             vrState.cleanHudFeedLoopStatus = false;
             return;
         }
-        workerTimers.setTimeout(() => cleanHudFeedLoop(), 500);
+        if (isUnmounted) {
+            return;
+        }
+        cleanHudFeedLoopTimeoutId = workerTimers.setTimeout(() => cleanHudFeedLoop(), 500);
     }
 
     function cleanHudFeed() {
@@ -2009,16 +2066,15 @@
             .replace(' pm', '');
     };
 
-    function setAppLanguage(appLanguage) {
+    async function setAppLanguage(appLanguage) {
         if (!appLanguage) {
             return;
         }
-        if (appLanguage !== vrState.appLanguage) {
-            vrState.appLanguage = appLanguage;
-            changeHtmlLangAttribute(vrState.appLanguage);
-            //@ts-ignore
-            i18n.locale = vrState.appLanguage;
-        }
+        vrState.appLanguage = appLanguage;
+
+        await loadLocalizedStrings(appLanguage);
+        changeHtmlLangAttribute(vrState.appLanguage);
+        locale.value = vrState.appLanguage;
     }
 
     function trackingResultToClass(deviceStatus) {
@@ -2039,7 +2095,6 @@
     }
 
     const {
-        appType,
         config,
         wristFeed,
         devices,

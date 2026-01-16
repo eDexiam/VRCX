@@ -1,440 +1,143 @@
 <template>
-    <div class="x-container feed">
-        <div style="margin: 0 0 10px; display: flex; align-items: center">
-            <div style="flex: none; margin-right: 10px; display: flex; align-items: center">
-                <el-tooltip placement="bottom" :content="t('view.feed.favorites_only_tooltip')">
-                    <el-switch v-model="feedTable.vip" active-color="#13ce66" @change="feedTableLookup"></el-switch>
-                </el-tooltip>
-            </div>
-            <el-select
-                v-model="feedTable.filter"
-                multiple
-                clearable
-                style="flex: 1"
-                :placeholder="t('view.feed.filter_placeholder')"
-                @change="feedTableLookup">
-                <el-option
-                    v-for="type in ['GPS', 'Online', 'Offline', 'Status', 'Avatar', 'Bio']"
-                    :key="type"
-                    :label="t('view.feed.filters.' + type)"
-                    :value="type"></el-option>
-            </el-select>
-            <el-input
-                v-model="feedTable.search"
-                :placeholder="t('view.feed.search_placeholder')"
-                clearable
-                style="flex: 0.4; margin-left: 10px"
-                @keyup.enter="feedTableLookup"
-                @change="feedTableLookup"></el-input>
-        </div>
-
-        <DataTable v-bind="feedTable">
-            <el-table-column type="expand" width="20">
-                <template #default="scope">
-                    <div style="position: relative; font-size: 14px">
-                        <template v-if="scope.row.type === 'GPS'">
-                            <Location
-                                v-if="scope.row.previousLocation"
-                                :location="scope.row.previousLocation"
-                                style="display: inline-block" />
-                            <el-tag type="info" effect="plain" size="small" style="margin-left: 5px">{{
-                                timeToText(scope.row.time)
-                            }}</el-tag>
-                            <br />
-                            <span style="margin-right: 5px">
-                                <el-icon><Right /></el-icon>
-                            </span>
-                            <Location
-                                v-if="scope.row.location"
-                                :location="scope.row.location"
-                                :hint="scope.row.worldName"
-                                :grouphint="scope.row.groupName" />
-                        </template>
-                        <template v-else-if="scope.row.type === 'Offline'">
-                            <template v-if="scope.row.location">
-                                <Location
-                                    :location="scope.row.location"
-                                    :hint="scope.row.worldName"
-                                    :grouphint="scope.row.groupName" />
-                                <el-tag type="info" effect="plain" size="small" style="margin-left: 5px">{{
-                                    timeToText(scope.row.time)
-                                }}</el-tag>
-                            </template>
-                        </template>
-                        <template v-else-if="scope.row.type === 'Online'">
-                            <Location
-                                v-if="scope.row.location"
-                                :location="scope.row.location"
-                                :hint="scope.row.worldName"
-                                :grouphint="scope.row.groupName" />
-                        </template>
-                        <template v-else-if="scope.row.type === 'Avatar'">
-                            <div style="display: flex; align-items: center">
-                                <el-popover placement="right" :width="500" trigger="click">
-                                    <template #reference>
-                                        <div style="display: inline-block; vertical-align: top; width: 160px">
-                                            <template v-if="scope.row.previousCurrentAvatarThumbnailImageUrl">
-                                                <img
-                                                    :src="scope.row.previousCurrentAvatarThumbnailImageUrl"
-                                                    class="x-link"
-                                                    style="flex: none; width: 160px; height: 120px; border-radius: 4px"
-                                                    loading="lazy" />
-                                                <br />
-                                                <AvatarInfo
-                                                    :imageurl="scope.row.previousCurrentAvatarThumbnailImageUrl"
-                                                    :userid="scope.row.userId"
-                                                    :hintownerid="scope.row.previousOwnerId"
-                                                    :hintavatarname="scope.row.previousAvatarName"
-                                                    :avatartags="scope.row.previousCurrentAvatarTags" />
-                                            </template>
-                                        </div>
-                                    </template>
-                                    <img
-                                        :src="scope.row.previousCurrentAvatarImageUrl"
-                                        :class="['x-link', 'x-popover-image']"
-                                        @click="showFullscreenImageDialog(scope.row.previousCurrentAvatarImageUrl)"
-                                        loading="lazy" />
-                                </el-popover>
-                                <span style="position: relative; margin: 0 10px">
-                                    <el-icon><Right /></el-icon>
-                                </span>
-                                <el-popover placement="right" :width="500" trigger="click">
-                                    <template #reference>
-                                        <div style="display: inline-block; vertical-align: top; width: 160px">
-                                            <template v-if="scope.row.currentAvatarThumbnailImageUrl">
-                                                <img
-                                                    :src="scope.row.currentAvatarThumbnailImageUrl"
-                                                    class="x-link"
-                                                    style="flex: none; width: 160px; height: 120px; border-radius: 4px"
-                                                    loading="lazy" />
-                                                <br />
-                                                <AvatarInfo
-                                                    :imageurl="scope.row.currentAvatarThumbnailImageUrl"
-                                                    :userid="scope.row.userId"
-                                                    :hintownerid="scope.row.ownerId"
-                                                    :hintavatarname="scope.row.avatarName"
-                                                    :avatartags="scope.row.currentAvatarTags" />
-                                            </template>
-                                        </div>
-                                    </template>
-                                    <img
-                                        :src="scope.row.currentAvatarImageUrl"
-                                        :class="['x-link', 'x-popover-image']"
-                                        @click="showFullscreenImageDialog(scope.row.currentAvatarImageUrl)"
-                                        loading="lazy" />
-                                </el-popover>
-                            </div>
-                        </template>
-                        <template v-else-if="scope.row.type === 'Status'">
-                            <el-tooltip placement="top">
-                                <template #content>
-                                    <span v-if="scope.row.previousStatus === 'active'">{{
-                                        t('dialog.user.status.active')
-                                    }}</span>
-                                    <span v-else-if="scope.row.previousStatus === 'join me'">{{
-                                        t('dialog.user.status.join_me')
-                                    }}</span>
-                                    <span v-else-if="scope.row.previousStatus === 'ask me'">{{
-                                        t('dialog.user.status.ask_me')
-                                    }}</span>
-                                    <span v-else-if="scope.row.previousStatus === 'busy'">{{
-                                        t('dialog.user.status.busy')
-                                    }}</span>
-                                    <span v-else>{{ t('dialog.user.status.offline') }}</span>
-                                </template>
-                                <i class="x-user-status" :class="statusClass(scope.row.previousStatus)"></i>
-                            </el-tooltip>
-                            <span style="margin-left: 5px" v-text="scope.row.previousStatusDescription"></span>
-                            <br />
-                            <span>
-                                <el-icon><Right /></el-icon>
-                            </span>
-                            <el-tooltip placement="top">
-                                <template #content>
-                                    <span v-if="scope.row.status === 'active'">{{
-                                        t('dialog.user.status.active')
-                                    }}</span>
-                                    <span v-else-if="scope.row.status === 'join me'">{{
-                                        t('dialog.user.status.join_me')
-                                    }}</span>
-                                    <span v-else-if="scope.row.status === 'ask me'">{{
-                                        t('dialog.user.status.ask_me')
-                                    }}</span>
-                                    <span v-else-if="scope.row.status === 'busy'">{{
-                                        t('dialog.user.status.busy')
-                                    }}</span>
-                                    <span v-else>{{ t('dialog.user.status.offline') }}</span>
-                                </template>
-                                <i
-                                    class="x-user-status"
-                                    :class="statusClass(scope.row.status)"
-                                    style="margin: 0 5px"></i>
-                            </el-tooltip>
-                            <span v-text="scope.row.statusDescription"></span>
-                        </template>
-                        <template v-else-if="scope.row.type === 'Bio'">
-                            <pre
-                                style="font-family: inherit; font-size: 12px; white-space: pre-wrap; line-height: 22px"
-                                v-html="formatDifference(scope.row.previousBio, scope.row.bio)"></pre>
-                        </template>
+    <div class="x-container feed" ref="feedRef">
+        <DataTableLayout
+            :table="table"
+            :loading="feedTable.loading"
+            :table-style="tableHeightStyle"
+            :page-sizes="pageSizes"
+            :total-items="totalItems"
+            :on-page-size-change="handlePageSizeChange">
+            <template #toolbar>
+                <div style="margin: 0 0 10px; display: flex; align-items: center">
+                    <div style="flex: none; margin-right: 10px; display: flex; align-items: center">
+                        <TooltipWrapper side="bottom" :content="t('view.feed.favorites_only_tooltip')">
+                            <Switch v-model="feedTable.vip" @update:modelValue="feedTableLookup" />
+                        </TooltipWrapper>
                     </div>
-                </template>
-            </el-table-column>
-
-            <el-table-column :label="t('table.feed.date')" prop="created_at" :sortable="true" width="130">
-                <template #default="scope">
-                    <el-tooltip placement="right">
-                        <template #content>
-                            <span>{{ formatDateFilter(scope.row.created_at, 'long') }}</span>
-                        </template>
-                        <span>{{ formatDateFilter(scope.row.created_at, 'short') }}</span>
-                    </el-tooltip>
-                </template>
-            </el-table-column>
-
-            <el-table-column :label="t('table.feed.type')" prop="type" width="80">
-                <template #default="scope">
-                    <span v-text="t('view.feed.filters.' + scope.row.type)"></span>
-                </template>
-            </el-table-column>
-
-            <el-table-column :label="t('table.feed.user')" prop="displayName" width="180">
-                <template #default="scope">
-                    <span
-                        class="x-link"
-                        style="padding-right: 10px"
-                        @click="showUserDialog(scope.row.userId)"
-                        v-text="scope.row.displayName"></span>
-                </template>
-            </el-table-column>
-
-            <el-table-column :label="t('table.feed.detail')">
-                <template #default="scope">
-                    <template v-if="scope.row.type === 'GPS'">
-                        <Location
-                            v-if="scope.row.location"
-                            :location="scope.row.location"
-                            :hint="scope.row.worldName"
-                            :grouphint="scope.row.groupName" />
-                    </template>
-                    <template v-else-if="scope.row.type === 'Offline' || scope.row.type === 'Online'">
-                        <Location
-                            v-if="scope.row.location"
-                            :location="scope.row.location"
-                            :hint="scope.row.worldName"
-                            :grouphint="scope.row.groupName" />
-                    </template>
-                    <template v-else-if="scope.row.type === 'Status'">
-                        <template v-if="scope.row.statusDescription === scope.row.previousStatusDescription">
-                            <el-tooltip placement="top">
-                                <template #content>
-                                    <span v-if="scope.row.previousStatus === 'active'">{{
-                                        t('dialog.user.status.active')
-                                    }}</span>
-                                    <span v-else-if="scope.row.previousStatus === 'join me'">{{
-                                        t('dialog.user.status.join_me')
-                                    }}</span>
-                                    <span v-else-if="scope.row.previousStatus === 'ask me'">{{
-                                        t('dialog.user.status.ask_me')
-                                    }}</span>
-                                    <span v-else-if="scope.row.previousStatus === 'busy'">{{
-                                        t('dialog.user.status.busy')
-                                    }}</span>
-                                    <span v-else>{{ t('dialog.user.status.offline') }}</span>
-                                </template>
-                                <i class="x-user-status" :class="statusClass(scope.row.previousStatus)"></i>
-                            </el-tooltip>
-                            <span style="margin: 0 5px">
-                                <el-icon><Right /></el-icon>
-                            </span>
-                            <el-tooltip placement="top">
-                                <template #content>
-                                    <span v-if="scope.row.status === 'active'">{{
-                                        t('dialog.user.status.active')
-                                    }}</span>
-                                    <span v-else-if="scope.row.status === 'join me'">{{
-                                        t('dialog.user.status.join_me')
-                                    }}</span>
-                                    <span v-else-if="scope.row.status === 'ask me'">{{
-                                        t('dialog.user.status.ask_me')
-                                    }}</span>
-                                    <span v-else-if="scope.row.status === 'busy'">{{
-                                        t('dialog.user.status.busy')
-                                    }}</span>
-                                    <span v-else>{{ t('dialog.user.status.offline') }}</span>
-                                </template>
-                                <i class="x-user-status" :class="statusClass(scope.row.status)"></i>
-                            </el-tooltip>
-                        </template>
-                        <template v-else>
-                            <el-tooltip placement="top">
-                                <template #content>
-                                    <span v-if="scope.row.status === 'active'">{{
-                                        t('dialog.user.status.active')
-                                    }}</span>
-                                    <span v-else-if="scope.row.status === 'join me'">{{
-                                        t('dialog.user.status.join_me')
-                                    }}</span>
-                                    <span v-else-if="scope.row.status === 'ask me'">{{
-                                        t('dialog.user.status.ask_me')
-                                    }}</span>
-                                    <span v-else-if="scope.row.status === 'busy'">{{
-                                        t('dialog.user.status.busy')
-                                    }}</span>
-                                    <span v-else>{{ t('dialog.user.status.offline') }}</span>
-                                </template>
-                                <i
-                                    class="x-user-status"
-                                    :class="statusClass(scope.row.status)"
-                                    style="margin-right: 3px"></i>
-                            </el-tooltip>
-                            <span v-text="scope.row.statusDescription"></span>
-                        </template>
-                    </template>
-                    <template v-else-if="scope.row.type === 'Avatar'">
-                        <AvatarInfo
-                            :imageurl="scope.row.currentAvatarImageUrl"
-                            :userid="scope.row.userId"
-                            :hintownerid="scope.row.ownerId"
-                            :hintavatarname="scope.row.avatarName"
-                            :avatartags="scope.row.currentAvatarTags" />
-                    </template>
-                    <template v-else-if="scope.row.type === 'Bio'">
-                        <span v-text="scope.row.bio"></span>
-                    </template>
-                </template>
-            </el-table-column>
-        </DataTable>
+                    <Select
+                        multiple
+                        :model-value="Array.isArray(feedTable.filter) ? feedTable.filter : []"
+                        @update:modelValue="handleFeedFilterChange">
+                        <SelectTrigger class="w-full" style="flex: 1">
+                            <SelectValue :placeholder="t('view.feed.filter_placeholder')" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectGroup>
+                                <SelectItem
+                                    v-for="type in ['GPS', 'Online', 'Offline', 'Status', 'Avatar', 'Bio']"
+                                    :key="type"
+                                    :value="type">
+                                    {{ t('view.feed.filters.' + type) }}
+                                </SelectItem>
+                            </SelectGroup>
+                        </SelectContent>
+                    </Select>
+                    <InputGroupField
+                        v-model="feedTable.search"
+                        :placeholder="t('view.feed.search_placeholder')"
+                        clearable
+                        style="flex: 0.4; margin-left: 10px"
+                        @keyup.enter="feedTableLookup"
+                        @change="feedTableLookup" />
+                </div>
+            </template>
+        </DataTableLayout>
     </div>
 </template>
 
 <script setup>
-    import { Right } from '@element-plus/icons-vue';
+    import { computed, ref, watch } from 'vue';
     import { storeToRefs } from 'pinia';
     import { useI18n } from 'vue-i18n';
 
-    import { useFeedStore, useGalleryStore, useUiStore, useUserStore } from '../../stores';
-    import { formatDateFilter, statusClass, timeToText } from '../../shared/utils';
+    import {
+        Select,
+        SelectContent,
+        SelectGroup,
+        SelectItem,
+        SelectTrigger,
+        SelectValue
+    } from '../../components/ui/select';
+    import { useAppearanceSettingsStore, useFeedStore, useVrcxStore } from '../../stores';
+    import { DataTableLayout } from '../../components/ui/data-table';
+    import { InputGroupField } from '../../components/ui/input-group';
+    import { Switch } from '../../components/ui/switch';
+    import { columns as baseColumns } from './columns.jsx';
+    import { useDataTableScrollHeight } from '../../composables/useDataTableScrollHeight';
+    import { useVrcxVueTable } from '../../lib/table/useVrcxVueTable';
 
-    const { showUserDialog } = useUserStore();
     const { feedTable } = storeToRefs(useFeedStore());
     const { feedTableLookup } = useFeedStore();
-    const { showFullscreenImageDialog } = useGalleryStore();
+    const appearanceSettingsStore = useAppearanceSettingsStore();
+    const vrcxStore = useVrcxStore();
+
+    const feedDisplayData = computed(() => feedTable.value.data.slice().reverse());
 
     const { t } = useI18n();
 
-    /**
-     * Function that format the differences between two strings with HTML tags
-     * markerStartTag and markerEndTag are optional, if emitted, the differences will be highlighted with yellow and underlined.
-     * @param {*} s1
-     * @param {*} s2
-     * @param {*} markerStartTag
-     * @param {*} markerEndTag
-     * @returns An array that contains both the string 1 and string 2, which the differences are formatted with HTML tags
-     */
+    const feedRef = ref(null);
 
-    //function getWordDifferences
-    function formatDifference(
-        oldString,
-        newString,
-        markerAddition = '<span class="x-text-added">{{text}}</span>',
-        markerDeletion = '<span class="x-text-removed">{{text}}</span>'
-    ) {
-        [oldString, newString] = [oldString, newString].map((s) =>
-            s
-                .replaceAll(/&/g, '&amp;')
-                .replaceAll(/</g, '&lt;')
-                .replaceAll(/>/g, '&gt;')
-                .replaceAll(/"/g, '&quot;')
-                .replaceAll(/'/g, '&#039;')
-                .replaceAll(/\n/g, '<br>')
-        );
+    // TODO: simplify
+    const { tableStyle: tableHeightStyle } = useDataTableScrollHeight(feedRef, {
+        offset: 30,
+        toolbarHeight: 54,
+        paginationHeight: 52
+    });
 
-        const oldWords = oldString.split(/\s+/).flatMap((word) => word.split(/(<br>)/));
-        const newWords = newString.split(/\s+/).flatMap((word) => word.split(/(<br>)/));
+    const pageSizes = computed(() => appearanceSettingsStore.tablePageSizes);
+    const pageSize = computed(() =>
+        feedTable.value.pageSizeLinked ? appearanceSettingsStore.tablePageSize : feedTable.value.pageSize
+    );
 
-        function findLongestMatch(oldStart, oldEnd, newStart, newEnd) {
-            let bestOldStart = oldStart;
-            let bestNewStart = newStart;
-            let bestSize = 0;
-
-            const lookup = new Map();
-            for (let i = oldStart; i < oldEnd; i++) {
-                const word = oldWords[i];
-                if (!lookup.has(word)) lookup.set(word, []);
-                lookup.get(word).push(i);
-            }
-
-            for (let j = newStart; j < newEnd; j++) {
-                const word = newWords[j];
-                if (!lookup.has(word)) continue;
-
-                for (const i of lookup.get(word)) {
-                    let size = 0;
-                    while (i + size < oldEnd && j + size < newEnd && oldWords[i + size] === newWords[j + size]) {
-                        size++;
-                    }
-                    if (size > bestSize) {
-                        bestOldStart = i;
-                        bestNewStart = j;
-                        bestSize = size;
-                    }
-                }
-            }
-
-            return {
-                oldStart: bestOldStart,
-                newStart: bestNewStart,
-                size: bestSize
-            };
+    const { table, pagination } = useVrcxVueTable({
+        persistKey: 'feed',
+        data: feedDisplayData,
+        columns: baseColumns,
+        getRowId: (row) => `${row.type}:${row.rowId}:${row.created_at ?? ''}`,
+        enableExpanded: true,
+        getRowCanExpand: () => true,
+        initialSorting: [],
+        initialExpanded: {},
+        initialPagination: {
+            pageIndex: 0,
+            pageSize: pageSize.value
         }
+    });
 
-        function buildDiff(oldStart, oldEnd, newStart, newEnd) {
-            const result = [];
-            const match = findLongestMatch(oldStart, oldEnd, newStart, newEnd);
+    const totalItems = computed(() => {
+        const length = table.getFilteredRowModel().rows.length;
+        const max = vrcxStore.maxTableSize;
+        return length > max && length < max + 51 ? max : length;
+    });
 
-            if (match.size > 0) {
-                // Handle differences before the match
-                if (oldStart < match.oldStart || newStart < match.newStart) {
-                    result.push(...buildDiff(oldStart, match.oldStart, newStart, match.newStart));
-                }
-
-                // Add the matched words
-                result.push(oldWords.slice(match.oldStart, match.oldStart + match.size).join(' '));
-
-                // Handle differences after the match
-                if (match.oldStart + match.size < oldEnd || match.newStart + match.size < newEnd) {
-                    result.push(...buildDiff(match.oldStart + match.size, oldEnd, match.newStart + match.size, newEnd));
-                }
-            } else {
-                function build(words, start, end, pattern) {
-                    let r = [];
-                    let ts = words
-                        .slice(start, end)
-                        .filter((w) => w.length > 0)
-                        .join(' ')
-                        .split('<br>');
-                    for (let i = 0; i < ts.length; i++) {
-                        if (i > 0) r.push('<br>');
-                        if (ts[i].length < 1) continue;
-                        r.push(pattern.replace('{{text}}', ts[i]));
-                    }
-                    return r;
-                }
-
-                // Add deletions
-                if (oldStart < oldEnd) result.push(...build(oldWords, oldStart, oldEnd, markerDeletion));
-
-                // Add insertions
-                if (newStart < newEnd) result.push(...build(newWords, newStart, newEnd, markerAddition));
-            }
-
-            return result;
+    const handlePageSizeChange = (size) => {
+        if (feedTable.value.pageSizeLinked) {
+            appearanceSettingsStore.setTablePageSize(size);
+        } else {
+            feedTable.value.pageSize = size;
         }
+    };
 
-        return buildDiff(0, oldWords.length, 0, newWords.length)
-            .join(' ')
-            .replace(/<br>[ ]+<br>/g, '<br><br>')
-            .replace(/<br> /g, '<br>');
+    function handleFeedFilterChange(value) {
+        feedTable.value.filter = Array.isArray(value) ? value : [];
+        feedTableLookup();
     }
+
+    watch(pageSize, (size) => {
+        if (pagination.value.pageSize === size) {
+            return;
+        }
+        pagination.value = {
+            ...pagination.value,
+            pageIndex: 0,
+            pageSize: size
+        };
+        table.setPageSize(size);
+    });
 </script>
+
+<style scoped>
+    .table-user {
+        color: var(--x-table-user-text-color) !important;
+    }
+</style>

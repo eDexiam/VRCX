@@ -1,6 +1,6 @@
-import { reactive, ref, watch } from 'vue';
-import { ElMessage, ElMessageBox } from 'element-plus';
+import { reactive, ref, shallowReactive, watch } from 'vue';
 import { defineStore } from 'pinia';
+import { toast } from 'vue-sonner';
 
 import dayjs from 'dayjs';
 
@@ -22,6 +22,7 @@ import { useGameStore } from './game';
 import { useGeneralSettingsStore } from './settings/general';
 import { useInstanceStore } from './instance';
 import { useLocationStore } from './location';
+import { useModalStore } from './modal';
 import { useNotificationStore } from './notification';
 import { usePhotonStore } from './photon';
 import { useSharedFeedStore } from './sharedFeed';
@@ -53,31 +54,19 @@ export const useGameLogStore = defineStore('GameLog', () => {
     const galleryStore = useGalleryStore();
     const photonStore = usePhotonStore();
     const sharedFeedStore = useSharedFeedStore();
+    const modalStore = useModalStore();
 
     const state = reactive({
         lastLocationAvatarList: new Map()
     });
 
     const gameLogTable = ref({
-        data: [],
+        data: shallowReactive([]),
         loading: false,
         search: '',
         filter: [],
-        tableProps: {
-            stripe: true,
-            size: 'small',
-            defaultSort: {
-                prop: 'created_at',
-                order: 'descending'
-            }
-        },
-        pageSize: 15,
+        pageSize: 20,
         pageSizeLinked: true,
-        paginationProps: {
-            small: true,
-            layout: 'sizes,prev,pager,next,total',
-            pageSizes: [10, 15, 20, 25, 50, 100]
-        },
         vip: false
     });
 
@@ -103,10 +92,13 @@ export const useGameLogStore = defineStore('GameLog', () => {
     watch(
         () => watchState.isLoggedIn,
         (isLoggedIn) => {
-            gameLogTable.value.data = [];
+            gameLogTable.value.data.length = 0;
             gameLogSessionTable.value = [];
             if (isLoggedIn) {
-                initGameLogTable();
+                // wait for friends to load, silly but works
+                setTimeout(() => {
+                    initGameLogTable();
+                }, 800);
             }
         },
         { flush: 'sync' }
@@ -349,16 +341,25 @@ export const useGameLogStore = defineStore('GameLog', () => {
         if (gameLogTable.value.vip) {
             vipList = Array.from(friendStore.localFavoriteFriends.values());
         }
-        gameLogTable.value.data = await database.lookupGameLogDatabase(
+        const rows = await database.lookupGameLogDatabase(
             gameLogTable.value.search,
             gameLogTable.value.filter,
             vipList
         );
+
+        for (const row of rows) {
+            row.isFriend = gameLogIsFriend(row);
+            row.isFavorite = gameLogIsFavorite(row);
+        }
+        gameLogTable.value.data = shallowReactive(rows);
         gameLogTable.value.loading = false;
     }
 
     function addGameLog(entry) {
+        entry.isFriend = gameLogIsFriend(entry);
+        entry.isFavorite = gameLogIsFavorite(entry);
         gameLogSessionTable.value.push(entry);
+        sweepGameLogSessionTable();
         sharedFeedStore.updateSharedFeed(false);
         if (entry.type === 'VideoPlay') {
             // event time can be before last gameLog entry
@@ -398,7 +399,39 @@ export const useGameLogStore = defineStore('GameLog', () => {
         }
         gameLogTable.value.data.push(entry);
         sweepGameLog();
-        uiStore.notifyMenu('gameLog');
+        uiStore.notifyMenu('game-log');
+    }
+
+    function sweepGameLogSessionTable() {
+        const data = gameLogSessionTable.value;
+        const k = data.length;
+        if (!k) {
+            return;
+        }
+
+        // 24 hour limit
+        const date = new Date();
+        date.setDate(date.getDate() - 1);
+        const limit = date.toJSON();
+
+        if (data[0].created_at < limit) {
+            let i = 0;
+            while (i < k && data[i].created_at < limit) {
+                ++i;
+            }
+            if (i === k) {
+                gameLogSessionTable.value = [];
+                return;
+            }
+            if (i) {
+                data.splice(0, i);
+            }
+        }
+
+        const maxLen = Math.floor(vrcxStore.maxTableSize * 1.5);
+        if (maxLen > 0 && data.length > maxLen + 100) {
+            data.splice(0, 100);
+        }
     }
 
     async function addGamelogLocationToDatabase(input) {
@@ -482,23 +515,11 @@ export const useGameLogStore = defineStore('GameLog', () => {
     function sweepGameLog() {
         const { data } = gameLogTable.value;
         const j = data.length;
-        if (j > vrcxStore.maxTableSize) {
-            data.splice(0, j - vrcxStore.maxTableSize);
+        if (j > vrcxStore.maxTableSize + 50) {
+            data.splice(0, 50);
         }
 
-        const date = new Date();
-        date.setDate(date.getDate() - 1); // 24 hour limit
-        const limit = date.toJSON();
-        let i = 0;
-        const k = gameLogSessionTable.value.length;
-        while (i < k && gameLogSessionTable.value[i].created_at < limit) {
-            ++i;
-        }
-        if (i === k) {
-            gameLogSessionTable.value = [];
-        } else if (i) {
-            gameLogSessionTable.value.splice(0, i);
-        }
+        sweepGameLogSessionTable();
     }
 
     function addGameLogEntry(gameLog, location) {
@@ -1348,6 +1369,7 @@ export const useGameLogStore = defineStore('GameLog', () => {
     async function getGameLogTable() {
         await database.initTables();
         gameLogSessionTable.value = await database.getGamelogDatabase();
+        sweepGameLogSessionTable();
         const dateTill = await database.getLastDateGameLogDatabase();
         updateGameLog(dateTill);
     }
@@ -1387,33 +1409,37 @@ export const useGameLogStore = defineStore('GameLog', () => {
 
     async function disableGameLogDialog() {
         if (gameStore.isGameRunning) {
-            ElMessage({
-                message:
-                    'VRChat needs to be closed before this option can be changed',
-                type: 'error'
-            });
+            toast.error(
+                'VRChat needs to be closed before this option can be changed'
+            );
             return;
         }
         if (!advancedSettingsStore.gameLogDisabled) {
-            ElMessageBox.confirm('Continue? Disable GameLog', 'Confirm', {
-                confirmButtonText: 'Confirm',
-                cancelButtonText: 'Cancel',
-                type: 'info'
-            }).then(({ action }) => {
-                if (action === 'confirm') {
+            modalStore
+                .confirm({
+                    description: 'Continue? Disable GameLog',
+                    title: 'Confirm'
+                })
+                .then(({ ok }) => {
+                    if (!ok) return;
                     advancedSettingsStore.setGameLogDisabled();
-                }
-            });
+                })
+                .catch(() => {});
         } else {
             advancedSettingsStore.setGameLogDisabled();
         }
     }
 
     async function initGameLogTable() {
-        gameLogTable.value.data = await database.lookupGameLogDatabase(
+        const rows = await database.lookupGameLogDatabase(
             gameLogTable.value.search,
             gameLogTable.value.filter
         );
+        for (const row of rows) {
+            row.isFriend = gameLogIsFriend(row);
+            row.isFavorite = gameLogIsFavorite(row);
+        }
+        gameLogTable.value.data = shallowReactive(rows);
     }
 
     return {

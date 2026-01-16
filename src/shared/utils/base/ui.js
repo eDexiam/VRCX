@@ -1,10 +1,13 @@
-import { ElMessage } from 'element-plus';
 import { storeToRefs } from 'pinia';
+import { toast } from 'vue-sonner';
 
 import { THEME_CONFIG } from '../../constants';
 import { i18n } from '../../../plugin/i18n';
 import { router } from '../../../plugin/router';
+import { textToHex } from './string';
 import { useAppearanceSettingsStore } from '../../../stores';
+
+import configRepository from '../../../service/config.js';
 
 /**
  *
@@ -26,6 +29,28 @@ function changeAppDarkStyle(isDark) {
     }
 }
 
+function applyThemeFonts(themeKey, fontLinks = []) {
+    document
+        .querySelectorAll('link[data-theme-font]')
+        .forEach((linkEl) => linkEl.remove());
+
+    if (!fontLinks?.length) {
+        return;
+    }
+
+    const head = document.head;
+    fontLinks.forEach((href) => {
+        if (!href) {
+            return;
+        }
+        const fontLink = document.createElement('link');
+        fontLink.rel = 'stylesheet';
+        fontLink.href = href;
+        fontLink.dataset.themeFont = themeKey;
+        head.appendChild(fontLink);
+    });
+}
+
 function changeAppThemeStyle(themeMode) {
     if (themeMode === 'system') {
         themeMode = systemIsDarkMode() ? 'dark' : 'light';
@@ -33,36 +58,26 @@ function changeAppThemeStyle(themeMode) {
 
     let themeConfig = THEME_CONFIG[themeMode];
     if (!themeConfig) {
+        // fallback to system
         console.error('Invalid theme mode:', themeMode);
-        // load system theme as fallback
+        configRepository.setString('VRCX_ThemeMode', 'system');
         themeMode = systemIsDarkMode() ? 'dark' : 'light';
         themeConfig = THEME_CONFIG[themeMode];
     }
 
-    let filePathPrefix = 'file://vrcx/';
-    if (LINUX) {
-        filePathPrefix = './';
-    }
-    if (process.env.NODE_ENV === 'development') {
-        filePathPrefix = 'http://localhost:9000/';
-        console.log('Using development file path prefix:', filePathPrefix);
-    }
+    applyThemeFonts(themeMode, themeConfig.fontLinks);
 
-    let $appThemeStyle = document.getElementById('app-theme-style');
-    if (!$appThemeStyle) {
-        $appThemeStyle = document.createElement('link');
-        $appThemeStyle.setAttribute('id', 'app-theme-style');
-        $appThemeStyle.rel = 'stylesheet';
-        document.head.appendChild($appThemeStyle);
-    }
-    $appThemeStyle.href = themeConfig.cssFile ? themeConfig.cssFile : '';
+    document.documentElement.setAttribute('data-theme', themeMode);
 
-    if (themeConfig.isDark) {
+    const shouldUseDarkClass = Boolean(themeConfig.isDark);
+    if (shouldUseDarkClass) {
         document.documentElement.classList.add('dark');
     } else {
         document.documentElement.classList.remove('dark');
     }
     changeAppDarkStyle(themeConfig.isDark);
+
+    return { isDark: themeConfig.isDark };
 
     // let $appThemeDarkStyle = document.getElementById('app-theme-dark-style');
     // const darkThemeCssPath = `${filePathPrefix}theme.dark.css`;
@@ -161,8 +176,11 @@ function HSVtoRGB(h, s, v) {
     let g = 0;
     let b = 0;
     if (arguments.length === 1) {
+        // @ts-ignore
         s = h.s;
+        // @ts-ignore
         v = h.v;
+        // @ts-ignore
         h = h.h;
     }
     const i = Math.floor(h * 6);
@@ -209,12 +227,47 @@ function HSVtoRGB(h, s, v) {
     return `#${decColor.toString(16).substr(1)}`;
 }
 
+function formatJsonVars(ref) {
+    // remove all object keys that start with $
+    const newRef = { ...ref };
+    for (const key in newRef) {
+        if (key.startsWith('$')) {
+            delete newRef[key];
+        }
+    }
+    // sort keys alphabetically
+    const sortedKeys = Object.keys(newRef).sort();
+    const sortedRef = {};
+    sortedKeys.forEach((key) => {
+        sortedRef[key] = newRef[key];
+    });
+    if ('displayName' in sortedRef) {
+        // add _hexDisplayName to top
+        return {
+            // @ts-ignore
+            _hexDisplayName: textToHex(sortedRef.displayName),
+            ...sortedRef
+        };
+    }
+    if ('name' in sortedRef) {
+        // add _hexName to top
+        return {
+            // @ts-ignore
+            _hexName: textToHex(sortedRef.name),
+            ...sortedRef
+        };
+    }
+    return sortedRef;
+}
+
 function getNextDialogIndex() {
     let z = 2000;
     document.querySelectorAll('.el-overlay,.el-modal-dialog').forEach((v) => {
+        // @ts-ignore
         if (v.style.display === 'none') {
             return;
         }
+        // @ts-ignore
         const _z = Number(v.style.zIndex) || 0;
         if (_z > z) {
             z = _z;
@@ -234,19 +287,19 @@ function setLoginContainerStyle(isDarkMode) {
     loginContainerStyle.id = 'login-container-style';
     loginContainerStyle.type = 'text/css';
 
-    const backgroundColor = isDarkMode ? '#101010' : '#ffffff';
-    const inputBackgroundColor = isDarkMode ? '#333333' : '#ffffff';
-    const inputBorder = isDarkMode ? '1px solid #3b3b3b' : '1px solid #DCDFE6';
+    const backgroundFallback = isDarkMode ? '#101010' : '#ffffff';
+    const inputBackgroundFallback = isDarkMode ? '#1f1f1f' : '#ffffff';
+    const borderFallback = isDarkMode ? '#3b3b3b' : '#DCDFE6';
 
     loginContainerStyle.innerHTML = `
     .x-login-container {
-        background-color: ${backgroundColor} !important;
+        background-color: var(--el-bg-color-page, ${backgroundFallback}) !important;
         transition: background-color 0.3s ease;
     }
 
     .x-login-container .el-input__wrapper {
-        background-color: ${inputBackgroundColor} !important;
-        border: ${inputBorder} !important;
+        background-color: var(--el-bg-color, ${inputBackgroundFallback}) !important;
+        border: 1px solid var(--el-border-color, ${borderFallback}) !important;
         transition: background-color 0.3s ease, border-color 0.3s ease;
     }
         `;
@@ -261,7 +314,6 @@ async function getThemeMode(configRepository) {
     );
 
     let isDarkMode;
-
     if (initThemeMode === 'light') {
         isDarkMode = false;
     } else if (initThemeMode === 'system') {
@@ -275,11 +327,7 @@ async function getThemeMode(configRepository) {
 
 function redirectToToolsTab() {
     router.push({ name: 'tools' });
-    ElMessage({
-        message: i18n.global.t('view.tools.redirect_message'),
-        type: 'primary',
-        duration: 3000
-    });
+    toast(i18n.global.t('view.tools.redirect_message'), { duration: 3000 });
 }
 
 export {
@@ -291,6 +339,7 @@ export {
     refreshCustomScript,
     HueToHex,
     HSVtoRGB,
+    formatJsonVars,
     getNextDialogIndex,
     changeHtmlLangAttribute,
     setLoginContainerStyle,

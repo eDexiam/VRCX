@@ -45,8 +45,7 @@ export const useVrStore = defineStore('Vr', () => {
         updateVrNowPlaying();
         // run these methods again to send data to the overlay
         sharedFeedStore.updateSharedFeed(true);
-        friendStore.onlineFriendCount = 0; // force an update
-        friendStore.updateOnlineFriendCoutner();
+        friendStore.updateOnlineFriendCounter(true); // force an update
     }
 
     async function saveOpenVROption() {
@@ -59,7 +58,6 @@ export const useVrStore = defineStore('Vr', () => {
 
     function updateVrNowPlaying() {
         const json = JSON.stringify(gameLogStore.nowPlaying);
-        AppApi.ExecuteVrFeedFunction('nowPlayingUpdate', json);
         AppApi.ExecuteVrOverlayFunction('nowPlayingUpdate', json);
     }
 
@@ -91,7 +89,6 @@ export const useVrStore = defineStore('Vr', () => {
             onlineFor
         };
         const json = JSON.stringify(lastLocation);
-        AppApi.ExecuteVrFeedFunction('lastLocationUpdate', json);
         AppApi.ExecuteVrOverlayFunction('lastLocationUpdate', json);
     }
 
@@ -100,6 +97,26 @@ export const useVrStore = defineStore('Vr', () => {
         if (appearanceSettingsStore.isDarkMode) {
             notificationTheme = 'sunset';
         }
+
+        /**
+         * @typedef {Object} VrConfigVarsPayload
+         * @property {boolean} overlayNotifications
+         * @property {boolean} hideDevicesFromFeed
+         * @property {boolean} vrOverlayCpuUsage
+         * @property {boolean} minimalFeed
+         * @property {string} notificationPosition
+         * @property {number} notificationTimeout
+         * @property {number} photonOverlayMessageTimeout
+         * @property {string} notificationTheme
+         * @property {boolean} backgroundEnabled
+         * @property {boolean} dtHour12
+         * @property {boolean} pcUptimeOnFeed
+         * @property {string} appLanguage
+         * @property {number} notificationOpacity
+         * @property {boolean} isWristDisabled
+         */
+
+        /** @type {VrConfigVarsPayload} */
         const VRConfigVars = {
             overlayNotifications:
                 notificationsSettingsStore.overlayNotifications,
@@ -116,10 +133,12 @@ export const useVrStore = defineStore('Vr', () => {
             dtHour12: appearanceSettingsStore.dtHour12,
             pcUptimeOnFeed: wristOverlaySettingsStore.pcUptimeOnFeed,
             appLanguage: appearanceSettingsStore.appLanguage,
-            notificationOpacity: advancedSettingsStore.notificationOpacity
+            notificationOpacity: advancedSettingsStore.notificationOpacity,
+            isWristDisabled: wristOverlaySettingsStore.overlayWrist === false
         };
+
+        /** @type {string} */
         const json = JSON.stringify(VRConfigVars);
-        AppApi.ExecuteVrFeedFunction('configUpdate', json);
         AppApi.ExecuteVrOverlayFunction('configUpdate', json);
     }
 
@@ -162,6 +181,9 @@ export const useVrStore = defineStore('Vr', () => {
             newState.menuButton,
             newState.overlayHand
         );
+        if (!newState.active) {
+            gameStore.updateIsHmdAfk(false);
+        }
 
         if (LINUX) {
             window.electron.updateVr(

@@ -63,7 +63,6 @@
                             v-for="friend in group"
                             :key="friend.id"
                             :friend="friend"
-                            @click="showUserDialog(friend.id)"
                             @confirm-delete-friend="confirmDeleteFriend"></friend-item>
                     </div>
                 </div>
@@ -73,7 +72,6 @@
                     v-for="friend in vipFriendsByGroupStatus"
                     :key="friend.id"
                     :friend="friend"
-                    @click="showUserDialog(friend.id)"
                     @confirm-delete-friend="confirmDeleteFriend">
                 </friend-item>
             </template>
@@ -91,8 +89,11 @@
 
             <div v-show="!isSidebarGroupByInstanceCollapsed">
                 <div v-for="friendArr in friendsInSameInstance" :key="friendArr[0].ref.$location.tag">
-                    <div style="margin-bottom: 3px">
-                        <Location class="extra" :location="getFriendsLocations(friendArr)" style="display: inline" />
+                    <div class="mb-1 flex items-center">
+                        <Location
+                            class="extra text-muted-foreground!"
+                            :location="getFriendsLocations(friendArr)"
+                            style="display: inline" />
                         <span class="extra" style="margin-left: 5px">{{ `(${friendArr.length})` }}</span>
                     </div>
                     <div v-if="friendArr && friendArr.length">
@@ -102,7 +103,6 @@
                             :friend="friend"
                             is-group-by-instance
                             :style="{ 'margin-bottom': idx === friendArr.length - 1 ? '5px' : undefined }"
-                            @click="showUserDialog(friend.id)"
                             @confirm-delete-friend="confirmDeleteFriend">
                         </friend-item>
                     </div>
@@ -126,7 +126,6 @@
                 v-for="friend in onlineFriendsByGroupStatus"
                 :key="friend.id"
                 :friend="friend"
-                @click="showUserDialog(friend.id)"
                 @confirm-delete-friend="confirmDeleteFriend" />
         </div>
         <div
@@ -144,7 +143,6 @@
                 v-for="friend in activeFriends"
                 :key="friend.id"
                 :friend="friend"
-                @click="showUserDialog(friend.id)"
                 @confirm-delete-friend="confirmDeleteFriend"></friend-item>
         </div>
         <div
@@ -162,14 +160,13 @@
                 v-for="friend in offlineFriends"
                 :key="friend.id"
                 :friend="friend"
-                @click="showUserDialog(friend.id)"
                 @confirm-delete-friend="confirmDeleteFriend"></friend-item>
         </div>
     </div>
 </template>
 
 <script setup>
-    import { computed, ref } from 'vue';
+    import { computed, ref, watch } from 'vue';
     import { ArrowRight } from '@element-plus/icons-vue';
     import { storeToRefs } from 'pinia';
     import { useI18n } from 'vue-i18n';
@@ -183,16 +180,20 @@
         useLocationStore,
         useUserStore
     } from '../../../stores';
-    import { getFriendsSortFunction, isRealInstance, userImage, userStatusClass } from '../../../shared/utils';
+    import { isRealInstance, userImage, userStatusClass } from '../../../shared/utils';
+    import { getFriendsLocations } from '../../../shared/utils/location.js';
+    import { watchState } from '../../../service/watchState';
 
-    import FriendItem from '../../../components/FriendItem.vue';
+    import FriendItem from './FriendItem.vue';
     import configRepository from '../../../service/config';
 
     const emit = defineEmits(['confirm-delete-friend']);
     const { t } = useI18n();
 
-    const { vipFriends, onlineFriends, activeFriends, offlineFriends } = storeToRefs(useFriendStore());
-    const { isSidebarGroupByInstance, isHideFriendsInSameInstance, isSidebarDivideByFriendGroup, sidebarSortMethods } =
+    const friendStore = useFriendStore();
+    const { vipFriends, onlineFriends, activeFriends, offlineFriends, friendsInSameInstance } =
+        storeToRefs(friendStore);
+    const { isSidebarGroupByInstance, isHideFriendsInSameInstance, isSidebarDivideByFriendGroup } =
         storeToRefs(useAppearanceSettingsStore());
     const { gameLogDisabled } = storeToRefs(useAdvancedSettingsStore());
     const { showUserDialog } = useUserStore();
@@ -208,41 +209,16 @@
     const isOfflineFriends = ref(false);
     const isSidebarGroupByInstanceCollapsed = ref(false);
 
-    loadFriendsGroupStates();
-
-    const friendsInSameInstance = computed(() => {
-        const friendsList = {};
-
-        const allFriends = [...vipFriends.value, ...onlineFriends.value];
-        allFriends.forEach((friend) => {
-            if (!friend.ref?.$location) {
-                return;
-            }
-
-            let locationTag = friend.ref.$location.tag;
-            if (!friend.ref.$location.isRealInstance && lastLocation.value.friendList.has(friend.id)) {
-                locationTag = lastLocation.value.location;
-            }
-            const isReal = isRealInstance(locationTag);
-            if (!isReal) {
-                return;
-            }
-
-            if (!friendsList[locationTag]) {
-                friendsList[locationTag] = [];
-            }
-            friendsList[locationTag].push(friend);
-        });
-
-        const sortedFriendsList = [];
-        for (const group of Object.values(friendsList)) {
-            if (group.length > 1) {
-                sortedFriendsList.push(group.sort(getFriendsSortFunction(sidebarSortMethods.value)));
+    watch(
+        () => watchState.isFriendsLoaded,
+        (isFriendsLoaded) => {
+            if (isFriendsLoaded) {
+                isOfflineFriends.value = offlineFriends.value.length < 10 ? true : false;
             }
         }
+    );
 
-        return sortedFriendsList.sort((a, b) => b.length - a.length);
-    });
+    loadFriendsGroupStates();
 
     const sameInstanceFriendId = computed(() => {
         const sameInstanceFriendId = new Set();
@@ -312,7 +288,6 @@
         configRepository.setBool('VRCX_isFriendsGroupFavorites', isVIPFriends.value);
         configRepository.setBool('VRCX_isFriendsGroupOnline', isOnlineFriends.value);
         configRepository.setBool('VRCX_isFriendsGroupActive', isActiveFriends.value);
-        configRepository.setBool('VRCX_isFriendsGroupOffline', isOfflineFriends.value);
     }
 
     async function loadFriendsGroupStates() {
@@ -320,7 +295,6 @@
         isVIPFriends.value = await configRepository.getBool('VRCX_isFriendsGroupFavorites', true);
         isOnlineFriends.value = await configRepository.getBool('VRCX_isFriendsGroupOnline', true);
         isActiveFriends.value = await configRepository.getBool('VRCX_isFriendsGroupActive', false);
-        isOfflineFriends.value = await configRepository.getBool('VRCX_isFriendsGroupOffline', false);
         isSidebarGroupByInstanceCollapsed.value = await configRepository.getBool(
             'VRCX_sidebarGroupByInstanceCollapsed',
             false
@@ -332,29 +306,6 @@
         configRepository.setBool('VRCX_sidebarGroupByInstanceCollapsed', isSidebarGroupByInstanceCollapsed.value);
     }
 
-    function getFriendsLocations(friendsArr) {
-        // prevent the instance title display as "Traveling".
-        if (!friendsArr?.length) {
-            return '';
-        }
-        for (const friend of friendsArr) {
-            if (isRealInstance(friend.ref?.location)) {
-                return friend.ref.location;
-            }
-        }
-        for (const friend of friendsArr) {
-            if (isRealInstance(friend.ref?.travelingToLocation)) {
-                return friend.ref.travelingToLocation;
-            }
-        }
-        for (const friend of friendsArr) {
-            if (lastLocation.value.friendList.has(friend.id)) {
-                return lastLocation.value.location;
-            }
-        }
-        return friendsArr[0].ref?.location;
-    }
-
     function confirmDeleteFriend(friend) {
         emit('confirm-delete-friend', friend);
     }
@@ -364,9 +315,9 @@
     .x-link:hover {
         text-decoration: none;
     }
-    .x-link:hover span {
+    /* .x-link:hover span {
         text-decoration: underline;
-    }
+    } */
     .is-rotated {
         transform: rotate(90deg);
     }

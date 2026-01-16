@@ -2,31 +2,39 @@
     <el-dialog
         :model-value="!!feedFiltersDialogMode"
         :title="dialogTitle"
-        width="550px"
+        width="600px"
         destroy-on-close
         @close="handleDialogClose">
         <div class="toggle-list" style="height: 75vh; overflow-y: auto">
             <div v-for="setting in currentOptions" :key="setting.key" class="toggle-item">
                 <span class="toggle-name"
                     >{{ setting.name
-                    }}<el-tooltip
+                    }}<TooltipWrapper
                         v-if="setting.tooltip"
-                        placement="top"
+                        side="top"
                         style="margin-left: 5px"
                         :content="setting.tooltip">
                         <el-icon v-if="setting.tooltipWarning"><Warning /></el-icon>
                         <el-icon v-else><InfoFilled /></el-icon>
-                    </el-tooltip>
+                    </TooltipWrapper>
                 </span>
 
-                <el-radio-group
-                    v-model="currentSharedFeedFilters[setting.key]"
-                    size="small"
-                    @change="saveSharedFeedFilters">
-                    <el-radio-button v-for="option in setting.options" :key="option.label" :label="option.label">
+                <ToggleGroup
+                    type="single"
+                    required
+                    variant="outline"
+                    size="sm"
+                    :model-value="currentSharedFeedFilters[setting.key]"
+                    @update:model-value="
+                        (value) => {
+                            currentSharedFeedFilters[setting.key] = value;
+                            saveSharedFeedFilters();
+                        }
+                    ">
+                    <ToggleGroupItem v-for="option in setting.options" :key="option.label" :value="option.label">
                         {{ t(option.textKey) }}
-                    </el-radio-button>
-                </el-radio-group>
+                    </ToggleGroupItem>
+                </ToggleGroup>
             </div>
 
             <template v-if="photonLoggingEnabled">
@@ -36,34 +44,46 @@
                 </div>
                 <div v-for="setting in photonFeedFiltersOptions" :key="setting.key" class="toggle-item">
                     <span class="toggle-name">{{ setting.name }}</span>
-                    <el-radio-group
-                        v-model="currentSharedFeedFilters[setting.key]"
-                        size="small"
-                        @change="saveSharedFeedFilters">
-                        <el-radio-button v-for="option in setting.options" :key="option.label" :label="option.label">
+                    <ToggleGroup
+                        type="single"
+                        required
+                        variant="outline"
+                        size="sm"
+                        :model-value="currentSharedFeedFilters[setting.key]"
+                        @update:model-value="
+                            (value) => {
+                                currentSharedFeedFilters[setting.key] = value;
+                                saveSharedFeedFilters();
+                            }
+                        ">
+                        <ToggleGroupItem v-for="option in setting.options" :key="option.label" :value="option.label">
                             {{ t(option.textKey) }}
-                        </el-radio-button>
-                    </el-radio-group>
+                        </ToggleGroupItem>
+                    </ToggleGroup>
                 </div>
             </template>
         </div>
 
         <template #footer>
-            <el-button @click="currentResetFunction">{{ t('dialog.shared_feed_filters.reset') }}</el-button>
-            <el-button type="primary" style="margin-left: 10px" @click="handleDialogClose">{{
+            <Button variant="secondary" @click="currentResetFunction">{{
+                t('dialog.shared_feed_filters.reset')
+            }}</Button>
+            <Button style="margin-left: 10px" @click="handleDialogClose">{{
                 t('dialog.shared_feed_filters.close')
-            }}</el-button>
+            }}</Button>
         </template>
     </el-dialog>
 </template>
 
 <script setup>
     import { InfoFilled, Warning } from '@element-plus/icons-vue';
+    import { Button } from '@/components/ui/button';
     import { computed } from 'vue';
     import { storeToRefs } from 'pinia';
     import { useI18n } from 'vue-i18n';
 
     import { useNotificationsSettingsStore, usePhotonStore, useSharedFeedStore } from '../../../stores';
+    import { ToggleGroup, ToggleGroupItem } from '../../../components/ui/toggle-group';
     import { feedFiltersOptions, sharedFeedFiltersDefaults } from '../../../shared/constants';
 
     import configRepository from '../../../service/config';
@@ -130,3 +150,11 @@
         emit('update:feedFiltersDialogMode', '');
     }
 </script>
+
+<style scoped>
+    .toggle-list .toggle-item {
+        display: flex;
+        align-items: center;
+        margin-bottom: 8px;
+    }
+</style>

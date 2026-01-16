@@ -4,6 +4,7 @@ const {
     BrowserWindow,
     ipcMain,
     app,
+    clipboard,
     Tray,
     Menu,
     dialog,
@@ -46,6 +47,7 @@ if (!isDotNetInstalled()) {
 const VRCX_URI_PREFIX = 'vrcx';
 let isOverlayActive = false;
 let appIsQuitting = false;
+const rootDir = app.getAppPath();
 
 // Get launch arguments
 let appImagePath = process.env.APPIMAGE;
@@ -54,7 +56,11 @@ const noInstall = args.includes('--no-install');
 const x11 = args.includes('--x11');
 const noDesktop = args.includes('--no-desktop');
 const startup = args.includes('--startup');
-if (process.defaultApp) {
+const debug = args.includes('--hot-reload');
+const noUpdater =
+    args.includes('--no-updater') ||
+    fs.existsSync(path.join(rootDir, '.no-updater'));
+if (process.defaultApp && process.platform !== 'win32') {
     if (process.argv.length >= 2) {
         app.setAsDefaultProtocolClient(VRCX_URI_PREFIX, process.execPath, [
             path.resolve(process.argv[1])
@@ -68,7 +74,6 @@ const homePath = getHomePath();
 tryRelaunchWithArgs(args);
 tryCopyFromWinePrefix();
 
-const rootDir = app.getAppPath();
 const armPath = path.join(rootDir, 'build/Electron/VRCX-Electron-arm64.cjs');
 if (fs.existsSync(armPath)) {
     require(armPath);
@@ -79,22 +84,22 @@ if (fs.existsSync(armPath)) {
 const InteropApi = require('./InteropApi');
 const interopApi = new InteropApi();
 
-const WRIST_FRAME_WIDTH = 512;
-const WRIST_FRAME_HEIGHT = 512;
-const WRIST_FRAME_SIZE = WRIST_FRAME_WIDTH * WRIST_FRAME_HEIGHT * 4;
-const WRIST_SHM_PATH = '/dev/shm/vrcx_wrist_overlay';
+const OVERLAY_WRIST_FRAME_WIDTH = 512;
+const OVERLAY_WRIST_FRAME_HEIGHT = 512;
+const OVERLAY_HMD_FRAME_WIDTH = 1024;
+const OVERLAY_HMD_FRAME_HEIGHT = 1024;
+const OVERLAY_SHARED_HEIGHT =
+    OVERLAY_WRIST_FRAME_HEIGHT + OVERLAY_HMD_FRAME_HEIGHT;
+const OVERLAY_SHARED_WIDTH = Math.max(
+    OVERLAY_WRIST_FRAME_WIDTH,
+    OVERLAY_HMD_FRAME_WIDTH
+);
+const OVERLAY_FRAME_SIZE =
+    OVERLAY_SHARED_WIDTH * OVERLAY_SHARED_HEIGHT * 4;
+const OVERLAY_SHM_PATH = '/dev/shm/vrcx_overlay';
 
-function createWristOverlayWindowShm() {
-    fs.writeFileSync(WRIST_SHM_PATH, Buffer.alloc(WRIST_FRAME_SIZE + 1));
-}
-
-const HMD_FRAME_WIDTH = 1024;
-const HMD_FRAME_HEIGHT = 1024;
-const HMD_FRAME_SIZE = HMD_FRAME_WIDTH * HMD_FRAME_HEIGHT * 4;
-const HMD_SHM_PATH = '/dev/shm/vrcx_hmd_overlay';
-
-function createHmdOverlayWindowShm() {
-    fs.writeFileSync(HMD_SHM_PATH, Buffer.alloc(HMD_FRAME_SIZE + 1));
+function createOverlayWindowShm() {
+    fs.writeFileSync(OVERLAY_SHM_PATH, Buffer.alloc(OVERLAY_FRAME_SIZE + 1));
 }
 
 const version = getVersion();
@@ -120,7 +125,13 @@ let mainWindow = undefined;
 const VRCXStorage = interopApi.getDotNetObject('VRCXStorage');
 const hasAskedToMoveAppImage =
     VRCXStorage.Get('VRCX_HasAskedToMoveAppImage') === 'true';
-let isCloseToTray = VRCXStorage.Get('VRCX_CloseToTray') === 'true';
+
+function getCloseToTray() {
+    if (process.platform === 'darwin') {
+        return true;
+    }
+    return VRCXStorage.Get('VRCX_CloseToTray') === 'true';
+}
 
 const gotTheLock = app.requestSingleInstanceLock();
 const strip_vrcx_prefix_regex = new RegExp('^' + VRCX_URI_PREFIX + '://');
@@ -154,28 +165,6 @@ if (!gotTheLock) {
         }
     });
 }
-
-ipcMain.handle('getArch', () => {
-    return process.arch.toString();
-});
-
-ipcMain.handle('applyWindowSettings', (event, position, size, state) => {
-    if (position) {
-        mainWindow.setPosition(parseInt(position.x), parseInt(position.y));
-    }
-    if (size) {
-        mainWindow.setSize(parseInt(size.width), parseInt(size.height));
-    }
-    if (state) {
-        if (state === '0') {
-            mainWindow.restore();
-        } else if (state === '1') {
-            mainWindow.restore();
-        } else if (state === '2') {
-            mainWindow.maximize();
-        }
-    }
-});
 
 ipcMain.handle('dialog:openFile', async () => {
     const result = await dialog.showOpenDialog(mainWindow, {
@@ -229,21 +218,11 @@ ipcMain.handle('app:restart', () => {
     }
 });
 
-ipcMain.handle('app:getWristOverlayWindow', () => {
-    if (wristOverlayWindow && wristOverlayWindow.webContents) {
+ipcMain.handle('app:getOverlayWindow', () => {
+    if (overlayWindow && overlayWindow.webContents) {
         return (
-            !wristOverlayWindow.webContents.isLoading() &&
-            wristOverlayWindow.webContents.isPainting()
-        );
-    }
-    return false;
-});
-
-ipcMain.handle('app:getHmdOverlayWindow', () => {
-    if (hmdOverlayWindow && hmdOverlayWindow.webContents) {
-        return (
-            !hmdOverlayWindow.webContents.isLoading() &&
-            hmdOverlayWindow.webContents.isPainting()
+            !overlayWindow.webContents.isLoading() &&
+            overlayWindow.webContents.isPainting()
         );
     }
     return false;
@@ -252,25 +231,34 @@ ipcMain.handle('app:getHmdOverlayWindow', () => {
 ipcMain.handle(
     'app:updateVr',
     (event, active, hmdOverlay, wristOverlay, menuButton, overlayHand) => {
-        if (!active) {
+        if (!active || (!hmdOverlay && !wristOverlay)) {
             disposeOverlay();
             return;
         }
-        isOverlayActive = true;
-
-        if (!hmdOverlay) {
-            destroyHmdOverlayWindow();
-        } else if (active && !hmdOverlayWindow) {
-            createHmdOverlayWindowOffscreen();
-        }
-
-        if (!wristOverlay) {
-            destroyWristOverlayWindow();
-        } else if (active && !wristOverlayWindow) {
-            createWristOverlayWindowOffscreen();
+        if (active && !overlayWindow) {
+            try {
+                createOverlayWindowOffscreen();
+            } catch (err) {
+                console.error('Error creating overlay windows:', err);
+            }
         }
     }
 );
+
+ipcMain.handle('app:getArch', () => {
+    return process.arch.toString();
+});
+ipcMain.handle('app:getClipboardText', () => {
+    return clipboard.readText();
+});
+
+ipcMain.handle('app:getNoUpdater', () => {
+    return noUpdater;
+});
+
+ipcMain.handle('app:setTrayIconNotification', (event, notify) => {
+    setTrayIconNotification(notify);
+});
 
 function tryRelaunchWithArgs(args) {
     if (
@@ -314,7 +302,7 @@ function createWindow() {
         y,
         width,
         height,
-        icon: path.join(rootDir, 'VRCX.png'),
+        icon: path.join(rootDir, 'images/VRCX.png'),
         autoHideMenuBar: true,
         titleBarStyle: 'hiddenInset',
         webPreferences: {
@@ -324,6 +312,10 @@ function createWindow() {
     applyWindowState();
     const indexPath = path.join(rootDir, 'build/html/index.html');
     mainWindow.loadFile(indexPath);
+    if (debug) {
+        mainWindow.loadURL('http://localhost:9000/index.html');
+        mainWindow.webContents.openDevTools();
+    }
 
     // add proxy config, doesn't work, thanks electron
     // const proxy = VRCXStorage.Get('VRCX_Proxy');
@@ -361,8 +353,7 @@ function createWindow() {
     mainWindow.webContents.setVisualZoomLevelLimits(1, 5);
 
     mainWindow.on('close', (event) => {
-        isCloseToTray = VRCXStorage.Get('VRCX_CloseToTray') === 'true';
-        if (isCloseToTray && !appIsQuitting) {
+        if (getCloseToTray() && !appIsQuitting) {
             event.preventDefault();
             mainWindow.hide();
         } else {
@@ -405,147 +396,98 @@ function createWindow() {
     });
 }
 
-let wristOverlayWindow = undefined;
+let overlayWindow = undefined;
 
-function createWristOverlayWindowOffscreen() {
-    if (!fs.existsSync(WRIST_SHM_PATH)) {
-        createWristOverlayWindowShm();
+function createOverlayWindowOffscreen() {
+    if (process.platform !== 'linux') {
+        console.error('Offscreen overlay is only supported on Linux.');
+        return;
+    }
+    isOverlayActive = true;
+    if (!fs.existsSync(OVERLAY_SHM_PATH)) {
+        createOverlayWindowShm();
     }
 
     const x = parseInt(VRCXStorage.Get('VRCX_LocationX')) || 0;
     const y = parseInt(VRCXStorage.Get('VRCX_LocationY')) || 0;
-    const width = WRIST_FRAME_WIDTH;
-    const height = WRIST_FRAME_HEIGHT;
+    const width = OVERLAY_SHARED_WIDTH;
+    const height = OVERLAY_SHARED_HEIGHT;
 
-    wristOverlayWindow = new BrowserWindow({
+    overlayWindow = new BrowserWindow({
         x,
         y,
         width,
         height,
-        icon: path.join(rootDir, 'VRCX.png'),
+        icon: path.join(rootDir, 'images/VRCX.png'),
         autoHideMenuBar: true,
         transparent: true,
         frame: false,
         show: false,
         webPreferences: {
+            partition: 'vrcx-vr-overlay',
             offscreen: true,
             preload: path.join(__dirname, 'preload.js')
         }
     });
-    wristOverlayWindow.webContents.setFrameRate(2);
+    overlayWindow.webContents.setFrameRate(48);
 
-    const indexPath = path.join(rootDir, 'build/html/vr.html');
-    const fileUrl = `file://${indexPath}?wrist`;
-    wristOverlayWindow.loadURL(fileUrl, { userAgent: version });
-
+    let fileUrl = `file://${path.join(rootDir, 'build/html/vr.html')}`;
+    if (debug) {
+        fileUrl = 'http://localhost:9000/vr.html';
+    }
+    overlayWindow.loadURL(fileUrl, { userAgent: version });
     // Use paint event for offscreen rendering
-    wristOverlayWindow.webContents.on('paint', (event, dirty, image) => {
+    overlayWindow.webContents.on('paint', (event, dirty, image) => {
         const buffer = image.toBitmap();
-        //console.log('Captured wrist frame via paint event, size:', buffer.length);
-        writeWristFrame(buffer);
+        //console.log('Captured frame via paint event, size:', buffer.length);
+        writeOverlayFrame(buffer);
     });
 }
 
-function writeWristFrame(imageBuffer) {
+function writeOverlayFrame(imageBuffer) {
     try {
-        const fd = fs.openSync(WRIST_SHM_PATH, 'r+');
-        const buffer = Buffer.alloc(WRIST_FRAME_SIZE + 1);
+        const fd = fs.openSync(OVERLAY_SHM_PATH, 'r+');
+        const buffer = Buffer.alloc(OVERLAY_FRAME_SIZE + 1);
         buffer[0] = 0; // not ready
-        imageBuffer.copy(buffer, 1, 0, WRIST_FRAME_SIZE);
+        imageBuffer.copy(buffer, 1, 0, OVERLAY_FRAME_SIZE);
         buffer[0] = 1; // ready
         fs.writeSync(fd, buffer);
         fs.closeSync(fd);
-        //console.log('Wrote wrist frame to shared memory');
+        //console.log('Wrote frame to shared memory');
     } catch (err) {
-        console.error('Error writing wrist frame to shared memory:', err);
+        console.error('Error writing frame to shared memory:', err);
     }
 }
 
-function destroyWristOverlayWindow() {
-    if (wristOverlayWindow && !wristOverlayWindow.isDestroyed()) {
-        wristOverlayWindow.close();
-    }
-    wristOverlayWindow = undefined;
-}
-
-let hmdOverlayWindow = undefined;
-
-function createHmdOverlayWindowOffscreen() {
-    if (!fs.existsSync(HMD_SHM_PATH)) {
-        createHmdOverlayWindowShm();
-    }
-
-    const x = parseInt(VRCXStorage.Get('VRCX_LocationX')) || 0;
-    const y = parseInt(VRCXStorage.Get('VRCX_LocationY')) || 0;
-    const width = HMD_FRAME_WIDTH;
-    const height = HMD_FRAME_HEIGHT;
-
-    hmdOverlayWindow = new BrowserWindow({
-        x,
-        y,
-        width,
-        height,
-        icon: path.join(rootDir, 'VRCX.png'),
-        autoHideMenuBar: true,
-        transparent: true,
-        frame: false,
-        show: false,
-        webPreferences: {
-            offscreen: true,
-            preload: path.join(__dirname, 'preload.js')
-        }
-    });
-    hmdOverlayWindow.webContents.setFrameRate(48);
-
-    const indexPath = path.join(rootDir, 'build/html/vr.html');
-    const fileUrl = `file://${indexPath}?hmd`;
-    hmdOverlayWindow.loadURL(fileUrl, { userAgent: version });
-
-    // Use paint event for offscreen rendering
-    hmdOverlayWindow.webContents.on('paint', (event, dirty, image) => {
-        const buffer = image.toBitmap();
-        //console.log('Captured HMD frame via paint event, size:', buffer.length);
-        writeHmdFrame(buffer);
-    });
-}
-
-function writeHmdFrame(imageBuffer) {
-    try {
-        const fd = fs.openSync(HMD_SHM_PATH, 'r+');
-        const buffer = Buffer.alloc(HMD_FRAME_SIZE + 1);
-        buffer[0] = 0; // not ready
-        imageBuffer.copy(buffer, 1, 0, HMD_FRAME_SIZE);
-        buffer[0] = 1; // ready
-        fs.writeSync(fd, buffer);
-        fs.closeSync(fd);
-        //console.log('Wrote HMD frame to shared memory');
-    } catch (err) {
-        console.error('Error writing HMD frame to shared memory:', err);
-    }
-}
-
-function destroyHmdOverlayWindow() {
-    if (hmdOverlayWindow && !hmdOverlayWindow.isDestroyed()) {
-        hmdOverlayWindow.close();
-    }
-    hmdOverlayWindow = undefined;
-}
-
+let tray = null;
+let trayIcon = null;
+let trayIconNotify = null;
 function createTray() {
-    let tray = null;
     if (process.platform === 'darwin') {
         const image = nativeImage.createFromPath(
             path.join(rootDir, 'images/VRCX.png')
         );
-        tray = new Tray(image.resize({ width: 16, height: 16 }));
+        trayIcon = image.resize({ width: 16, height: 16 });
+
+        const imageNotify = nativeImage.createFromPath(
+            path.join(rootDir, 'images/VRCX_notify.png')
+        );
+        trayIconNotify = imageNotify.resize({ width: 16, height: 16 });
     } else if (process.platform === 'linux') {
         const image = nativeImage.createFromPath(
             path.join(rootDir, 'images/VRCX.png')
         );
-        tray = new Tray(image.resize({ width: 64, height: 64 }));
+        trayIcon = image.resize({ width: 64, height: 64 });
+
+        const imageNotify = nativeImage.createFromPath(
+            path.join(rootDir, 'images/VRCX_notify.png')
+        );
+        trayIconNotify = imageNotify.resize({ width: 64, height: 64 });
     } else {
-        tray = new Tray(path.join(rootDir, 'images/VRCX.ico'));
+        trayIcon = path.join(rootDir, 'images/VRCX.ico');
+        trayIconNotify = path.join(rootDir, 'images/VRCX_notify.ico');
     }
+    tray = new Tray(trayIcon);
     const contextMenu = Menu.buildFromTemplate([
         {
             label: 'Open',
@@ -576,6 +518,10 @@ function createTray() {
     tray.on('click', () => {
         mainWindow.show();
     });
+}
+
+function setTrayIconNotification(notify) {
+    tray.setImage(notify ? trayIconNotify : trayIcon);
 }
 
 async function installVRCX() {
@@ -667,13 +613,13 @@ async function createDesktopFile() {
 
     // Download the icon and save it to the target directory
     const iconPath = path.join(homePath, '.local/share/icons/VRCX.png');
-    if (!fs.existsSync(iconPath)) {
+    if (!fs.existsSync(iconPath) || fs.statSync(iconPath).size === 0) {
         const iconDir = path.dirname(iconPath);
         if (!fs.existsSync(iconDir)) {
             fs.mkdirSync(iconDir, { recursive: true });
         }
         const iconUrl =
-            'https://raw.githubusercontent.com/vrcx-team/VRCX/master/VRCX.png';
+            'https://raw.githubusercontent.com/vrcx-team/VRCX/master/images/VRCX.png';
         await downloadIcon(iconUrl, iconPath)
             .then(() => {
                 console.log('Icon downloaded and saved to:', iconPath);
@@ -872,7 +818,7 @@ function tryCopyFromWinePrefix() {
 
 function applyWindowState() {
     if (VRCXStorage.Get('VRCX_StartAsMinimizedState') === 'true' && startup) {
-        if (isCloseToTray) {
+        if (getCloseToTray()) {
             mainWindow.hide();
             return;
         }
@@ -898,21 +844,16 @@ function applyWindowState() {
 app.whenReady().then(() => {
     createWindow();
     createTray();
-
-    if (process.platform === 'linux') {
-        try {
-            createWristOverlayWindowOffscreen();
-            createHmdOverlayWindowOffscreen();
-        } catch (err) {
-            console.error('Error creating overlay windows:', err);
-        }
-    }
-
     installVRCX();
 
     app.on('activate', function () {
         if (BrowserWindow.getAllWindows().length === 0) {
             createWindow();
+        } else {
+            // Ensure main window shows when clicking Dock icon (critical for macOS)
+            if (mainWindow && !mainWindow.isVisible()) {
+                mainWindow.show();
+            }
         }
     });
 });
@@ -921,25 +862,19 @@ function disposeOverlay() {
     if (!isOverlayActive) {
         return;
     }
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+        overlayWindow.close();
+    }
+    overlayWindow = undefined;
     isOverlayActive = false;
-    if (wristOverlayWindow) {
-        wristOverlayWindow.close();
-        wristOverlayWindow = undefined;
-    }
-    if (hmdOverlayWindow) {
-        hmdOverlayWindow.close();
-        hmdOverlayWindow = undefined;
-    }
-
-    if (fs.existsSync(WRIST_SHM_PATH)) {
-        fs.unlinkSync(WRIST_SHM_PATH);
-    }
-    if (fs.existsSync(HMD_SHM_PATH)) {
-        fs.unlinkSync(HMD_SHM_PATH);
+    if (fs.existsSync(OVERLAY_SHM_PATH)) {
+        fs.unlinkSync(OVERLAY_SHM_PATH);
     }
 }
 
 app.on('before-quit', function () {
+    // Mark it as a quitting state to make macOS Dock's "Quit" action take effect.
+    appIsQuitting = true;
     disposeOverlay();
 });
 

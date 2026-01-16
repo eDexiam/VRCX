@@ -1,6 +1,7 @@
 import { reactive, ref, watch } from 'vue';
-import { ElMessage, ElMessageBox } from 'element-plus';
+import { ElMessageBox } from 'element-plus';
 import { defineStore } from 'pinia';
+import { toast } from 'vue-sonner';
 import { useI18n } from 'vue-i18n';
 
 import Noty from 'noty';
@@ -12,10 +13,10 @@ import { database } from '../service/database';
 import { escapeTag } from '../shared/utils';
 import { request } from '../service/request';
 import { useAdvancedSettingsStore } from './settings/advanced';
+import { useModalStore } from './modal';
 import { useNotificationStore } from './notification';
 import { useUpdateLoopStore } from './updateLoop';
 import { useUserStore } from './user';
-import { useVrcxStore } from './vrcx';
 import { watchState } from '../service/watchState';
 
 import configRepository from '../service/config';
@@ -27,7 +28,7 @@ export const useAuthStore = defineStore('Auth', () => {
     const notificationStore = useNotificationStore();
     const userStore = useUserStore();
     const updateLoopStore = useUpdateLoopStore();
-    const vrcxStore = useVrcxStore();
+    const modalStore = useModalStore();
 
     const { t } = useI18n();
     const state = reactive({
@@ -43,22 +44,7 @@ export const useAuthStore = defineStore('Auth', () => {
         endpoint: '',
         websocket: '',
         saveCredentials: false,
-        savedCredentials: {},
-        lastUserLoggedIn: '',
-        rules: {
-            username: [
-                {
-                    required: true,
-                    trigger: 'blur'
-                }
-            ],
-            password: [
-                {
-                    required: true,
-                    trigger: 'blur'
-                }
-            ]
-        }
+        lastUserLoggedIn: ''
     });
 
     const enablePrimaryPasswordDialog = ref({
@@ -110,49 +96,57 @@ export const useAuthStore = defineStore('Auth', () => {
     );
 
     async function init() {
-        const [savedCredentials, lastUserLoggedIn, enableCustomEndpoint] =
-            await Promise.all([
-                configRepository.getString('savedCredentials', '{}'),
-                configRepository.getString('lastUserLoggedIn', ''),
-                configRepository.getBool('VRCX_enableCustomEndpoint', false)
-            ]);
+        const [lastUserLoggedIn, enableCustomEndpoint] = await Promise.all([
+            configRepository.getString('lastUserLoggedIn', ''),
+            configRepository.getBool('VRCX_enableCustomEndpoint', false)
+        ]);
         loginForm.value.lastUserLoggedIn = lastUserLoggedIn;
+        state.enableCustomEndpoint = enableCustomEndpoint;
+    }
+
+    init();
+
+    async function getAllSavedCredentials() {
+        let savedCredentials = {};
         try {
-            const credentials = JSON.parse(savedCredentials || '{}');
+            savedCredentials = JSON.parse(
+                await configRepository.getString('savedCredentials', '{}')
+            );
             let edited = false;
-            for (const userId in credentials) {
+            for (const userId in savedCredentials) {
                 // fix goofy typo
-                if (credentials[userId].loginParmas) {
-                    credentials[userId].loginParams =
-                        credentials[userId].loginParmas;
-                    delete credentials[userId].loginParmas;
+                if (savedCredentials[userId].loginParmas) {
+                    savedCredentials[userId].loginParams =
+                        savedCredentials[userId].loginParmas;
+                    delete savedCredentials[userId].loginParmas;
                     edited = true;
                 }
                 // fix missing fields
-                if (!credentials[userId].loginParams.endpoint) {
-                    credentials[userId].loginParams.endpoint = '';
+                if (!savedCredentials[userId].loginParams.endpoint) {
+                    savedCredentials[userId].loginParams.endpoint = '';
                     edited = true;
                 }
-                if (!credentials[userId].loginParams.websocket) {
-                    credentials[userId].loginParams.websocket = '';
+                if (!savedCredentials[userId].loginParams.websocket) {
+                    savedCredentials[userId].loginParams.websocket = '';
                     edited = true;
                 }
             }
             if (edited) {
                 await configRepository.setString(
                     'savedCredentials',
-                    JSON.stringify(credentials)
+                    JSON.stringify(savedCredentials)
                 );
             }
-            loginForm.value.savedCredentials = credentials;
-        } catch (error) {
-            console.error('Failed to parse savedCredentials:', error);
-            loginForm.value.savedCredentials = {};
+        } catch (e) {
+            console.error('Failed to get saved credentials:', e);
         }
-        state.enableCustomEndpoint = enableCustomEndpoint;
+        return savedCredentials;
     }
 
-    init();
+    async function getSavedCredentials(userId) {
+        const savedCredentials = await getAllSavedCredentials();
+        return savedCredentials[userId];
+    }
 
     async function handleLogoutEvent() {
         if (watchState.isLoggedIn) {
@@ -187,10 +181,9 @@ export const useAuthStore = defineStore('Auth', () => {
             !advancedSettingsStore.enablePrimaryPassword &&
             (await configRepository.getString('lastUserLoggedIn')) !== null
         ) {
-            const user =
-                loginForm.value.savedCredentials[
-                    loginForm.value.lastUserLoggedIn
-                ];
+            const user = await getSavedCredentials(
+                loginForm.value.lastUserLoggedIn
+            );
             if (user?.loginParams?.endpoint) {
                 AppDebug.endpointDomain = user.loginParams.endpoint;
                 AppDebug.websocketDomain = user.loginParams.websocket;
@@ -220,11 +213,10 @@ export const useAuthStore = defineStore('Auth', () => {
     async function clearCookiesTryLogin() {
         await webApiService.clearCookies();
         if (loginForm.value.lastUserLoggedIn) {
-            const user =
-                loginForm.value.savedCredentials[
-                    loginForm.value.lastUserLoggedIn
-                ];
-            if (typeof user !== 'undefined') {
+            const user = await getSavedCredentials(
+                loginForm.value.lastUserLoggedIn
+            );
+            if (user) {
                 delete user.cookies;
                 await relogin(user);
             }
@@ -233,11 +225,10 @@ export const useAuthStore = defineStore('Auth', () => {
 
     async function resendEmail2fa() {
         if (loginForm.value.lastUserLoggedIn) {
-            const user =
-                loginForm.value.savedCredentials[
-                    loginForm.value.lastUserLoggedIn
-                ];
-            if (typeof user !== 'undefined') {
+            const user = await getSavedCredentials(
+                loginForm.value.lastUserLoggedIn
+            );
+            if (user) {
                 await webApiService.clearCookies();
                 delete user.cookies;
                 relogin(user).then(() => {
@@ -272,24 +263,28 @@ export const useAuthStore = defineStore('Auth', () => {
                     inputPattern: /[\s\S]{1,32}/
                 }
             )
-                .then(({ value }) => {
-                    for (const userId in loginForm.value.savedCredentials) {
+                .then(async ({ value }) => {
+                    const savedCredentials = JSON.parse(
+                        await configRepository.getString(
+                            'savedCredentials',
+                            '{}'
+                        )
+                    );
+                    for (const userId in savedCredentials) {
                         security
                             .decrypt(
-                                loginForm.value.savedCredentials[userId]
-                                    .loginParams.password,
+                                savedCredentials[userId].loginParams.password,
                                 value
                             )
                             .then(async (pt) => {
                                 credentialsToSave.value = {
                                     username:
-                                        loginForm.value.savedCredentials[userId]
-                                            .loginParams.username,
+                                        savedCredentials[userId].loginParams
+                                            .username,
                                     password: pt
                                 };
                                 await updateStoredUser(
-                                    loginForm.value.savedCredentials[userId]
-                                        .user
+                                    savedCredentials[userId].user
                                 );
                                 await configRepository.setBool(
                                     'enablePrimaryPassword',
@@ -320,35 +315,24 @@ export const useAuthStore = defineStore('Auth', () => {
         enablePrimaryPasswordDialog.value.visible = false;
         if (advancedSettingsStore.enablePrimaryPassword) {
             const key = enablePrimaryPasswordDialog.value.password;
-            for (const userId in loginForm.value.savedCredentials) {
+            const savedCredentials = await getAllSavedCredentials();
+            for (const userId in savedCredentials) {
                 security
-                    .encrypt(
-                        loginForm.value.savedCredentials[userId].loginParams
-                            .password,
-                        key
-                    )
+                    .encrypt(savedCredentials[userId].loginParams.password, key)
                     .then((ct) => {
                         credentialsToSave.value = {
                             username:
-                                loginForm.value.savedCredentials[userId]
-                                    .loginParams.username,
+                                savedCredentials[userId].loginParams.username,
                             password: ct
                         };
-                        updateStoredUser(
-                            loginForm.value.savedCredentials[userId].user
-                        );
+                        updateStoredUser(savedCredentials[userId].user);
                     });
             }
         }
     }
 
     async function updateStoredUser(user) {
-        let savedCredentials = {};
-        if ((await configRepository.getString('savedCredentials')) !== null) {
-            savedCredentials = JSON.parse(
-                await configRepository.getString('savedCredentials')
-            );
-        }
+        const savedCredentials = await getAllSavedCredentials();
         if (credentialsToSave.value) {
             savedCredentials[user.id] = {
                 user,
@@ -366,7 +350,6 @@ export const useAuthStore = defineStore('Auth', () => {
             savedCredentials[user.id].cookies =
                 await webApiService.getCookies();
         }
-        loginForm.value.savedCredentials = savedCredentials;
         const jsonCredentialsArray = JSON.stringify(savedCredentials);
         await configRepository.setString(
             'savedCredentials',
@@ -377,12 +360,7 @@ export const useAuthStore = defineStore('Auth', () => {
     }
 
     async function migrateStoredUsers() {
-        let savedCredentials = {};
-        if ((await configRepository.getString('savedCredentials')) !== null) {
-            savedCredentials = JSON.parse(
-                await configRepository.getString('savedCredentials')
-            );
-        }
+        const savedCredentials = await getAllSavedCredentials();
         for (const name in savedCredentials) {
             const userId = savedCredentials[name]?.user?.id;
             if (userId && userId !== name) {
@@ -429,21 +407,20 @@ export const useAuthStore = defineStore('Auth', () => {
     }
 
     function logout() {
-        ElMessageBox.confirm('Continue? Logout', 'Confirm', {
-            confirmButtonText: 'Confirm',
-            cancelButtonText: 'Cancel',
-            type: 'info'
-        })
-            .then((action) => {
-                if (action === 'confirm') {
-                    const existingStyle = document.getElementById(
-                        'login-container-style'
-                    );
-                    if (existingStyle) {
-                        existingStyle.parentNode.removeChild(existingStyle);
-                    }
-                    handleLogoutEvent();
+        modalStore
+            .confirm({
+                description: 'Continue? Logout',
+                title: 'Confirm'
+            })
+            .then(({ ok }) => {
+                if (!ok) return;
+                const existingStyle = document.getElementById(
+                    'login-container-style'
+                );
+                if (existingStyle) {
+                    existingStyle.parentNode.removeChild(existingStyle);
                 }
+                handleLogoutEvent();
             })
             .catch(() => {});
     }
@@ -488,10 +465,7 @@ export const useAuthStore = defineStore('Auth', () => {
                             });
                     })
                     .catch((_) => {
-                        ElMessage({
-                            message: 'Incorrect primary password',
-                            type: 'error'
-                        });
+                        toast.error('Incorrect primary password');
                         reject(_);
                     });
             } else {
@@ -520,9 +494,7 @@ export const useAuthStore = defineStore('Auth', () => {
     }
 
     async function deleteSavedLogin(userId) {
-        const savedCredentials = JSON.parse(
-            await configRepository.getString('savedCredentials')
-        );
+        const savedCredentials = await getAllSavedCredentials();
         delete savedCredentials[userId];
         // Disable primary password when no account is available.
         if (Object.keys(savedCredentials).length === 0) {
@@ -531,9 +503,10 @@ export const useAuthStore = defineStore('Auth', () => {
                 false
             );
         }
-        loginForm.value.savedCredentials = savedCredentials;
-        const jsonCredentials = JSON.stringify(savedCredentials);
-        await configRepository.setString('savedCredentials', jsonCredentials);
+        await configRepository.setString(
+            'savedCredentials',
+            JSON.stringify(savedCredentials)
+        );
         new Noty({
             type: 'success',
             text: 'Account removed.'
@@ -571,12 +544,15 @@ export const useAuthStore = defineStore('Auth', () => {
                                 inputPattern: /[\s\S]{1,32}/
                             }
                         )
-                            .then(({ value }) => {
+                            .then(async ({ value }) => {
+                                const savedCredentials = JSON.parse(
+                                    await configRepository.getString(
+                                        'savedCredentials'
+                                    )
+                                );
                                 const saveCredential =
-                                    loginForm.value.savedCredentials[
-                                        Object.keys(
-                                            loginForm.value.savedCredentials
-                                        )[0]
+                                    savedCredentials[
+                                        Object.keys(savedCredentials)[0]
                                     ];
                                 security
                                     .decrypt(
@@ -818,14 +794,15 @@ export const useAuthStore = defineStore('Auth', () => {
         }
     }
 
-    function handleAutoLogin() {
+    async function handleAutoLogin() {
         if (attemptingAutoLogin.value) {
             return;
         }
         attemptingAutoLogin.value = true;
-        const user =
-            loginForm.value.savedCredentials[loginForm.value.lastUserLoggedIn];
-        if (typeof user === 'undefined') {
+        const user = await getSavedCredentials(
+            loginForm.value.lastUserLoggedIn
+        );
+        if (!user) {
             attemptingAutoLogin.value = false;
             return;
         }
@@ -850,6 +827,7 @@ export const useAuthStore = defineStore('Auth', () => {
             return;
         }
         state.autoLoginAttempts.add(new Date().getTime());
+        console.log('Attempting automatic login...');
         relogin(user)
             .then(() => {
                 if (AppDebug.errorNoty) {
@@ -915,6 +893,7 @@ export const useAuthStore = defineStore('Auth', () => {
         handleAutoLogin,
         handleLogoutEvent,
         handleCurrentUserUpdate,
-        loginComplete
+        loginComplete,
+        getAllSavedCredentials
     };
 });

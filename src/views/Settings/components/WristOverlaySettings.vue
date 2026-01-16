@@ -2,22 +2,22 @@
     <div class="options-container" style="margin-top: 0">
         <span class="header">{{ t('view.settings.wrist_overlay.steamvr_wrist_overlay.header') }}</span>
         <div class="options-container-item">
-            <el-button
-                size="small"
-                :icon="Files"
+            <Button
+                size="sm"
+                variant="outline"
                 :disabled="!openVR || !overlayWrist"
                 @click="emit('open-feed-filters')"
-                >{{ t('view.settings.wrist_overlay.steamvr_wrist_overlay.wrist_feed_filters') }}</el-button
+                >{{ t('view.settings.wrist_overlay.steamvr_wrist_overlay.wrist_feed_filters') }}</Button
             >
         </div>
         <div class="options-container-item">
             <span>{{ t('view.settings.wrist_overlay.steamvr_wrist_overlay.description') }}</span>
-            <br />
-            <br />
+        </div>
+        <div class="options-container-item">
             <span>{{ t('view.settings.wrist_overlay.steamvr_wrist_overlay.grip') }}</span>
-            <br />
+        </div>
+        <div class="options-container-item">
             <span>{{ t('view.settings.wrist_overlay.steamvr_wrist_overlay.menu') }}</span>
-            <br />
         </div>
         <simple-switch
             :label="t('view.settings.wrist_overlay.steamvr_wrist_overlay.steamvr_overlay')"
@@ -43,53 +43,66 @@
             " />
         <div class="options-container-item" style="min-width: 118px">
             <span class="name">{{ t('view.settings.wrist_overlay.steamvr_wrist_overlay.start_overlay_with') }}</span>
-            <el-radio-group
-                :model-value="openVRAlways"
+            <RadioGroup
+                :model-value="openVRAlways ? 'true' : 'false'"
                 :disabled="!openVR"
-                @change="
-                    setOpenVRAlways();
-                    saveOpenVROption();
-                ">
-                <el-radio :label="false">{{ 'VRChat' }}</el-radio>
-                <el-radio :label="true">{{ 'SteamVR' }}</el-radio>
-            </el-radio-group>
+                class="gap-2 flex"
+                style="margin-top: 8px"
+                @update:modelValue="handleOpenVRAlwaysRadio">
+                <div class="flex items-center space-x-2">
+                    <RadioGroupItem id="openVRAlways-false" value="false" />
+                    <label for="openVRAlways-false">{{ 'VRChat' }}</label>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <RadioGroupItem id="openVRAlways-true" value="true" />
+                    <label for="openVRAlways-true">{{ 'SteamVR' }}</label>
+                </div>
+            </RadioGroup>
         </div>
         <div class="options-container-item">
             <span class="name">{{ t('view.settings.wrist_overlay.steamvr_wrist_overlay.overlay_button') }}</span>
-            <el-radio-group
-                :model-value="overlaybutton"
+            <RadioGroup
+                :model-value="overlaybutton ? 'true' : 'false'"
                 :disabled="!openVR || !overlayWrist"
-                @change="
-                    setOverlaybutton();
-                    saveOpenVROption();
-                ">
-                <el-radio :label="false">{{
-                    t('view.settings.wrist_overlay.steamvr_wrist_overlay.overlay_button_grip')
-                }}</el-radio>
-                <el-radio :label="true">{{
-                    t('view.settings.wrist_overlay.steamvr_wrist_overlay.overlay_button_menu')
-                }}</el-radio>
-            </el-radio-group>
+                class="gap-2 flex"
+                style="margin-top: 8px"
+                @update:modelValue="handleOverlayButtonRadio">
+                <div class="flex items-center space-x-2">
+                    <RadioGroupItem id="overlaybutton-false" value="false" />
+                    <label for="overlaybutton-false">{{
+                        t('view.settings.wrist_overlay.steamvr_wrist_overlay.overlay_button_grip')
+                    }}</label>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <RadioGroupItem id="overlaybutton-true" value="true" />
+                    <label for="overlaybutton-true">{{
+                        t('view.settings.wrist_overlay.steamvr_wrist_overlay.overlay_button_menu')
+                    }}</label>
+                </div>
+            </RadioGroup>
         </div>
         <div class="options-container-item">
             <span class="name">{{ t('view.settings.wrist_overlay.steamvr_wrist_overlay.display_overlay_on') }}</span>
-            <el-radio-group
+            <ToggleGroup
+                type="single"
+                required
+                variant="outline"
+                size="sm"
                 :model-value="overlayHand"
-                size="small"
-                @change="
+                @update:model-value="
                     setOverlayHand($event);
                     saveOpenVROption();
                 ">
-                <el-radio-button label="1">{{
+                <ToggleGroupItem value="1">{{
                     t('view.settings.wrist_overlay.steamvr_wrist_overlay.display_overlay_on_left')
-                }}</el-radio-button>
-                <el-radio-button label="2">{{
+                }}</ToggleGroupItem>
+                <ToggleGroupItem value="2">{{
                     t('view.settings.wrist_overlay.steamvr_wrist_overlay.display_overlay_on_right')
-                }}</el-radio-button>
-                <el-radio-button label="0">{{
+                }}</ToggleGroupItem>
+                <ToggleGroupItem value="0">{{
                     t('view.settings.wrist_overlay.steamvr_wrist_overlay.display_overlay_on_both')
-                }}</el-radio-button>
-            </el-radio-group>
+                }}</ToggleGroupItem>
+            </ToggleGroup>
         </div>
         <simple-switch
             :label="t('view.settings.wrist_overlay.steamvr_wrist_overlay.grey_background')"
@@ -143,11 +156,13 @@
 </template>
 
 <script setup>
-    import { Files } from '@element-plus/icons-vue';
+    import { Button } from '@/components/ui/button';
     import { storeToRefs } from 'pinia';
     import { useI18n } from 'vue-i18n';
 
     import { useNotificationsSettingsStore, useVrStore, useWristOverlaySettingsStore } from '../../../stores';
+    import { RadioGroup, RadioGroupItem } from '../../../components/ui/radio-group';
+    import { ToggleGroup, ToggleGroupItem } from '../../../components/ui/toggle-group';
 
     import SimpleSwitch from './SimpleSwitch.vue';
 
@@ -190,4 +205,20 @@
     } = wristOverlaySettingsStore;
 
     const { saveOpenVROption } = useVrStore();
+
+    function handleOpenVRAlwaysRadio(value) {
+        const nextValue = value === 'true';
+        if (nextValue !== openVRAlways.value) {
+            setOpenVRAlways();
+            saveOpenVROption();
+        }
+    }
+
+    function handleOverlayButtonRadio(value) {
+        const nextValue = value === 'true';
+        if (nextValue !== overlaybutton.value) {
+            setOverlaybutton();
+            saveOpenVROption();
+        }
+    }
 </script>

@@ -3,9 +3,9 @@
         <div class="options-container" style="margin-top: 0">
             <span class="header">{{ t('view.settings.notifications.notifications.header') }}</span>
             <div class="options-container-item">
-                <el-button size="small" :icon="ChatSquare" @click="showNotyFeedFiltersDialog">{{
+                <Button size="sm" variant="outline" @click="showNotyFeedFiltersDialog">{{
                     t('view.settings.notifications.notifications.notification_filter')
-                }}</el-button>
+                }}</Button>
             </div>
         </div>
         <div class="options-container">
@@ -17,9 +17,12 @@
                     t('view.settings.notifications.notifications.desktop_notifications.when_to_display')
                 }}</span>
                 <br />
-                <el-radio-group
+                <ToggleGroup
+                    type="single"
+                    required
+                    variant="outline"
+                    size="sm"
                     :model-value="overlayToast"
-                    size="small"
                     :disabled="
                         (!overlayNotifications || !openVR) &&
                         !xsNotifications &&
@@ -27,23 +30,23 @@
                         !ovrtWristNotifications
                     "
                     style="margin-top: 5px"
-                    @change="
+                    @update:model-value="
                         setOverlayToast($event);
                         saveOpenVROption();
                     ">
-                    <el-radio-button label="Never">{{
+                    <ToggleGroupItem value="Never">{{
                         t('view.settings.notifications.notifications.conditions.never')
-                    }}</el-radio-button>
-                    <el-radio-button label="Game Running">{{
+                    }}</ToggleGroupItem>
+                    <ToggleGroupItem value="Game Running">{{
                         t('view.settings.notifications.notifications.conditions.inside_vrchat')
-                    }}</el-radio-button>
-                    <el-radio-button label="Game Closed">{{
+                    }}</ToggleGroupItem>
+                    <ToggleGroupItem value="Game Closed">{{
                         t('view.settings.notifications.notifications.conditions.outside_vrchat')
-                    }}</el-radio-button>
-                    <el-radio-button label="Always">{{
+                    }}</ToggleGroupItem>
+                    <ToggleGroupItem value="Always">{{
                         t('view.settings.notifications.notifications.conditions.always')
-                    }}</el-radio-button>
-                </el-radio-group>
+                    }}</ToggleGroupItem>
+                </ToggleGroup>
             </div>
             <simple-switch
                 :label="t('view.settings.notifications.notifications.steamvr_notifications.steamvr_overlay')"
@@ -62,46 +65,43 @@
                         saveOpenVROption();
                     " />
                 <div class="options-container-item">
-                    <el-button
-                        size="small"
-                        :icon="Rank"
+                    <Button
+                        size="sm"
+                        variant="outline"
                         :disabled="!overlayNotifications || !openVR"
                         @click="showNotificationPositionDialog"
                         >{{
                             t('view.settings.notifications.notifications.steamvr_notifications.notification_position')
-                        }}</el-button
+                        }}</Button
                     >
                 </div>
-                <div class="options-container-item">
-                    <span class="name" style="vertical-align: top; padding-top: 10px">{{
-                        t('view.settings.notifications.notifications.steamvr_notifications.notification_opacity')
-                    }}</span>
-                    <el-slider
-                        :model-value="notificationOpacity"
-                        @input="setNotificationOpacity"
-                        :min="0"
-                        :max="100"
-                        style="display: inline-block; width: 300px; padding-top: 16px" />
-                </div>
-                <div class="options-container-item">
-                    <el-button
-                        size="small"
-                        :icon="Timer"
-                        :disabled="(!overlayNotifications || !openVR) && !xsNotifications"
-                        @click="promptNotificationTimeout"
-                        >{{
-                            t('view.settings.notifications.notifications.steamvr_notifications.notification_timeout')
-                        }}</el-button
-                    >
-                </div>
-                <simple-switch
-                    :label="t('view.settings.notifications.notifications.steamvr_notifications.user_images')"
-                    :value="imageNotifications"
-                    @change="
-                        setImageNotifications();
-                        saveOpenVROption();
-                    " />
             </template>
+            <div class="options-container-item">
+                <span class="name" style="vertical-align: top; padding-top: 10px">{{
+                    t('view.settings.notifications.notifications.steamvr_notifications.notification_opacity')
+                }}</span>
+                <div style="flex: 0 0 300px; width: 300px; max-width: 100%; padding-top: 16px">
+                    <Slider v-model="notificationOpacityValue" :min="0" :max="100" />
+                </div>
+            </div>
+            <div class="options-container-item">
+                <Button
+                    size="sm"
+                    variant="outline"
+                    :disabled="(!overlayNotifications || !openVR) && !xsNotifications"
+                    @click="promptNotificationTimeout"
+                    >{{
+                        t('view.settings.notifications.notifications.steamvr_notifications.notification_timeout')
+                    }}</Button
+                >
+            </div>
+            <simple-switch
+                :label="t('view.settings.notifications.notifications.steamvr_notifications.user_images')"
+                :value="imageNotifications"
+                @change="
+                    setImageNotifications();
+                    saveOpenVROption();
+                " />
             <template v-if="!isLinux">
                 <simple-switch
                     :label="
@@ -158,46 +158,43 @@
                     t('view.settings.notifications.notifications.desktop_notifications.when_to_display')
                 }}</span>
                 <br />
-                <el-radio-group
+                <ToggleGroup
+                    type="single"
+                    required
+                    variant="outline"
+                    size="sm"
                     :model-value="desktopToast"
-                    size="small"
                     style="margin-top: 5px"
-                    @change="
-                        setDesktopToast($event);
-                        saveOpenVROption();
-                    ">
-                    <el-radio-button label="Never">{{
+                    @update:model-value="setDesktopToast(String($event))">
+                    <ToggleGroupItem value="Never">{{
                         t('view.settings.notifications.notifications.conditions.never')
-                    }}</el-radio-button>
-                    <el-radio-button label="Desktop Mode">{{
+                    }}</ToggleGroupItem>
+                    <ToggleGroupItem value="Desktop Mode">{{
                         t('view.settings.notifications.notifications.conditions.desktop')
-                    }}</el-radio-button>
-                    <el-radio-button label="Inside VR">{{
+                    }}</ToggleGroupItem>
+                    <ToggleGroupItem value="Inside VR">{{
                         t('view.settings.notifications.notifications.conditions.inside_vr')
-                    }}</el-radio-button>
-                    <el-radio-button label="Outside VR">{{
+                    }}</ToggleGroupItem>
+                    <ToggleGroupItem value="Outside VR">{{
                         t('view.settings.notifications.notifications.conditions.outside_vr')
-                    }}</el-radio-button>
-                    <el-radio-button label="Game Running">{{
+                    }}</ToggleGroupItem>
+                    <ToggleGroupItem value="Game Running">{{
                         t('view.settings.notifications.notifications.conditions.inside_vrchat')
-                    }}</el-radio-button>
-                    <el-radio-button label="Game Closed">{{
+                    }}</ToggleGroupItem>
+                    <ToggleGroupItem value="Game Closed">{{
                         t('view.settings.notifications.notifications.conditions.outside_vrchat')
-                    }}</el-radio-button>
-                    <el-radio-button label="Always">{{
+                    }}</ToggleGroupItem>
+                    <ToggleGroupItem value="Always">{{
                         t('view.settings.notifications.notifications.conditions.always')
-                    }}</el-radio-button>
-                </el-radio-group>
+                    }}</ToggleGroupItem>
+                </ToggleGroup>
             </div>
             <simple-switch
                 :label="
                     t('view.settings.notifications.notifications.desktop_notifications.desktop_notification_while_afk')
                 "
                 :value="afkDesktopToast"
-                @change="
-                    setAfkDesktopToast();
-                    saveOpenVROption();
-                " />
+                @change="setAfkDesktopToast" />
         </div>
         <div class="options-container">
             <span class="sub-header">{{ t('view.settings.notifications.notifications.text_to_speech.header') }}</span>
@@ -206,69 +203,68 @@
                     t('view.settings.notifications.notifications.text_to_speech.when_to_play')
                 }}</span>
                 <br />
-                <el-radio-group
+                <ToggleGroup
+                    type="single"
+                    required
+                    variant="outline"
+                    size="sm"
                     :model-value="notificationTTS"
-                    size="small"
                     style="margin-top: 5px"
-                    @change="saveNotificationTTS">
-                    <el-radio-button label="Never">{{
+                    @update:model-value="saveNotificationTTS">
+                    <ToggleGroupItem value="Never">{{
                         t('view.settings.notifications.notifications.conditions.never')
-                    }}</el-radio-button>
-                    <el-radio-button label="Inside VR">{{
+                    }}</ToggleGroupItem>
+                    <ToggleGroupItem value="Inside VR">{{
                         t('view.settings.notifications.notifications.conditions.inside_vr')
-                    }}</el-radio-button>
-                    <el-radio-button label="Game Running">{{
+                    }}</ToggleGroupItem>
+                    <ToggleGroupItem value="Game Running">{{
                         t('view.settings.notifications.notifications.conditions.inside_vrchat')
-                    }}</el-radio-button>
-                    <el-radio-button label="Game Closed">{{
+                    }}</ToggleGroupItem>
+                    <ToggleGroupItem value="Game Closed">{{
                         t('view.settings.notifications.notifications.conditions.outside_vrchat')
-                    }}</el-radio-button>
-                    <el-radio-button label="Always">{{
+                    }}</ToggleGroupItem>
+                    <ToggleGroupItem value="Always">{{
                         t('view.settings.notifications.notifications.conditions.always')
-                    }}</el-radio-button>
-                </el-radio-group>
+                    }}</ToggleGroupItem>
+                </ToggleGroup>
             </div>
             <div class="options-container-item">
                 <span class="name">{{ t('view.settings.notifications.notifications.text_to_speech.tts_voice') }}</span>
-                <el-dropdown trigger="click" size="small" @command="(voice) => changeTTSVoice(voice)">
-                    <el-button size="small" :disabled="notificationTTS === 'Never'">
-                        <span
-                            >{{ getTTSVoiceName() }} <el-icon style="margin-left: 5px"><ArrowDown /></el-icon
-                        ></span>
-                    </el-button>
-                    <template #dropdown>
-                        <el-dropdown-menu>
-                            <el-dropdown-item
-                                v-for="(voice, index) in TTSvoices"
-                                :key="index"
-                                :command="index"
-                                v-text="voice.name" />
-                        </el-dropdown-menu>
-                    </template>
-                </el-dropdown>
+                <Select
+                    :model-value="ttsVoiceIndex"
+                    :disabled="notificationTTS === 'Never'"
+                    @update:modelValue="(v) => (ttsVoiceIndex = v)">
+                    <SelectTrigger size="sm">
+                        <SelectValue :placeholder="getTTSVoiceName()" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectGroup>
+                            <SelectItem v-for="(voice, index) in TTSvoices" :key="index" :value="index">
+                                {{ voice.name }}
+                            </SelectItem>
+                        </SelectGroup>
+                    </SelectContent>
+                </Select>
             </div>
             <simple-switch
                 :label="t('view.settings.notifications.notifications.text_to_speech.use_memo_nicknames')"
                 :value="notificationTTSNickName"
                 :disabled="notificationTTS === 'Never'"
-                @change="
-                    setNotificationTTSNickName();
-                    saveOpenVROption();
-                " />
+                @change="setNotificationTTSNickName" />
             <simple-switch
                 :label="t('view.settings.notifications.notifications.text_to_speech.tts_test_placeholder')"
                 :value="isTestTTSVisible"
                 @change="isTestTTSVisible = !isTestTTSVisible" />
             <div v-if="isTestTTSVisible" style="margin-top: 5px">
-                <el-input
+                <InputGroupTextareaField
                     v-model="notificationTTSTest"
-                    type="textarea"
                     :placeholder="t('view.settings.notifications.notifications.text_to_speech.tts_test_placeholder')"
                     :rows="1"
-                    style="width: 175px; display: inline-block"></el-input>
-                <el-button size="small" :icon="VideoPlay" style="margin-left: 10px" @click="testNotificationTTS">{{
+                    style="width: 175px; display: inline-block"
+                    input-class="resize-none min-h-0" />
+                <Button size="sm" variant="outline" style="margin-left: 10px" @click="testNotificationTTS">{{
                     t('view.settings.notifications.notifications.text_to_speech.play')
-                }}</el-button>
+                }}</Button>
             </div>
         </div>
         <NotificationPositionDialog v-model:isNotificationPositionDialogVisible="isNotificationPositionDialogVisible" />
@@ -277,12 +273,16 @@
 </template>
 
 <script setup>
-    import { ArrowDown, ChatSquare, Rank, Timer, VideoPlay } from '@element-plus/icons-vue';
+    import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
     import { computed, ref } from 'vue';
+    import { Button } from '@/components/ui/button';
+    import { InputGroupTextareaField } from '@/components/ui/input-group';
     import { storeToRefs } from 'pinia';
     import { useI18n } from 'vue-i18n';
 
     import { useAdvancedSettingsStore, useNotificationsSettingsStore, useVrStore } from '../../../../stores';
+    import { ToggleGroup, ToggleGroupItem } from '../../../../components/ui/toggle-group';
+    import { Slider } from '../../../../components/ui/slider';
 
     import FeedFiltersDialog from '../../dialogs/FeedFiltersDialog.vue';
     import NotificationPositionDialog from '../../dialogs/NotificationPositionDialog.vue';
@@ -336,6 +336,28 @@
     const feedFiltersDialogMode = ref('');
     const isNotificationPositionDialogVisible = ref(false);
     const isLinux = computed(() => LINUX);
+    const notificationOpacityValue = computed({
+        get: () => [notificationOpacity.value],
+        set: (value) => {
+            const next = value?.[0];
+            if (typeof next === 'number') {
+                setNotificationOpacity(next);
+            }
+        }
+    });
+
+    const ttsVoiceIndex = computed({
+        get: () => {
+            const currentName = getTTSVoiceName();
+            const idx = TTSvoices.value.findIndex((v) => v?.name === currentName);
+            return idx >= 0 ? idx : null;
+        },
+        set: (value) => {
+            if (typeof value === 'number') {
+                changeTTSVoice(value);
+            }
+        }
+    });
 
     function showNotyFeedFiltersDialog() {
         feedFiltersDialogMode.value = 'noty';

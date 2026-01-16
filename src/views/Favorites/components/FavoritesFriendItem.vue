@@ -1,117 +1,139 @@
 <template>
-    <div @click="$emit('click')">
-        <div class="x-friend-item">
-            <template v-if="favorite.ref">
-                <div class="avatar" :class="userStatusClass(favorite.ref)">
+    <div :class="cardClasses" @click="$emit('click')">
+        <template v-if="favorite.ref">
+            <div class="favorites-search-card__content">
+                <div class="favorites-search-card__avatar">
                     <img :src="userImage(favorite.ref, true)" loading="lazy" />
                 </div>
-                <div class="detail">
-                    <span
-                        class="name"
-                        :style="{ color: favorite.ref.$userColour }"
-                        v-text="favorite.ref.displayName"></span>
-                    <Location
-                        class="extra"
-                        v-if="favorite.ref.location !== 'offline'"
-                        :location="favorite.ref.location"
-                        :traveling="favorite.ref.travelingToLocation"
-                        :link="false" />
-                    <span v-else v-text="favorite.ref.statusDescription"></span>
+                <div class="favorites-search-card__detail">
+                    <div class="favorites-search-card__title">
+                        <span class="name" :style="displayNameStyle">{{ favorite.ref.displayName }}</span>
+                    </div>
+                    <div v-if="favorite.ref.location !== 'offline'" class="favorites-search-card__location">
+                        <Location
+                            :location="favorite.ref.location"
+                            :traveling="favorite.ref.travelingToLocation"
+                            :link="false" />
+                    </div>
+                    <span v-else class="extra">{{ favorite.ref.statusDescription }}</span>
                 </div>
-                <div class="editing">
-                    <el-dropdown trigger="hover" size="small" style="margin-left: 5px" :persistent="false">
-                        <div>
-                            <el-button type="default" :icon="Back" size="small" circle></el-button>
+            </div>
+            <div class="favorites-search-card__actions">
+                <template v-if="editMode">
+                    <div class="favorites-search-card__action favorites-search-card__action--checkbox" @click.stop>
+                        <Checkbox v-model="isSelected" />
+                    </div>
+                    <div class="favorites-search-card__action-group">
+                        <div class="favorites-search-card__action favorites-search-card__action--full" @click.stop>
+                            <FavoritesMoveDropdown
+                                :favoriteGroup="favoriteFriendGroups"
+                                :currentGroup="group"
+                                :currentFavorite="favorite"
+                                class="favorites-search-card__dropdown"
+                                type="friend" />
                         </div>
-                        <template #dropdown>
-                            <span style="font-weight: bold; display: block; text-align: center">
-                                {{ t('view.favorite.move_tooltip') }}
-                            </span>
-                            <el-dropdown-menu>
-                                <template v-for="groupAPI in favoriteFriendGroups" :key="groupAPI.name">
-                                    <el-dropdown-item
-                                        v-if="groupAPI.name !== group.name"
-                                        style="display: block; margin: 10px 0"
-                                        :disabled="groupAPI.count >= groupAPI.capacity"
-                                        @click="moveFavorite(favorite.ref, groupAPI, 'friend')">
-                                        {{ groupAPI.displayName }} ({{ groupAPI.count }} / {{ groupAPI.capacity }})
-                                    </el-dropdown-item>
-                                </template>
-                            </el-dropdown-menu>
-                        </template>
-                    </el-dropdown>
-                    <el-button type="text" size="small" style="margin-left: 5px" @click.stop>
-                        <el-checkbox v-model="favorite.$selected"></el-checkbox>
-                    </el-button>
+                        <div class="favorites-search-card__action">
+                            <TooltipWrapper side="left" :content="t('view.favorite.unfavorite_tooltip')">
+                                <Button
+                                    size="icon-sm"
+                                    variant="outline"
+                                    class="favorites-search-card__action-btn rounded-full text-xs h-6 w-6"
+                                    @click.stop="handleDeleteFavorite">
+                                    <i class="ri-delete-bin-line"></i>
+                                </Button>
+                            </TooltipWrapper>
+                        </div>
+                    </div>
+                </template>
+                <template v-else>
+                    <div class="favorites-search-card__action">
+                        <TooltipWrapper side="right" :content="t('view.favorite.edit_favorite_tooltip')">
+                            <Button
+                                size="icon-sm"
+                                variant="outline"
+                                class="favorites-search-card__action-btn rounded-full text-xs h-6 w-6"
+                                @click.stop="showFavoriteDialog('friend', favorite.id)"
+                                ><i class="ri-star-line"></i
+                            ></Button>
+                        </TooltipWrapper>
+                    </div>
+                </template>
+            </div>
+        </template>
+        <template v-else>
+            <div class="favorites-search-card__content">
+                <div class="favorites-search-card__avatar is-empty"></div>
+                <div class="favorites-search-card__detail">
+                    <span>{{ favorite.name || favorite.id }}</span>
                 </div>
-                <div class="default">
-                    <el-tooltip placement="right" :content="t('view.favorite.unfavorite_tooltip')" :teleported="false">
-                        <el-button
-                            v-if="shiftHeld"
-                            size="small"
-                            :icon="Close"
-                            circle
-                            style="color: #f56c6c; margin-left: 5px"
-                            @click.stop="deleteFavorite(favorite.id)"></el-button>
-                        <el-button
-                            v-else
-                            type="default"
-                            :icon="Star"
-                            size="small"
-                            circle
-                            style="margin-left: 5px"
-                            @click.stop="showFavoriteDialog('friend', favorite.id)"></el-button>
-                    </el-tooltip>
+            </div>
+            <div class="favorites-search-card__actions">
+                <div class="favorites-search-card__action">
+                    <Button
+                        class="rounded-full text-xs h-6 w-6"
+                        size="icon-sm"
+                        variant="outline"
+                        @click.stop="handleDeleteFavorite">
+                        <i class="ri-delete-bin-line"></i>
+                    </Button>
                 </div>
-            </template>
-            <template v-else>
-                <div class="avatar"></div>
-                <div class="detail">
-                    <span v-text="favorite.name || favorite.id"></span>
-                </div>
-                <el-button
-                    type="text"
-                    :icon="Close"
-                    size="small"
-                    style="margin-left: 5px"
-                    @click.stop="deleteFavorite(favorite.id)"></el-button>
-            </template>
-        </div>
+            </div>
+        </template>
     </div>
 </template>
 
 <script setup>
-    import { Back, Close, Star } from '@element-plus/icons-vue';
+    import { Button } from '@/components/ui/button';
+    import { Checkbox } from '@/components/ui/checkbox';
+    import { computed } from 'vue';
     import { storeToRefs } from 'pinia';
     import { useI18n } from 'vue-i18n';
 
-    import { useFavoriteStore, useUiStore } from '../../../stores';
-    import { userImage, userStatusClass } from '../../../shared/utils';
     import { favoriteRequest } from '../../../api';
+    import { useFavoriteStore } from '../../../stores';
+    import { userImage } from '../../../shared/utils';
 
-    defineProps({
+    import FavoritesMoveDropdown from './FavoritesMoveDropdown.vue';
+
+    const props = defineProps({
         favorite: { type: Object, required: true },
-        group: { type: Object, required: true }
+        group: { type: Object, default: null },
+        editMode: { type: Boolean, default: false },
+        selected: { type: Boolean, default: false }
     });
 
-    defineEmits(['click']);
+    const emit = defineEmits(['click', 'toggle-select']);
 
     const { favoriteFriendGroups } = storeToRefs(useFavoriteStore());
     const { showFavoriteDialog } = useFavoriteStore();
-    const { shiftHeld } = storeToRefs(useUiStore());
     const { t } = useI18n();
 
-    function moveFavorite(ref, group, type) {
-        favoriteRequest.deleteFavorite({ objectId: ref.id }).then(() => {
-            favoriteRequest.addFavorite({
-                type,
-                favoriteId: ref.id,
-                tags: group.name
-            });
-        });
-    }
+    const isSelected = computed({
+        get: () => props.selected,
+        set: (value) => emit('toggle-select', value)
+    });
 
-    function deleteFavorite(objectId) {
-        favoriteRequest.deleteFavorite({ objectId });
+    const cardClasses = computed(() => [
+        'favorites-search-card',
+        'favorites-search-card--friend',
+        {
+            'is-selected': props.selected,
+            'is-edit-mode': props.editMode
+        }
+    ]);
+
+    const displayNameStyle = computed(() => {
+        if (props.favorite?.ref?.$userColour) {
+            return {
+                color: props.favorite.ref.$userColour
+            };
+        }
+        return {};
+    });
+
+    function handleDeleteFavorite() {
+        favoriteRequest.deleteFavorite({
+            objectId: props.favorite.id
+        });
     }
 </script>

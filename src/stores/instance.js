@@ -1,6 +1,6 @@
-import { computed, reactive, ref, watch } from 'vue';
-import { ElMessage } from 'element-plus';
+import { reactive, ref, watch } from 'vue';
 import { defineStore } from 'pinia';
+import { toast } from 'vue-sonner';
 import { useI18n } from 'vue-i18n';
 
 import {
@@ -71,42 +71,27 @@ export const useInstanceStore = defineStore('Instance', () => {
         lastUpdated: ''
     });
 
+    /** @type {import('vue').Ref<any>} */
     const currentInstanceLocation = ref({});
 
-    const queuedInstances = ref(new Map());
+    const queuedInstances = reactive(new Map());
 
     const previousInstancesInfoDialogVisible = ref(false);
 
     const previousInstancesInfoDialogInstanceId = ref('');
 
-    const instanceJoinHistory = ref(new Map());
+    const instanceJoinHistory = reactive(new Map());
 
     const currentInstanceUsersData = ref([]);
-    const currentInstanceUsersTable = computed(() => {
-        return {
-            data: currentInstanceWorld.value.ref.id
-                ? currentInstanceUsersData.value
-                : [],
-            tableProps: {
-                stripe: true,
-                size: 'small',
-                defaultSort: {
-                    prop: 'timer',
-                    order: 'descending'
-                }
-            },
-            layout: 'table'
-        };
-    });
 
     watch(
         () => watchState.isLoggedIn,
         (isLoggedIn) => {
             currentInstanceUsersData.value = [];
-            instanceJoinHistory.value = new Map();
+            instanceJoinHistory.clear();
             previousInstancesInfoDialogVisible.value = false;
             cachedInstances.clear();
-            queuedInstances.value.clear();
+            queuedInstances.clear();
             if (isLoggedIn) {
                 getInstanceJoinHistory();
             }
@@ -115,7 +100,15 @@ export const useInstanceStore = defineStore('Instance', () => {
     );
 
     async function getInstanceJoinHistory() {
-        instanceJoinHistory.value = await database.getInstanceJoinHistory();
+        try {
+            const data = await database.getInstanceJoinHistory();
+            instanceJoinHistory.clear();
+            for (const [key, value] of data) {
+                instanceJoinHistory.set(key, value);
+            }
+        } catch (error) {
+            console.error('Failed to get instance join history:', error);
+        }
     }
 
     function addInstanceJoinHistory(location, dateTime) {
@@ -123,12 +116,12 @@ export const useInstanceStore = defineStore('Instance', () => {
             return;
         }
 
-        if (instanceJoinHistory.value.has(location)) {
-            instanceJoinHistory.value.delete(location);
+        if (instanceJoinHistory.has(location)) {
+            instanceJoinHistory.delete(location);
         }
 
         const epoch = new Date(dateTime).getTime();
-        instanceJoinHistory.value.set(location, epoch);
+        instanceJoinHistory.set(location, epoch);
     }
 
     function showPreviousInstancesInfoDialog(instanceId) {
@@ -531,7 +524,7 @@ export const useInstanceStore = defineStore('Instance', () => {
                 };
             }
         }
-        const { instanceId, shortName } = D.$location;
+        const { instanceId, shortName } = D?.$location || {};
         if (instanceId && typeof instances[instanceId] === 'undefined') {
             instances[instanceId] = {
                 id: instanceId,
@@ -546,9 +539,9 @@ export const useInstanceStore = defineStore('Instance', () => {
         const cachedCurrentUser = userStore.cachedUsers.get(
             userStore.currentUser.id
         );
-        const lastLocation$ = cachedCurrentUser.$location;
+        const lastLocation$ = cachedCurrentUser?.$location;
         const playersInInstance = locationStore.lastLocation.playerList;
-        if (lastLocation$.worldId === D.id && playersInInstance.size > 0) {
+        if (lastLocation$?.worldId === D.id && playersInInstance.size > 0) {
             // pull instance json from cache
             const friendsInInstance = locationStore.lastLocation.friendList;
             instance = {
@@ -580,7 +573,7 @@ export const useInstanceStore = defineStore('Instance', () => {
                 typeof ref === 'undefined' ||
                 typeof ref.$location === 'undefined' ||
                 ref.$location.worldId !== D.id ||
-                (ref.$location.instanceId === lastLocation$.instanceId &&
+                (ref.$location.instanceId === lastLocation$?.instanceId &&
                     playersInInstance.size > 0 &&
                     ref.location !== 'traveling')
             ) {
@@ -674,7 +667,7 @@ export const useInstanceStore = defineStore('Instance', () => {
             // sort selected and current instance to top
             if (
                 b.location === D.$location.tag ||
-                b.location === lastLocation$.tag
+                b.location === lastLocation$?.tag
             ) {
                 // sort selected instance above current instance
                 if (a.location === D.$location.tag) {
@@ -684,7 +677,7 @@ export const useInstanceStore = defineStore('Instance', () => {
             }
             if (
                 a.location === D.$location.tag ||
-                a.location === lastLocation$.tag
+                a.location === lastLocation$?.tag
             ) {
                 // sort selected instance above current instance
                 if (b.location === D.$location.tag) {
@@ -751,10 +744,10 @@ export const useInstanceStore = defineStore('Instance', () => {
         const cachedCurrentUser = userStore.cachedUsers.get(
             userStore.currentUser.id
         );
-        const lastLocation$ = cachedCurrentUser.$location;
-        const currentLocation = lastLocation$.tag;
+        const lastLocation$ = cachedCurrentUser?.$location;
+        const currentLocation = lastLocation$?.tag;
         const playersInInstance = locationStore.lastLocation.playerList;
-        if (lastLocation$.groupId === D.id && playersInInstance.size > 0) {
+        if (lastLocation$?.groupId === D.id && playersInInstance.size > 0) {
             const friendsInInstance = locationStore.lastLocation.friendList;
             instance = {
                 id: lastLocation$.instanceId,
@@ -785,7 +778,7 @@ export const useInstanceStore = defineStore('Instance', () => {
                 typeof ref === 'undefined' ||
                 typeof ref.$location === 'undefined' ||
                 ref.$location.groupId !== D.id ||
-                (ref.$location.instanceId === lastLocation$.instanceId &&
+                (ref.$location.instanceId === lastLocation$?.instanceId &&
                     playersInInstance.size > 0 &&
                     ref.location !== 'traveling')
             ) {
@@ -883,14 +876,11 @@ export const useInstanceStore = defineStore('Instance', () => {
     }
 
     function removeAllQueuedInstances() {
-        queuedInstances.value.forEach((ref) => {
-            ElMessage({
-                message: `Removed instance ${ref.$worldName} from queue`,
-                type: 'info'
-            });
-            ref.$msgBox?.close();
+        queuedInstances.forEach((ref) => {
+            toast.info(`Removed instance ${ref.$worldName} from queue`);
+            toast.dismiss(ref.$msgBox);
         });
-        queuedInstances.value.clear();
+        queuedInstances.clear();
     }
 
     /**
@@ -898,10 +888,10 @@ export const useInstanceStore = defineStore('Instance', () => {
      * @param {string} instanceId
      */
     function removeQueuedInstance(instanceId) {
-        const ref = queuedInstances.value.get(instanceId);
+        const ref = queuedInstances.get(instanceId);
         if (typeof ref !== 'undefined') {
-            ref.$msgBox.close();
-            queuedInstances.value.delete(instanceId);
+            toast.dismiss(ref.$msgBox);
+            queuedInstances.delete(instanceId);
         }
     }
 
@@ -910,22 +900,21 @@ export const useInstanceStore = defineStore('Instance', () => {
      * @param {string} instanceId
      */
     function applyQueuedInstance(instanceId) {
-        queuedInstances.value.forEach((ref) => {
+        queuedInstances.forEach((ref) => {
             if (ref.location !== instanceId) {
-                ElMessage({
-                    message: t('message.instance.removed_form_queue', {
+                toast.info(
+                    t('message.instance.removed_form_queue', {
                         worldName: ref.$worldName
-                    }),
-                    type: 'info'
-                });
-                ref.$msgBox?.close();
-                queuedInstances.value.delete(ref.location);
+                    })
+                );
+                toast.dismiss(ref.$msgBox);
+                queuedInstances.delete(ref.location);
             }
         });
         if (!instanceId) {
             return;
         }
-        if (!queuedInstances.value.has(instanceId)) {
+        if (!queuedInstances.has(instanceId)) {
             const L = parseLocation(instanceId);
             if (L.isRealInstance) {
                 instanceRequest
@@ -958,20 +947,17 @@ export const useInstanceStore = defineStore('Instance', () => {
      * @param {string} instanceId
      */
     function instanceQueueReady(instanceId) {
-        const ref = queuedInstances.value.get(instanceId);
+        const ref = queuedInstances.get(instanceId);
         if (typeof ref !== 'undefined') {
-            ref.$msgBox.close();
-            queuedInstances.value.delete(instanceId);
+            toast.dismiss(ref.$msgBox);
+            queuedInstances.delete(instanceId);
         }
         const L = parseLocation(instanceId);
         const group = groupStore.cachedGroups.get(L.groupId);
         const groupName = group?.name ?? '';
         const worldName = ref?.$worldName ?? '';
         const location = displayLocation(instanceId, worldName, groupName);
-        ElMessage({
-            message: `Instance ready to join ${location}`,
-            type: 'success'
-        });
+        toast.success(`Instance ready to join ${location}`);
         const noty = {
             created_at: new Date().toJSON(),
             type: 'group.queueReady',
@@ -1002,7 +988,7 @@ export const useInstanceStore = defineStore('Instance', () => {
      * @returns {Promise<void>}
      */
     async function instanceQueueUpdate(instanceId, position, queueSize) {
-        let ref = queuedInstances.value.get(instanceId);
+        let ref = queuedInstances.get(instanceId);
         if (typeof ref === 'undefined') {
             ref = {
                 $msgBox: null,
@@ -1028,15 +1014,17 @@ export const useInstanceStore = defineStore('Instance', () => {
             ref.$worldName,
             ref.$groupName
         );
-        ref.$msgBox?.close();
-        ref.$msgBox = ElMessage({
-            message: `You are in position ${ref.position} of ${ref.queueSize} in the queue for ${location} `,
-            type: 'info',
-            duration: 0,
-            showClose: true,
-            customClass: 'vrc-instance-queue-message'
-        });
-        queuedInstances.value.set(instanceId, ref);
+        toast.dismiss(ref.$msgBox ?? undefined);
+        ref.$msgBox = toast.info(
+            `You are in position ${ref.position} of ${ref.queueSize} in the queue for ${location} `,
+            {
+                duration: Infinity,
+                position: 'bottom-right',
+                closeButton: true,
+                class: 'vrc-instance-queue-message'
+            }
+        );
+        queuedInstances.set(instanceId, ref);
         // workerTimers.setTimeout(this.instanceQueueTimeout, 3600000);
     }
 
@@ -1076,6 +1064,7 @@ export const useInstanceStore = defineStore('Instance', () => {
             let isMuted = false;
             let isAvatarInteractionDisabled = false;
             let isChatBoxMuted = false;
+            let ageVerified = false;
             photonStore.photonLobbyCurrent.forEach((ref1, id) => {
                 if (typeof ref1 !== 'undefined') {
                     if (
@@ -1137,6 +1126,7 @@ export const useInstanceStore = defineStore('Instance', () => {
                 isAvatarInteractionDisabled =
                     ref.$moderations.isAvatarInteractionDisabled;
                 isChatBoxMuted = ref.$moderations.isChatBoxMuted;
+                ageVerified = ref.ageVerificationStatus === '18+';
             }
             users.push({
                 ref,
@@ -1149,9 +1139,13 @@ export const useInstanceStore = defineStore('Instance', () => {
                 inVRMode,
                 groupOnNameplate,
                 isFriend,
-                timeoutTime
+                timeoutTime,
+                isBlocked,
+                isMuted,
+                isAvatarInteractionDisabled,
+                isChatBoxMuted,
+                ageVerified
             });
-            // get block, mute
         };
 
         const playersInInstance = locationStore.lastLocation.playerList;
@@ -1196,9 +1190,9 @@ export const useInstanceStore = defineStore('Instance', () => {
 
     // $app.methods.instanceQueueClear = function () {
     //     // remove all instances from queue
-    //     queuedInstances.value.forEach((ref) => {
-    //         ref.$msgBox.close();
-    //         queuedInstances.value.delete(ref.location);
+    //     queuedInstances.forEach((ref) => {
+    //         toast.dismiss(ref.$msgBox);
+    //         queuedInstances.delete(ref.location);
     //     });
     // };
 
@@ -1213,7 +1207,7 @@ export const useInstanceStore = defineStore('Instance', () => {
         previousInstancesInfoDialogVisible,
         previousInstancesInfoDialogInstanceId,
         instanceJoinHistory,
-        currentInstanceUsersTable,
+        currentInstanceUsersData,
 
         applyInstance,
         updateCurrentInstanceWorld,

@@ -3,7 +3,7 @@
         <div class="options-container" style="margin-top: 0; padding: 5px">
             <span class="header">{{ t('view.settings.header') }}</span>
         </div>
-        <el-tabs type="card" style="height: calc(100% - 51px)">
+        <el-tabs style="height: calc(100% - 51px)">
             <el-tab-pane :label="t('view.settings.category.general')">
                 <GeneralTab />
             </el-tab-pane>
@@ -30,6 +30,7 @@
 </template>
 
 <script setup>
+    import { onBeforeMount } from 'vue';
     import { useI18n } from 'vue-i18n';
 
     import AdvancedTab from './components/Tabs/AdvancedTab.vue';
@@ -41,4 +42,12 @@
     import WristOverlayTab from './components/Tabs/WristOverlayTab.vue';
 
     const { t } = useI18n();
+
+    onBeforeMount(() => {
+        const menuItem = document.querySelector('li[role="menuitem"].is-active');
+
+        if (menuItem) {
+            menuItem.classList.remove('is-active');
+        }
+    });
 </script>

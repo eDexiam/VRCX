@@ -6,25 +6,31 @@
         width="600px"
         @close="closeDialog">
         <div>
-            <el-input
+            <InputGroupAction
                 v-for="(provider, index) in avatarRemoteDatabaseProviderList"
                 :key="index"
                 v-model="avatarRemoteDatabaseProviderList[index]"
-                size="small"
+                size="sm"
                 style="margin-top: 5px"
                 @change="saveAvatarProviderList">
-                <el-button :icon="Delete" @click="removeAvatarProvider(provider)"></el-button>
-            </el-input>
+                <template #actions>
+                    <Button variant="outline" size="icon" @click="removeAvatarProvider(provider)">
+                        <Trash2 />
+                    </Button>
+                </template>
+            </InputGroupAction>
 
-            <el-button size="small" style="margin-top: 5px" @click="avatarRemoteDatabaseProviderList.push('')">
+            <Button size="sm" style="margin-top: 5px" @click="avatarRemoteDatabaseProviderList.push('')">
                 {{ t('dialog.avatar_database_provider.add_provider') }}
-            </el-button>
+            </Button>
         </div>
     </el-dialog>
 </template>
 
 <script setup>
-    import { Delete } from '@element-plus/icons-vue';
+    import { Button } from '@/components/ui/button';
+    import { InputGroupAction } from '@/components/ui/input-group';
+    import { Trash2 } from 'lucide-vue-next';
     import { storeToRefs } from 'pinia';
     import { useI18n } from 'vue-i18n';
 

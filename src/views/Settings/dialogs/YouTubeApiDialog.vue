@@ -7,31 +7,32 @@
         @close="closeDialog">
         <div style="font-size: 12px">{{ t('dialog.youtube_api.description') }} <br /></div>
 
-        <el-input
+        <InputGroupTextareaField
             v-model="youTubeApiKey"
-            type="textarea"
             :placeholder="t('dialog.youtube_api.placeholder')"
-            maxlength="39"
-            show-word-limit
-            style="display: block; margin-top: 10px">
-        </el-input>
+            :maxlength="39"
+            :rows="2"
+            class="mt-2.5"
+            show-count />
 
         <template #footer>
-            <div style="display: flex">
-                <el-button @click="openExternalLink('https://smashballoon.com/doc/youtube-api-key/')">
+            <div class="flex items-center justify-between">
+                <Button variant="outline" @click="openExternalLink('https://smashballoon.com/doc/youtube-api-key/')">
                     {{ t('dialog.youtube_api.guide') }}
-                </el-button>
-                <el-button type="primary" style="margin-left: auto" @click="testYouTubeApiKey">
+                </Button>
+                <Button style="margin-left: auto" @click="testYouTubeApiKey">
                     {{ t('dialog.youtube_api.save') }}
-                </el-button>
+                </Button>
             </div>
         </template>
     </el-dialog>
 </template>
 
 <script setup>
-    import { ElMessage } from 'element-plus';
+    import { Button } from '@/components/ui/button';
+    import { InputGroupTextareaField } from '@/components/ui/input-group';
     import { storeToRefs } from 'pinia';
+    import { toast } from 'vue-sonner';
     import { useI18n } from 'vue-i18n';
 
     import { openExternalLink } from '../../../shared/utils';
@@ -57,26 +58,17 @@
     async function testYouTubeApiKey() {
         const previousKey = youTubeApiKey.value;
         if (!youTubeApiKey.value) {
-            ElMessage({
-                message: 'YouTube API key removed',
-                type: 'success'
-            });
+            toast.success('YouTube API key removed');
             closeDialog();
             return;
         }
         const data = await lookupYouTubeVideo('dQw4w9WgXcQ');
         if (!data) {
             setYouTubeApiKey(previousKey);
-            ElMessage({
-                message: 'Invalid YouTube API key',
-                type: 'error'
-            });
+            toast.error('Invalid YouTube API key');
         } else {
             setYouTubeApiKey(youTubeApiKey.value);
-            ElMessage({
-                message: 'YouTube API key valid!',
-                type: 'success'
-            });
+            toast.success('YouTube API key valid!');
             closeDialog();
         }
     }
