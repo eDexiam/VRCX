@@ -1,154 +1,271 @@
 <template>
-    <div class="mutual-graph pt-12" ref="mutualGraphRef">
-        <div class="options-container mutual-graph__toolbar">
-            <div class="mutual-graph__actions">
-                <TooltipWrapper :content="t('view.charts.mutual_friend.force_dialog.open_label')" side="top">
-                    <Button
-                        class="rounded-full"
-                        size="icon"
-                        variant="outline"
-                        :disabled="!graphReady"
-                        @click="openForceDialog">
-                        <Settings />
-                    </Button>
-                </TooltipWrapper>
-                <TooltipWrapper :content="fetchButtonLabel" side="top">
-                    <Button :disabled="fetchButtonDisabled" @click="startFetch">
-                        <Spinner v-if="isFetching" />
-                        {{ fetchButtonLabel }}
-                    </Button>
-                </TooltipWrapper>
-                <TooltipWrapper
-                    v-if="isFetching"
-                    :content="t('view.charts.mutual_friend.actions.stop_fetching')"
-                    side="top">
-                    <Button variant="destructive" :disabled="status.cancelRequested" @click="cancelFetch">
-                        {{ t('view.charts.mutual_friend.actions.stop') }}
-                    </Button>
-                </TooltipWrapper>
-            </div>
-        </div>
+    <div id="chart" class="x-container">
+        <div
+            class="mt-0 flex min-h-[calc(100vh-140px)] flex-col items-center justify-betweenpt-12"
+            ref="mutualGraphRef">
+            <div class="flex items-center w-full">
+                <div class="options-container flex items-center gap-3 bg-transparent pb-3 shadow-none">
+                    <div>
+                        <TooltipWrapper
+                            v-if="isFetching"
+                            :content="t('view.charts.mutual_friend.actions.stop_fetching')"
+                            side="top">
+                            <Button variant="destructive" :disabled="status.cancelRequested" @click="cancelFetch">
+                                <Spinner />
+                                {{ t('view.charts.mutual_friend.actions.stop') }}
+                            </Button>
+                        </TooltipWrapper>
 
-        <div v-if="isFetching" class="mutual-graph__status">
-            <div class="mutual-graph__status-row">
-                <span>{{ t('view.charts.mutual_friend.progress.friends_processed') }}</span>
-                <strong>{{ fetchState.processedFriends }} / {{ totalFriends }}</strong>
-            </div>
-
-            <Progress :model-value="progressPercent" class="h-3" />
-        </div>
-
-        <div ref="chartRef" class="mutual-graph__canvas"></div>
-
-        <div v-if="hasFetched && !isFetching && !graphReady" class="mutual-graph__placeholder">
-            <span>{{ t('view.charts.mutual_friend.progress.no_relationships_discovered') }}</span>
-        </div>
-
-        <el-dialog
-            v-model="isForceDialogVisible"
-            :title="t('view.charts.mutual_friend.force_dialog.title')"
-            width="440px">
-            <p class="mutual-graph__force-description">
-                {{ t('view.charts.mutual_friend.force_dialog.description') }}
-            </p>
-            <FieldGroup class="mutual-graph__force-form">
-                <Field>
-                    <FieldLabel>{{ t('view.charts.mutual_friend.force_dialog.repulsion') }}</FieldLabel>
-                    <FieldContent>
-                        <NumberField
-                            v-model="forceForm.repulsion"
-                            :step="1"
-                            :format-options="{ maximumFractionDigits: 0 }"
-                            class="mutual-graph__number-input">
-                            <NumberFieldContent>
-                                <NumberFieldInput />
-                            </NumberFieldContent>
-                        </NumberField>
-                        <FieldDescription class="mutual-graph__helper">
-                            {{ t('view.charts.mutual_friend.force_dialog.repulsion_help') }}
-                        </FieldDescription>
-                    </FieldContent>
-                </Field>
-                <Field>
-                    <FieldLabel>{{ t('view.charts.mutual_friend.force_dialog.edge_length_min') }}</FieldLabel>
-                    <FieldContent>
-                        <NumberField
-                            v-model="forceForm.edgeLengthMin"
-                            :step="1"
-                            :format-options="{ maximumFractionDigits: 0 }"
-                            class="mutual-graph__number-input">
-                            <NumberFieldContent>
-                                <NumberFieldInput />
-                            </NumberFieldContent>
-                        </NumberField>
-                        <FieldDescription class="mutual-graph__helper">
-                            {{ t('view.charts.mutual_friend.force_dialog.edge_length_min_help') }}
-                        </FieldDescription>
-                    </FieldContent>
-                </Field>
-                <Field>
-                    <FieldLabel>{{ t('view.charts.mutual_friend.force_dialog.edge_length_max') }}</FieldLabel>
-                    <FieldContent>
-                        <NumberField
-                            v-model="forceForm.edgeLengthMax"
-                            :step="1"
-                            :format-options="{ maximumFractionDigits: 0 }"
-                            class="mutual-graph__number-input">
-                            <NumberFieldContent>
-                                <NumberFieldInput />
-                            </NumberFieldContent>
-                        </NumberField>
-                        <FieldDescription class="mutual-graph__helper">
-                            {{ t('view.charts.mutual_friend.force_dialog.edge_length_max_help') }}
-                        </FieldDescription>
-                    </FieldContent>
-                </Field>
-                <Field>
-                    <FieldLabel>{{ t('view.charts.mutual_friend.force_dialog.gravity') }}</FieldLabel>
-                    <FieldContent>
-                        <NumberField
-                            v-model="forceForm.gravity"
-                            :max="1"
-                            :step="0.1"
-                            :format-options="{ maximumFractionDigits: 1 }"
-                            class="mutual-graph__number-input">
-                            <NumberFieldContent>
-                                <NumberFieldInput />
-                            </NumberFieldContent>
-                        </NumberField>
-                        <FieldDescription class="mutual-graph__helper">
-                            {{ t('view.charts.mutual_friend.force_dialog.gravity_help') }}
-                        </FieldDescription>
-                    </FieldContent>
-                </Field>
-            </FieldGroup>
-
-            <template #footer>
-                <div class="mutual-graph__dialog-footer">
-                    <Button variant="secondary" class="mr-2" @click="resetForceSettings">{{
-                        t('view.charts.mutual_friend.force_dialog.reset')
-                    }}</Button>
-                    <Button :disabled="!graphReady" @click="applyForceSettings">
-                        {{ t('view.charts.mutual_friend.force_dialog.apply') }}
-                    </Button>
+                        <TooltipWrapper v-else :content="fetchButtonLabel" side="top">
+                            <Button :disabled="fetchButtonDisabled" @click="startFetch">
+                                {{ fetchButtonLabel }}
+                            </Button>
+                        </TooltipWrapper>
+                    </div>
+                    <VirtualCombobox
+                        v-if="graphReady"
+                        :model-value="selectedFriendId"
+                        @update:modelValue="navigateToFriend"
+                        :groups="friendPickerGroups"
+                        :placeholder="t('view.charts.mutual_friend.actions.go_to_friend')"
+                        :search-placeholder="t('view.charts.mutual_friend.actions.go_to_friend')"
+                        :close-on-select="true"
+                        :deselect-on-reselect="true">
+                        <template #item="{ item, selected }">
+                            <div class="x-friend-item flex w-full items-center">
+                                <template v-if="item.user">
+                                    <div :class="['avatar', userStatusClass(item.user)]">
+                                        <img :src="userImage(item.user)" loading="lazy" />
+                                    </div>
+                                    <div class="detail">
+                                        <span class="name" :style="{ color: item.user.$userColour }">{{
+                                            item.user.displayName
+                                        }}</span>
+                                    </div>
+                                </template>
+                                <template v-else>
+                                    <span>{{ item.label }}</span>
+                                </template>
+                                <CheckIcon :class="['ml-auto size-4', selected ? 'opacity-100' : 'opacity-0']" />
+                            </div>
+                        </template>
+                    </VirtualCombobox>
                 </div>
-            </template>
-        </el-dialog>
+                <div class="ml-auto flex items-center gap-2">
+                    <Sheet>
+                        <SheetTrigger as-child>
+                            <div>
+                                <TooltipWrapper :content="t('view.charts.mutual_friend.settings.title')" side="top">
+                                    <Button class="rounded-full" size="icon" variant="ghost">
+                                        <Settings />
+                                    </Button>
+                                </TooltipWrapper>
+                            </div>
+                        </SheetTrigger>
+                        <SheetContent side="right" class="w-90">
+                            <SheetHeader>
+                                <SheetTitle>{{ t('view.charts.mutual_friend.settings.title') }}</SheetTitle>
+                            </SheetHeader>
+
+                            <FieldGroup class="mt-4 gap-4 p-4">
+                                <Field>
+                                    <FieldLabel>{{
+                                        t('view.charts.mutual_friend.settings.layout_iterations')
+                                    }}</FieldLabel>
+                                    <FieldContent>
+                                        <div class="flex items-center gap-3">
+                                            <Slider
+                                                v-model="layoutIterationsModel"
+                                                :min="LAYOUT_ITERATIONS_MIN"
+                                                :max="LAYOUT_ITERATIONS_MAX"
+                                                :step="100" />
+                                            <span
+                                                class="min-w-12 text-right text-sm text-muted-foreground tabular-nums">
+                                                {{ layoutSettings.layoutIterations }}
+                                            </span>
+                                        </div>
+                                        <p class="mt-1 text-xs text-muted-foreground">
+                                            {{ t('view.charts.mutual_friend.settings.layout_iterations_help') }}
+                                        </p>
+                                    </FieldContent>
+                                </Field>
+
+                                <Field>
+                                    <FieldLabel>{{
+                                        t('view.charts.mutual_friend.settings.layout_spacing')
+                                    }}</FieldLabel>
+                                    <FieldContent>
+                                        <div class="flex items-center gap-3">
+                                            <Slider
+                                                v-model="layoutSpacingModel"
+                                                :min="LAYOUT_SPACING_MIN"
+                                                :max="LAYOUT_SPACING_MAX"
+                                                :step="1" />
+                                            <span
+                                                class="min-w-12 text-right text-sm text-muted-foreground tabular-nums">
+                                                {{ layoutSettings.layoutSpacing }}
+                                            </span>
+                                        </div>
+                                        <p class="mt-1 text-xs text-muted-foreground">
+                                            {{ t('view.charts.mutual_friend.settings.layout_spacing_help') }}
+                                        </p>
+                                    </FieldContent>
+                                </Field>
+
+                                <Field>
+                                    <FieldLabel>{{
+                                        t('view.charts.mutual_friend.settings.edge_curvature')
+                                    }}</FieldLabel>
+                                    <FieldContent>
+                                        <div class="flex items-center gap-3">
+                                            <Slider
+                                                v-model="edgeCurvatureModel"
+                                                :min="EDGE_CURVATURE_MIN"
+                                                :max="EDGE_CURVATURE_MAX"
+                                                :step="0.01" />
+                                            <span
+                                                class="min-w-12 text-right text-sm text-muted-foreground tabular-nums">
+                                                {{ edgeCurvatureLabel }}
+                                            </span>
+                                        </div>
+                                        <p class="mt-1 text-xs text-muted-foreground">
+                                            {{ t('view.charts.mutual_friend.settings.edge_curvature_help') }}
+                                        </p>
+                                    </FieldContent>
+                                </Field>
+
+                                <Field>
+                                    <FieldLabel>{{
+                                        t('view.charts.mutual_friend.settings.community_separation')
+                                    }}</FieldLabel>
+                                    <FieldContent>
+                                        <div class="flex items-center gap-3">
+                                            <Slider
+                                                v-model="communitySeparationModel"
+                                                :min="COMMUNITY_SEPARATION_MIN"
+                                                :max="COMMUNITY_SEPARATION_MAX"
+                                                :step="0.1" />
+                                            <span
+                                                class="min-w-12 text-right text-sm text-muted-foreground tabular-nums">
+                                                {{ communitySeparationLabel }}
+                                            </span>
+                                        </div>
+                                        <p class="mt-1 text-xs text-muted-foreground">
+                                            {{ t('view.charts.mutual_friend.settings.community_separation_help') }}
+                                        </p>
+                                    </FieldContent>
+                                </Field>
+                            </FieldGroup>
+
+                            <FieldGroup class="gap-4 p-4">
+                                <Field>
+                                    <FieldLabel>{{
+                                        t('view.charts.mutual_friend.settings.exclude_friends')
+                                    }}</FieldLabel>
+                                    <FieldContent>
+                                        <VirtualCombobox
+                                            v-model="excludedFriendIds"
+                                            :groups="excludePickerGroups"
+                                            :placeholder="
+                                                t('view.charts.mutual_friend.settings.exclude_friends_placeholder')
+                                            "
+                                            :search-placeholder="t('view.charts.mutual_friend.actions.go_to_friend')"
+                                            :multiple="true">
+                                            <template #item="{ item, selected }">
+                                                <div class="x-friend-item flex w-full items-center">
+                                                    <template v-if="item.user">
+                                                        <div :class="['avatar', userStatusClass(item.user)]">
+                                                            <img :src="userImage(item.user)" loading="lazy" />
+                                                        </div>
+                                                        <div class="detail">
+                                                            <span
+                                                                class="name"
+                                                                :style="{ color: item.user.$userColour }"
+                                                                >{{ item.user.displayName }}</span
+                                                            >
+                                                        </div>
+                                                    </template>
+                                                    <template v-else>
+                                                        <span>{{ item.label }}</span>
+                                                    </template>
+                                                    <CheckIcon
+                                                        :class="[
+                                                            'ml-auto size-4',
+                                                            selected ? 'opacity-100' : 'opacity-0'
+                                                        ]" />
+                                                </div>
+                                            </template>
+                                        </VirtualCombobox>
+                                        <p class="mt-1 text-xs text-muted-foreground">
+                                            {{ t('view.charts.mutual_friend.settings.exclude_friends_help') }}
+                                        </p>
+                                    </FieldContent>
+                                </Field>
+                            </FieldGroup>
+
+                            <div class="p-4 pt-0">
+                                <Button variant="outline" size="sm" class="w-full" @click="resetLayoutSettings">
+                                    {{ t('view.charts.mutual_friend.settings.reset_defaults') }}
+                                </Button>
+                            </div>
+                        </SheetContent>
+                    </Sheet>
+
+                    <div
+                        v-if="isFetching"
+                        class="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] items-center rounded-md bg-transparent p-3 w-70">
+                        <div class="flex justify-between text-sm mb-1">
+                            <span class="mr-1">{{ t('view.charts.mutual_friend.progress.friends_processed') }}</span>
+                            <strong>{{ fetchState.processedFriends }} / {{ totalFriends }}</strong>
+                        </div>
+                        <Progress :model-value="progressPercent" class="h-3" />
+                    </div>
+                </div>
+            </div>
+
+            <div
+                v-show="!(hasFetched && !isFetching && !graphReady)"
+                ref="graphContainerRef"
+                class="mt-3 h-[calc(100vh-260px)] min-h-[520px] w-full flex-1 rounded-lg bg-transparent"
+                :style="{ backgroundColor: canvasBackground }"></div>
+
+            <Empty v-if="hasFetched && !isFetching && !graphReady" class="mt-3 w-full flex-1">
+                <EmptyHeader>
+                    <EmptyDescription>
+                        {{ t('view.charts.mutual_friend.progress.no_relationships_discovered') }}
+                    </EmptyDescription>
+                </EmptyHeader>
+            </Empty>
+        </div>
+        <BackToTop target="#chart" :right="30" :bottom="30" />
     </div>
 </template>
 
 <script setup>
+    defineOptions({ name: 'ChartsMutual' });
+
     import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
-    import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
-    import { NumberField, NumberFieldContent, NumberFieldInput } from '@/components/ui/number-field';
+    import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+    import { Field, FieldContent, FieldGroup, FieldLabel } from '@/components/ui/field';
+    import { Empty, EmptyDescription, EmptyHeader } from '@/components/ui/empty';
+    import { Check as CheckIcon, Settings } from 'lucide-vue-next';
     import { Button } from '@/components/ui/button';
     import { Progress } from '@/components/ui/progress';
-    import { Settings } from 'lucide-vue-next';
+    import { Slider } from '@/components/ui/slider';
     import { Spinner } from '@/components/ui/spinner';
-    import { onBeforeRouteLeave } from 'vue-router';
+    import { VirtualCombobox } from '@/components/ui/virtual-combobox';
+    import { createNodeBorderProgram } from '@sigma/node-border';
     import { storeToRefs } from 'pinia';
     import { toast } from 'vue-sonner';
     import { useI18n } from 'vue-i18n';
+
+    import BackToTop from '@/components/BackToTop.vue';
+    import EdgeCurveProgram from '@sigma/edge-curve';
+    import Graph from 'graphology';
+    import Sigma from 'sigma';
+    import forceAtlas2 from 'graphology-layout-forceatlas2';
+    import louvain from 'graphology-communities-louvain';
+    import noverlap from 'graphology-layout-noverlap';
 
     import {
         useAppearanceSettingsStore,
@@ -157,14 +274,11 @@
         useModalStore,
         useUserStore
     } from '../../../stores';
-    import { applyForceOverrides, computeForceOptions, useMutualGraphChart } from '../composables/useMutualGraphChart';
-    import { createRateLimiter, executeWithBackoff } from '../../../shared/utils';
+    import { userImage, userStatusClass } from '../../../shared/utils';
     import { database } from '../../../service/database';
-    import { userRequest } from '../../../api';
+    import { watchState } from '../../../service/watchState';
 
     import configRepository from '../../../service/config';
-
-    import * as echarts from 'echarts';
 
     const { t } = useI18n();
     const friendStore = useFriendStore();
@@ -174,25 +288,172 @@
     const appearanceStore = useAppearanceSettingsStore();
     const { friends } = storeToRefs(friendStore);
     const { currentUser } = storeToRefs(userStore);
-    const { activeTab, mutualGraphPayload } = storeToRefs(chartsStore);
     const { isDarkMode } = storeToRefs(appearanceStore);
     const cachedUsers = userStore.cachedUsers;
     const showUserDialog = (userId) => userStore.showUserDialog(userId);
 
-    const graphPayload = mutualGraphPayload;
     const fetchState = chartsStore.mutualGraphFetchState;
     const status = chartsStore.mutualGraphStatus;
 
-    const chartTheme = computed(() => (isDarkMode.value ? 'dark' : undefined));
+    const MAX_LABEL_NAME_LENGTH = 20;
 
-    const { buildGraph, createChartOption } = useMutualGraphChart({
-        cachedUsers,
-        graphPayload
+    const COLORS_PALETTE = [
+        '#5470c6',
+        '#91cc75',
+        '#fac858',
+        '#ee6666',
+        '#73c0de',
+        '#3ba272',
+        '#fc8452',
+        '#9a60b4',
+        '#ea7ccc'
+    ];
+
+    const NodeBorderProgram = createNodeBorderProgram({
+        borders: [
+            { size: { value: 0.1 }, color: { value: '#f2f2f2' } },
+            { size: { fill: true }, color: { attribute: 'color' } }
+        ]
     });
 
-    const chartRef = ref(null);
-    let chartInstance = null;
+    const graphContainerRef = ref(null);
+    const mutualGraphRef = ref(null);
+
+    let sigmaInstance = null;
+    let currentGraph = null;
     let resizeObserver = null;
+    let pendingRender = null;
+    let pendingLayoutUpdate = null;
+    let lastMutualMap = null;
+
+    const LAYOUT_ITERATIONS_MIN = 300;
+    const LAYOUT_ITERATIONS_MAX = 1500;
+    const LAYOUT_SPACING_MIN = 8;
+    const LAYOUT_SPACING_MAX = 240;
+    const EDGE_CURVATURE_MIN = 0;
+    const EDGE_CURVATURE_MAX = 0.2;
+    const COMMUNITY_SEPARATION_MIN = 0;
+    const COMMUNITY_SEPARATION_MAX = 3;
+
+    const LAYOUT_DEFAULTS = {
+        layoutIterations: 800,
+        layoutSpacing: 60,
+        edgeCurvature: 0.1,
+        communitySeparation: 0
+    };
+
+    const layoutSettings = reactive({ ...LAYOUT_DEFAULTS });
+
+    const layoutIterationsModel = computed({
+        get: () => [layoutSettings.layoutIterations],
+        set: (value) => {
+            layoutSettings.layoutIterations = clampNumber(
+                Math.round(value?.[0] ?? layoutSettings.layoutIterations),
+                LAYOUT_ITERATIONS_MIN,
+                LAYOUT_ITERATIONS_MAX
+            );
+        }
+    });
+
+    const layoutSpacingModel = computed({
+        get: () => [layoutSettings.layoutSpacing],
+        set: (value) => {
+            layoutSettings.layoutSpacing = clampNumber(
+                Math.round(value?.[0] ?? layoutSettings.layoutSpacing),
+                LAYOUT_SPACING_MIN,
+                LAYOUT_SPACING_MAX
+            );
+        }
+    });
+
+    const edgeCurvatureModel = computed({
+        get: () => [layoutSettings.edgeCurvature],
+        set: (value) => {
+            const next = clampNumber(
+                value?.[0] ?? layoutSettings.edgeCurvature,
+                EDGE_CURVATURE_MIN,
+                EDGE_CURVATURE_MAX
+            );
+            layoutSettings.edgeCurvature = Number(next.toFixed(2));
+        }
+    });
+
+    const edgeCurvatureLabel = computed(() => layoutSettings.edgeCurvature.toFixed(2));
+
+    const communitySeparationModel = computed({
+        get: () => [layoutSettings.communitySeparation],
+        set: (value) => {
+            const next = clampNumber(
+                value?.[0] ?? layoutSettings.communitySeparation,
+                COMMUNITY_SEPARATION_MIN,
+                COMMUNITY_SEPARATION_MAX
+            );
+            layoutSettings.communitySeparation = Number(next.toFixed(1));
+        }
+    });
+    const communitySeparationLabel = computed(() => layoutSettings.communitySeparation.toFixed(1));
+
+    let lastLayoutSpacing = layoutSettings.layoutSpacing;
+
+    watch(isDarkMode, () => {
+        if (!currentGraph) return;
+        renderGraph(currentGraph, true);
+    });
+
+    watch(
+        () => [layoutSettings.layoutIterations, layoutSettings.layoutSpacing],
+        () => {
+            scheduleLayoutUpdate({ runLayout: true });
+            persistLayoutSettings();
+        }
+    );
+
+    watch(
+        () => layoutSettings.edgeCurvature,
+        () => {
+            scheduleLayoutUpdate({ runLayout: false });
+            persistLayoutSettings();
+        }
+    );
+
+    watch(
+        () => layoutSettings.communitySeparation,
+        () => {
+            scheduleLayoutUpdate({ runLayout: true });
+            persistLayoutSettings();
+        }
+    );
+
+    async function loadLayoutSettings() {
+        const [iterations, spacing, curvature, separation] = await Promise.all([
+            configRepository.getInt('VRCX_MutualGraphLayoutIterations', LAYOUT_DEFAULTS.layoutIterations),
+            configRepository.getInt('VRCX_MutualGraphLayoutSpacing', LAYOUT_DEFAULTS.layoutSpacing),
+            configRepository.getFloat('VRCX_MutualGraphEdgeCurvature', LAYOUT_DEFAULTS.edgeCurvature),
+            configRepository.getFloat('VRCX_MutualGraphCommunitySeparation', LAYOUT_DEFAULTS.communitySeparation)
+        ]);
+        layoutSettings.layoutIterations = clampNumber(iterations, LAYOUT_ITERATIONS_MIN, LAYOUT_ITERATIONS_MAX);
+        layoutSettings.layoutSpacing = clampNumber(spacing, LAYOUT_SPACING_MIN, LAYOUT_SPACING_MAX);
+        layoutSettings.edgeCurvature = clampNumber(curvature, EDGE_CURVATURE_MIN, EDGE_CURVATURE_MAX);
+        layoutSettings.communitySeparation = clampNumber(
+            separation,
+            COMMUNITY_SEPARATION_MIN,
+            COMMUNITY_SEPARATION_MAX
+        );
+        lastLayoutSpacing = layoutSettings.layoutSpacing;
+    }
+
+    function persistLayoutSettings() {
+        configRepository.setInt('VRCX_MutualGraphLayoutIterations', layoutSettings.layoutIterations);
+        configRepository.setInt('VRCX_MutualGraphLayoutSpacing', layoutSettings.layoutSpacing);
+        configRepository.setFloat('VRCX_MutualGraphEdgeCurvature', layoutSettings.edgeCurvature);
+        configRepository.setFloat('VRCX_MutualGraphCommunitySeparation', layoutSettings.communitySeparation);
+    }
+
+    function resetLayoutSettings() {
+        Object.assign(layoutSettings, LAYOUT_DEFAULTS);
+        excludedFriendIds.value = [];
+        persistLayoutSettings();
+    }
 
     const isFetching = computed({
         get: () => status.isFetching,
@@ -207,11 +468,14 @@
         }
     });
 
+    const graphNodeCount = ref(0);
+    const isLoadingSnapshot = ref(false);
     const totalFriends = computed(() => friends.value.size);
     const isOptOut = computed(() => Boolean(currentUser.value?.hasSharedConnectionsOptOut));
-    // @ts-ignore
-    const graphReady = computed(() => Array.isArray(graphPayload.value?.nodes) && graphPayload.value.nodes.length > 0);
-    const fetchButtonDisabled = computed(() => isFetching.value || isOptOut.value || totalFriends.value === 0);
+    const graphReady = computed(() => graphNodeCount.value > 0);
+    const fetchButtonDisabled = computed(
+        () => isFetching.value || isOptOut.value || totalFriends.value === 0 || isLoadingSnapshot.value
+    );
     const fetchButtonLabel = computed(() =>
         hasFetched.value
             ? t('view.charts.mutual_friend.actions.fetch_again')
@@ -220,41 +484,84 @@
     const progressPercent = computed(() =>
         totalFriends.value ? Math.min(100, Math.round((fetchState.processedFriends / totalFriends.value) * 100)) : 0
     );
-    const forceDefaults = computed(() =>
-        computeForceOptions(graphPayload.value?.nodes ?? [], graphPayload.value?.links ?? [])
-    );
-    const hasGraphData = computed(() => graphReady.value && Boolean(graphPayload.value?.nodes?.length));
 
-    const isForceDialogVisible = ref(false);
-    const forceOverrides = ref(null);
-    const persistedForce = ref(null);
-    const forceForm = reactive({
-        repulsion: null,
-        edgeLengthMin: null,
-        edgeLengthMax: null,
-        gravity: null
+    const canvasBackground = computed(() => 'transparent');
+
+    const selectedFriendId = ref(null);
+
+    const EXCLUDED_FRIENDS_KEY = 'VRCX_MutualGraphExcludedFriends';
+    const excludedFriendIds = ref(loadExcludedFriends());
+
+    function loadExcludedFriends() {
+        try {
+            const stored = localStorage.getItem(EXCLUDED_FRIENDS_KEY);
+            if (stored) return JSON.parse(stored);
+        } catch {
+            /* ignore */
+        }
+        return [];
+    }
+
+    function saveExcludedFriends() {
+        localStorage.setItem(EXCLUDED_FRIENDS_KEY, JSON.stringify(excludedFriendIds.value));
+    }
+
+    watch(excludedFriendIds, () => {
+        saveExcludedFriends();
+        if (lastMutualMap) applyGraph(lastMutualMap);
     });
-    const forceConfigKey = 'VRCX_MutualGraphForce';
 
-    const parseForceField = (value, { min = 0, max = Infinity, decimals = 0 } = {}) => {
-        if (value === '' || value === null || value === undefined) {
-            return { value: null, invalid: false };
+    const excludePickerGroups = computed(() => {
+        if (!lastMutualMap) return [];
+        const currentUserId = currentUser.value?.id;
+        const seen = new Set();
+        const items = [];
+        for (const [friendId, { mutuals }] of lastMutualMap.entries()) {
+            if (friendId === currentUserId || seen.has(friendId)) continue;
+            seen.add(friendId);
+            const cached = cachedUsers.get(friendId);
+            const displayName = cached?.displayName || friendId;
+            items.push({ value: friendId, label: displayName, search: displayName, user: cached || null });
+            for (const mutual of mutuals) {
+                if (!mutual?.id || mutual.id === currentUserId || seen.has(mutual.id)) continue;
+                seen.add(mutual.id);
+                const mc = cachedUsers.get(mutual.id);
+                const mName = mc?.displayName || mutual.displayName || mutual.id;
+                items.push({ value: mutual.id, label: mName, search: mName, user: mc || null });
+            }
         }
-        const num = Number(value);
-        if (Number.isNaN(num) || num < min || num > max) {
-            return { value: null, invalid: true };
-        }
-        const factor = decimals ? 10 ** decimals : 1;
-        return { value: Math.round(num * factor) / factor, invalid: false };
-    };
+        items.sort((a, b) => a.label.localeCompare(b.label));
+        return [{ key: 'friends', label: t('side_panel.friends'), items }];
+    });
 
-    const coerceForceField = (value, options) => {
-        const parsed = parseForceField(value, options);
-        return parsed.invalid ? null : parsed.value;
-    };
+    const friendPickerGroups = computed(() => {
+        if (!currentGraph || !graphNodeCount.value) return [];
+        const currentUserId = currentUser.value?.id;
+        const items = [];
+        currentGraph.forEachNode((nodeId, attrs) => {
+            if (nodeId === currentUserId) return;
+            const cached = cachedUsers.get(nodeId);
+            const displayName = cached?.displayName || attrs.label || nodeId;
+            items.push({
+                value: nodeId,
+                label: displayName,
+                search: displayName,
+                user: cached || null
+            });
+        });
+        items.sort((a, b) => a.label.localeCompare(b.label));
+        return [{ key: 'friends', label: t('side_panel.friends'), items }];
+    });
 
-    const mutualGraphRef = ref(null);
-
+    function navigateToFriend(friendId) {
+        selectedFriendId.value = friendId;
+        if (!friendId || !currentGraph || !sigmaInstance) return;
+        if (!currentGraph.hasNode(friendId)) return;
+        const nodeDisplayData = sigmaInstance.getNodeDisplayData(friendId);
+        if (!nodeDisplayData) return;
+        const camera = sigmaInstance.getCamera();
+        camera.animate({ x: nodeDisplayData.x, y: nodeDisplayData.y, ratio: 0.15 }, { duration: 300 });
+    }
     const mutualGraphResizeObserver = new ResizeObserver(() => {
         setMutualGraphHeight();
     });
@@ -268,15 +575,19 @@
     }
 
     onMounted(() => {
+        loadLayoutSettings();
         nextTick(() => {
-            if (!chartRef.value) {
-                return;
-            }
-            createChartInstance();
-            resizeObserver = new ResizeObserver(() => chartInstance?.resize());
-            resizeObserver.observe(chartRef.value);
+            if (!graphContainerRef.value) return;
+
+            resizeObserver = new ResizeObserver(() => {
+                if (sigmaInstance?.refresh) sigmaInstance.refresh();
+            });
+            resizeObserver.observe(graphContainerRef.value);
+
             mutualGraphResizeObserver.observe(mutualGraphRef.value);
             setMutualGraphHeight();
+
+            if (currentGraph) renderGraph(currentGraph);
         });
     });
 
@@ -285,84 +596,455 @@
             resizeObserver.disconnect();
             resizeObserver = null;
         }
-        if (chartInstance) {
-            chartInstance.dispose();
-            chartInstance = null;
+        if (sigmaInstance) {
+            sigmaInstance.kill();
+            sigmaInstance = null;
         }
-        if (mutualGraphResizeObserver) {
-            mutualGraphResizeObserver.disconnect();
-        }
+        currentGraph = null;
+        if (mutualGraphResizeObserver) mutualGraphResizeObserver.disconnect();
     });
 
     watch(
-        chartTheme,
-        () => {
-            if (!chartRef.value) {
-                return;
-            }
-            if (chartInstance) {
-                chartInstance.dispose();
-                chartInstance = null;
-            }
-            nextTick(() => {
-                if (!chartRef.value) {
-                    return;
-                }
-                createChartInstance();
-            });
-        },
-        { immediate: false }
-    );
-
-    watch(
-        activeTab,
-        (tab) => {
-            if (tab === 'mutual') {
-                loadGraphFromDatabase();
-                loadForceOverridesFromConfig();
-            }
+        () => watchState.isFriendsLoaded,
+        (isFriendsLoaded) => {
+            if (isFriendsLoaded) loadGraphFromDatabase();
         },
         { immediate: true }
     );
 
-    watch(
-        graphReady,
-        (ready) => {
-            if (ready && forceOverrides.value) {
-                updateChart(graphPayload.value);
-            }
-        },
-        { immediate: false }
-    );
-
     function showStatusMessage(message, type = 'info') {
-        if (!message) {
-            return;
-        }
+        if (!message) return;
         const toastFn = toast[type] ?? toast;
         toastFn(message, { duration: 4000 });
     }
 
-    function createChartInstance() {
-        if (!chartRef.value) {
-            return;
-        }
-        chartInstance = echarts.init(chartRef.value, chartTheme.value, { renderer: 'svg' });
-        chartInstance.on('click', handleChartNodeClick);
+    function truncateLabelText(text) {
+        if (!text) return 'Unknown';
+        return text.length > MAX_LABEL_NAME_LENGTH ? `${text.slice(0, MAX_LABEL_NAME_LENGTH)}…` : text;
+    }
 
-        if (graphReady.value) {
-            // @ts-ignore
-            updateChart(graphPayload.value);
+    function initPositions(graph) {
+        const n = graph.order;
+        const radius = Math.max(50, Math.sqrt(n) * 30);
+        graph.forEachNode((node) => {
+            const a = Math.random() * Math.PI * 2;
+            const r = Math.sqrt(Math.random()) * radius;
+            graph.mergeNodeAttributes(node, {
+                x: Math.cos(a) * r,
+                y: Math.sin(a) * r
+            });
+        });
+    }
+
+    function clampNumber(value, min, max) {
+        const normalized = Number.isFinite(value) ? value : min;
+        return Math.min(max, Math.max(min, normalized));
+    }
+
+    function lerp(a, b, t) {
+        return a + (b - a) * t;
+    }
+
+    function jitterPositions(graph, magnitude) {
+        graph.forEachNode((node, attrs) => {
+            if (!Number.isFinite(attrs.x) || !Number.isFinite(attrs.y)) return;
+            graph.mergeNodeAttributes(node, {
+                x: attrs.x + (Math.random() - 0.5) * magnitude,
+                y: attrs.y + (Math.random() - 0.5) * magnitude
+            });
+        });
+    }
+
+    // @ts-ignore
+    function runLayout(graph, { reinitialize } = {}) {
+        if (reinitialize) initPositions(graph);
+
+        const iterations = clampNumber(layoutSettings.layoutIterations, LAYOUT_ITERATIONS_MIN, LAYOUT_ITERATIONS_MAX);
+        const spacing = clampNumber(layoutSettings.layoutSpacing, LAYOUT_SPACING_MIN, LAYOUT_SPACING_MAX);
+        const t = (spacing - LAYOUT_SPACING_MIN) / (LAYOUT_SPACING_MAX - LAYOUT_SPACING_MIN);
+        const clampedT = clampNumber(t, 0, 1);
+        const deltaSpacing = spacing - lastLayoutSpacing;
+        lastLayoutSpacing = spacing;
+
+        const inferred = forceAtlas2.inferSettings ? forceAtlas2.inferSettings(graph) : {};
+        const settings = {
+            ...inferred,
+            barnesHutOptimize: true,
+            barnesHutTheta: 0.8,
+            strongGravityMode: true,
+            gravity: lerp(1.6, 0.6, clampedT),
+            scalingRatio: spacing,
+            slowDown: 2
+        };
+
+        if (Math.abs(deltaSpacing) >= 8) jitterPositions(graph, lerp(0.5, 2.0, clampedT));
+
+        forceAtlas2.assign(graph, { iterations, settings });
+        const noverlapIterations = clampNumber(Math.round(Math.sqrt(graph.order) * 6), 200, 600);
+        noverlap.assign(graph, {
+            maxIterations: noverlapIterations,
+            settings: {
+                ratio: lerp(1.05, 1.35, clampedT),
+                margin: lerp(1, 8, clampedT)
+            }
+        });
+    }
+
+    function applyEdgeCurvature(graph) {
+        const curvature = clampNumber(layoutSettings.edgeCurvature, EDGE_CURVATURE_MIN, EDGE_CURVATURE_MAX);
+        const type = curvature > 0 ? 'curve' : 'line';
+
+        graph.forEachEdge((edge) => {
+            graph.mergeEdgeAttributes(edge, { curvature, type });
+        });
+    }
+
+    function applyCommunitySeparation(graph) {
+        const separation = layoutSettings.communitySeparation;
+        if (separation <= 0) return;
+
+        const communities = new Map();
+        graph.forEachNode((node, attrs) => {
+            const cid = attrs.community;
+            if (cid === undefined) return;
+            if (!communities.has(cid)) communities.set(cid, { nodes: [], cx: 0, cy: 0 });
+            communities.get(cid).nodes.push({ node, x: attrs.x, y: attrs.y });
+        });
+
+        // compute per-community centroid
+        for (const [, data] of communities) {
+            let sx = 0,
+                sy = 0;
+            for (const n of data.nodes) {
+                sx += n.x;
+                sy += n.y;
+            }
+            data.cx = sx / data.nodes.length;
+            data.cy = sy / data.nodes.length;
+        }
+
+        // compute global centroid
+        let gcx = 0,
+            gcy = 0,
+            total = 0;
+        for (const [, data] of communities) {
+            gcx += data.cx * data.nodes.length;
+            gcy += data.cy * data.nodes.length;
+            total += data.nodes.length;
+        }
+        gcx /= total;
+        gcy /= total;
+
+        // push each community away from global centroid
+        for (const [, data] of communities) {
+            const dx = data.cx - gcx;
+            const dy = data.cy - gcy;
+            const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+            const pushX = (dx / dist) * separation * 100;
+            const pushY = (dy / dist) * separation * 100;
+            for (const n of data.nodes) {
+                graph.mergeNodeAttributes(n.node, {
+                    x: n.x + pushX,
+                    y: n.y + pushY
+                });
+            }
         }
     }
 
-    async function loadGraphFromDatabase() {
-        if (hasFetched.value || isFetching.value) {
+    function scheduleLayoutUpdate({ runLayout: shouldRunLayout }) {
+        if (!currentGraph) return;
+        if (pendingLayoutUpdate) clearTimeout(pendingLayoutUpdate);
+        pendingLayoutUpdate = setTimeout(() => {
+            pendingLayoutUpdate = null;
+            applyEdgeCurvature(currentGraph);
+            if (shouldRunLayout) {
+                runLayout(currentGraph, { reinitialize: false });
+                applyCommunitySeparation(currentGraph);
+            }
+            renderGraph(currentGraph);
+        }, 100);
+    }
+
+    function assignCommunitiesAndColors(graph) {
+        const communities = louvain(graph);
+        const ids = Array.from(new Set(Object.values(communities)));
+        ids.sort((a, b) => String(a).localeCompare(String(b)));
+        const idToIndex = new Map(ids.map((id, i) => [id, i]));
+
+        graph.forEachNode((node) => {
+            const communityId = communities[node];
+            const idx = idToIndex.get(communityId) ?? 0;
+            graph.setNodeAttribute(node, 'community', communityId);
+            graph.setNodeAttribute(node, 'color', COLORS_PALETTE[idx % COLORS_PALETTE.length]);
+        });
+    }
+
+    function buildGraphFromMutualMap(mutualMap) {
+        const graph = new Graph({
+            type: 'undirected',
+            multi: false,
+            allowSelfLoops: false
+        });
+
+        const excludeSet = new Set(excludedFriendIds.value);
+        const nodeDegree = new Map();
+        const nodeNames = new Map();
+
+        function ensureNode(id, name) {
+            if (!id || excludeSet.has(id)) return;
+            if (!graph.hasNode(id)) {
+                graph.addNode(id);
+                nodeDegree.set(id, 0);
+            }
+            if (name && !nodeNames.get(id)) nodeNames.set(id, name);
+        }
+
+        function addEdge(source, target) {
+            if (!source || !target || source === target) return;
+            if (excludeSet.has(source) || excludeSet.has(target)) return;
+            const [a, b] = [source, target].sort();
+            const key = `${a}__${b}`;
+            if (graph.hasEdge(key)) return;
+            graph.addEdgeWithKey(key, a, b, { size: 0.75 });
+            nodeDegree.set(a, (nodeDegree.get(a) || 0) + 1);
+            nodeDegree.set(b, (nodeDegree.get(b) || 0) + 1);
+        }
+
+        for (const [friendId, { friend, mutuals }] of mutualMap.entries()) {
+            const friendRef = friend?.ref || cachedUsers.get(friendId);
+            const friendName = friendRef?.displayName;
+            ensureNode(friendId, friendName || friendId);
+
+            for (const mutual of mutuals) {
+                if (!mutual?.id) continue;
+                const cached = cachedUsers.get(mutual.id);
+                const label = cached?.displayName || mutual.displayName || mutual.id;
+                ensureNode(mutual.id, label);
+                addEdge(friendId, mutual.id);
+            }
+        }
+
+        const nodeIds = graph.nodes();
+        const maxDegree = nodeIds.reduce((max, id) => Math.max(max, nodeDegree.get(id) || 0), 0);
+
+        nodeIds.forEach((id) => {
+            const degree = nodeDegree.get(id) || 0;
+            const size = 4 + (maxDegree ? (degree / maxDegree) * 18 : 0);
+            const label = truncateLabelText(nodeNames.get(id) || id);
+            graph.mergeNodeAttributes(id, { label, size, type: 'border' });
+        });
+
+        if (graph.order > 1) {
+            runLayout(graph, { reinitialize: true });
+            assignCommunitiesAndColors(graph);
+            applyCommunitySeparation(graph);
+            applyEdgeCurvature(graph);
+        }
+
+        graphNodeCount.value = graph.order;
+        return graph;
+    }
+
+    function renderGraph(graph, forceRecreate = false) {
+        if (!graphContainerRef.value) return;
+        const container = graphContainerRef.value;
+        const { width, height } = container.getBoundingClientRect();
+        if (!width || !height) {
+            if (pendingRender) return;
+            pendingRender = requestAnimationFrame(() => {
+                pendingRender = null;
+                renderGraph(graph, forceRecreate);
+            });
             return;
         }
+
+        const DEFAULT_LABEL_THRESHOLD = 10;
+
+        const labelColor = isDarkMode.value ? '#e2e8f0' : '#111827';
+        const EDGE_BASE = isDarkMode.value ? '#334155' : '#94a3b8';
+        const EDGE_ACTIVE = isDarkMode.value ? '#bac1c9' : '#0f172a';
+
+        let cameraState = null;
+
+        if (sigmaInstance && forceRecreate) {
+            try {
+                const cam = sigmaInstance.getCamera?.();
+                cameraState = cam?.getState?.() || null;
+            } catch (e) {}
+            sigmaInstance.kill();
+            sigmaInstance = null;
+        }
+
+        if (!sigmaInstance) {
+            sigmaInstance = new Sigma(graph, container, {
+                renderLabels: true,
+                labelRenderedSizeThreshold: DEFAULT_LABEL_THRESHOLD,
+                labelColor: { color: labelColor },
+                defaultEdgeColor: EDGE_BASE,
+                zIndex: true,
+                defaultNodeType: 'border',
+                nodeProgramClasses: { border: NodeBorderProgram },
+                edgeProgramClasses: { curve: EdgeCurveProgram },
+                defaultDrawNodeHover: (ctx, data, settings) => {
+                    if (!data.label) return;
+
+                    const fontSize = settings.labelSize ?? 12;
+                    const font = settings.labelFont ?? 'sans-serif';
+
+                    ctx.font = `${fontSize}px ${font}`;
+                    ctx.textBaseline = 'middle';
+
+                    const paddingX = 6;
+                    const paddingY = 4;
+
+                    const textWidth = ctx.measureText(data.label).width;
+                    const w = textWidth + paddingX * 2;
+                    const h = fontSize + paddingY * 2;
+
+                    const x = data.x + data.size - 5;
+                    const y = data.y - h / 2;
+
+                    ctx.shadowColor = 'rgba(0, 0, 0, 0.25)';
+                    ctx.shadowBlur = 6;
+                    ctx.shadowOffsetX = 0;
+                    ctx.shadowOffsetY = 2;
+
+                    ctx.fillStyle = 'rgba(255, 255, 255, 1)';
+                    ctx.fillRect(x, y, w, h);
+
+                    ctx.fillStyle = '#111827';
+                    ctx.fillText(data.label, x + paddingX, y + h / 2);
+                }
+            });
+        } else {
+            sigmaInstance.setGraph(graph);
+            sigmaInstance.setSetting('labelRenderedSizeThreshold', DEFAULT_LABEL_THRESHOLD);
+            sigmaInstance.setSetting('labelColor', { color: labelColor });
+            sigmaInstance.setSetting('defaultEdgeColor', EDGE_BASE);
+            sigmaInstance.setSetting('zIndex', true);
+        }
+
+        if (cameraState) {
+            try {
+                const cam = sigmaInstance.getCamera?.();
+                cam?.setState?.(cameraState);
+            } catch (e) {}
+        }
+
+        let hovered = null;
+        let neighbors = new Set();
+
+        const rebuildNeighbors = (node) => {
+            neighbors = node ? new Set(graph.neighbors(node)) : new Set();
+        };
+
+        sigmaInstance.setSetting('nodeReducer', (node, data) => {
+            const res = { ...data };
+
+            if (!hovered) {
+                res.color = data.color;
+                res.zIndex = 1;
+                return res;
+            }
+
+            const isHover = node === hovered;
+            const isNeighbor = neighbors.has(node);
+
+            if (isHover) {
+                res.color = '#facc15';
+                res.size = (data.size || 4) * 1.6;
+                res.label = `${data.label} (${neighbors.size})`;
+                res.labelColor = '#111827';
+                res.zIndex = 3;
+                return res;
+            }
+
+            if (isNeighbor) {
+                res.color = data.color;
+                res.size = (data.size || 4) * 1.2;
+                res.label = data.label;
+                res.labelColor = '#111827';
+                res.zIndex = 2;
+                return res;
+            }
+
+            res.color = isDarkMode.value ? 'rgba(148,163,184,0.04)' : 'rgba(100,116,139,0.06)';
+            res.size = 0.7;
+            res.label = '';
+            res.zIndex = 0;
+            return res;
+        });
+
+        sigmaInstance.setSetting('edgeReducer', (edge, data) => {
+            const res = { ...data };
+
+            if (!hovered) {
+                res.hidden = false;
+                res.color = EDGE_BASE;
+                res.size = data.size || 1;
+                return res;
+            }
+
+            const [s, t] = graph.extremities(edge);
+            const active = s === hovered || t === hovered;
+
+            if (active) {
+                res.hidden = false;
+                res.color = EDGE_ACTIVE;
+                res.size = data.size || 1;
+                return res;
+            }
+
+            res.hidden = true;
+            return res;
+        });
+
+        sigmaInstance.removeAllListeners?.();
+
+        sigmaInstance.on('enterNode', ({ node }) => {
+            hovered = node;
+            rebuildNeighbors(node);
+            sigmaInstance.setSetting('labelRenderedSizeThreshold', 0);
+            sigmaInstance.refresh();
+        });
+
+        sigmaInstance.on('leaveNode', () => {
+            hovered = null;
+            rebuildNeighbors(null);
+            sigmaInstance.setSetting('labelRenderedSizeThreshold', DEFAULT_LABEL_THRESHOLD);
+            sigmaInstance.refresh();
+        });
+
+        sigmaInstance.on('clickNode', ({ node }) => {
+            if (node) showUserDialog(node);
+        });
+
+        sigmaInstance.refresh();
+    }
+
+    function applyGraph(mutualMap) {
+        lastMutualMap = mutualMap;
+        const graph = buildGraphFromMutualMap(mutualMap);
+        currentGraph = graph;
+        renderGraph(graph);
+    }
+
+    async function loadGraphFromDatabase() {
+        if (!watchState.isLoggedIn || !currentUser.value?.id) return;
+        if (!watchState.isFriendsLoaded) return;
+        if (isFetching.value || isLoadingSnapshot.value) return;
+        if (hasFetched.value && !status.needsRefetch && currentGraph) return;
+
+        isLoadingSnapshot.value = true;
+        // loadingToastId.value = toast.info(t('view.charts.mutual_friend.status.loading_cache'));
+
         try {
             const snapshot = await database.getMutualGraphSnapshot();
             if (!snapshot || snapshot.size === 0) {
+                if (totalFriends.value === 0) {
+                    showStatusMessage(t('view.charts.mutual_friend.status.no_friends_to_process'), 'info');
+                    return;
+                }
                 if (isOptOut.value) {
                     promptEnableMutualFriendsSharing();
                     return;
@@ -370,38 +1052,41 @@
                 await promptInitialFetch();
                 return;
             }
+
             const mutualMap = new Map();
             snapshot.forEach((mutualIds, friendId) => {
-                if (!friendId) {
-                    return;
-                }
+                if (!friendId) return;
                 const friendEntry = friends.value?.get ? friends.value.get(friendId) : undefined;
                 const fallbackRef = friendEntry?.ref || cachedUsers.get(friendId);
+
                 let normalizedMutuals = Array.isArray(mutualIds) ? mutualIds : [];
                 normalizedMutuals = normalizedMutuals.filter((id) => id != 'usr_00000000-0000-0000-0000-000000000000');
+
                 mutualMap.set(friendId, {
                     friend: friendEntry || (fallbackRef ? { id: friendId, ref: fallbackRef } : { id: friendId }),
                     mutuals: normalizedMutuals.map((id) => ({ id }))
                 });
             });
+
             if (!mutualMap.size) {
                 await promptInitialFetch();
                 return;
             }
-            buildGraph(mutualMap, updateChart);
-            hasFetched.value = true;
+
+            applyGraph(mutualMap);
+            chartsStore.markMutualGraphLoaded({ notify: false });
             fetchState.processedFriends = Math.min(mutualMap.size, totalFriends.value || mutualMap.size);
             status.friendSignature = totalFriends.value;
             status.needsRefetch = false;
         } catch (err) {
             console.error('[MutualNetworkGraph] Failed to load cached mutual graph', err);
+        } finally {
+            isLoadingSnapshot.value = false;
         }
     }
 
     async function promptInitialFetch() {
-        if (isFetching.value || hasFetched.value || !totalFriends.value) {
-            return;
-        }
+        if (isFetching.value || hasFetched.value || !totalFriends.value) return;
 
         modalStore
             .confirm({
@@ -412,7 +1097,6 @@
             })
             .then(async ({ ok }) => {
                 if (!ok) return;
-
                 await startFetch();
             });
     }
@@ -433,387 +1117,14 @@
             .catch(() => {});
     }
 
-    function cancelFetch() {
-        if (isFetching.value) {
-            status.cancelRequested = true;
-        }
-    }
-
-    const isCancelled = () => status.cancelRequested === true;
-
     async function startFetch() {
-        const rateLimiter = createRateLimiter({
-            limitPerInterval: 5,
-            intervalMs: 1000
-        });
-
-        const fetchMutualFriends = async (userId) => {
-            const collected = [];
-            let offset = 0;
-            while (true) {
-                if (isCancelled()) {
-                    break;
-                }
-                await rateLimiter.wait();
-                if (isCancelled()) {
-                    break;
-                }
-                const args = await executeWithBackoff(
-                    () => {
-                        if (isCancelled()) {
-                            throw new Error('cancelled');
-                        }
-                        return userRequest.getMutualFriends({ userId, offset, n: 100 });
-                    },
-                    {
-                        maxRetries: 4,
-                        baseDelay: 500,
-                        shouldRetry: (err) => err?.status === 429 || (err?.message || '').includes('429')
-                    }
-                ).catch((err) => {
-                    if ((err?.message || '') === 'cancelled') {
-                        return null;
-                    }
-                    throw err;
-                });
-                if (!args || isCancelled()) {
-                    break;
-                }
-                collected.push(...args.json);
-                if (args.json.length < 100) {
-                    break;
-                }
-                offset += args.json.length;
-            }
-            return collected;
-        };
-
-        if (isFetching.value || isOptOut.value) {
-            return;
-        }
-        if (!totalFriends.value) {
-            showStatusMessage(t('view.charts.mutual_friend.status.no_friends_to_process'), 'info');
-            return;
-        }
-
-        isFetching.value = true;
-        status.completionNotified = false;
-        status.needsRefetch = false;
-        status.cancelRequested = false;
-        hasFetched.value = false;
-        Object.assign(fetchState, {
-            processedFriends: 0
-        });
-
-        const friendSnapshot = Array.from(friends.value.values());
-        const mutualMap = new Map();
-
-        let cancelled = false;
-        try {
-            for (let index = 0; index < friendSnapshot.length; index += 1) {
-                const friend = friendSnapshot[index];
-                if (!friend?.id) {
-                    continue;
-                }
-                if (isCancelled()) {
-                    cancelled = true;
-                    break;
-                }
-                try {
-                    const mutuals = await fetchMutualFriends(friend.id);
-                    if (isCancelled()) {
-                        cancelled = true;
-                        break;
-                    }
-                    mutualMap.set(friend.id, { friend, mutuals });
-                } catch (err) {
-                    if ((err?.message || '') === 'cancelled' || isCancelled()) {
-                        cancelled = true;
-                        break;
-                    }
-                    console.warn('[MutualNetworkGraph] Skipping friend due to fetch error', friend.id, err);
-                    continue;
-                }
-                fetchState.processedFriends = index + 1;
-                if (status.cancelRequested) {
-                    cancelled = true;
-                    break;
-                }
-            }
-
-            if (cancelled) {
-                hasFetched.value = false;
-                showStatusMessage(t('view.charts.mutual_friend.messages.fetch_cancelled_graph_not_updated'), 'warning');
-                return;
-            }
-
-            buildGraph(mutualMap, updateChart);
-            status.friendSignature = totalFriends.value;
-            status.needsRefetch = false;
-
-            try {
-                await persistMutualGraph(mutualMap);
-            } catch (persistErr) {
-                console.error('[MutualNetworkGraph] Failed to cache data', persistErr);
-            }
-            hasFetched.value = true;
-        } catch (err) {
-            console.error('[MutualNetworkGraph] fetch aborted', err);
-        } finally {
-            isFetching.value = false;
-            status.cancelRequested = false;
-        }
+        if (isFetching.value || isOptOut.value) return;
+        const mutualMap = await chartsStore.fetchMutualGraph();
+        if (!mutualMap) return;
+        applyGraph(mutualMap);
     }
 
-    async function persistMutualGraph(mutualMap) {
-        const snapshot = new Map();
-        mutualMap.forEach((value, friendId) => {
-            if (!friendId) {
-                return;
-            }
-            const normalizedFriendId = String(friendId);
-            const collection = Array.isArray(value?.mutuals) ? value.mutuals : [];
-            const ids = [];
-            for (const entry of collection) {
-                const identifier =
-                    typeof entry?.id === 'string'
-                        ? entry.id
-                        : entry?.id !== undefined && entry?.id !== null
-                          ? String(entry.id)
-                          : '';
-                if (identifier) {
-                    ids.push(identifier);
-                }
-            }
-            snapshot.set(normalizedFriendId, ids);
-        });
-        await database.saveMutualGraphSnapshot(snapshot);
-    }
-
-    function updateChart(payload) {
-        const nodes = payload?.nodes ?? [];
-        if (!nodes.length) {
-            if (chartInstance) {
-                chartInstance.clear();
-            }
-            return;
-        }
-        if (!chartInstance) {
-            return;
-        }
-        const forceOption =
-            persistedForce.value ||
-            applyForceOverrides(computeForceOptions(nodes, payload?.links ?? []), forceOverrides.value);
-        chartInstance.setOption(createChartOption(payload, forceOption));
-        nextTick(() => chartInstance?.resize());
-    }
-
-    function handleChartNodeClick(params) {
-        if (params?.dataType !== 'node') {
-            return;
-        }
-        const nodeId = params.data?.id;
-        if (nodeId) {
-            showUserDialog(nodeId);
-        }
-    }
-
-    onBeforeRouteLeave(() => {
-        chartsStore.resetMutualGraphState();
-    });
-
-    function syncForceForm(source) {
-        const base = source || forceDefaults.value || {};
-        const edgeLength = Array.isArray(base.edgeLength) ? base.edgeLength : [];
-        forceForm.repulsion = coerceForceField(base.repulsion, { min: 0 });
-        forceForm.edgeLengthMin = coerceForceField(edgeLength[0], { min: 0 });
-        forceForm.edgeLengthMax = coerceForceField(edgeLength[1], { min: 0 });
-        forceForm.gravity = coerceForceField(base.gravity, { min: 0, max: 1, decimals: 1 });
-    }
-
-    function openForceDialog() {
-        syncForceForm(forceOverrides.value);
-        isForceDialogVisible.value = true;
-    }
-
-    function applyForceSettings() {
-        if (!hasGraphData.value) {
-            isForceDialogVisible.value = false;
-            return;
-        }
-        const defaults = forceDefaults.value;
-        const defaultEdge = Array.isArray(defaults.edgeLength) ? defaults.edgeLength : [null, null];
-        const repulsion = parseForceField(forceForm.repulsion, { min: 0 });
-        const minEdge = parseForceField(forceForm.edgeLengthMin, { min: 0 });
-        const maxEdge = parseForceField(forceForm.edgeLengthMax, { min: 0 });
-        const gravity = parseForceField(forceForm.gravity, { min: 0, max: 1, decimals: 1 });
-
-        const hasInvalid = [repulsion, minEdge, maxEdge, gravity].some((entry) => entry.invalid);
-        if (hasInvalid) {
-            toast.error(t('view.charts.mutual_friend.force_dialog.invalid_input'));
-            return;
-        }
-
-        const edgeLength = [minEdge.value ?? defaultEdge[0] ?? 0, maxEdge.value ?? defaultEdge[1] ?? 0];
-        edgeLength[0] = Math.max(0, edgeLength[0]);
-        edgeLength[1] = Math.max(edgeLength[0], edgeLength[1]);
-
-        forceOverrides.value = {
-            repulsion: repulsion.value === null ? defaults.repulsion : repulsion.value,
-            edgeLength,
-            gravity: gravity.value === null ? defaults.gravity : gravity.value,
-            layoutAnimation: defaults.layoutAnimation
-        };
-        persistedForce.value = applyForceOverrides(defaults, forceOverrides.value);
-        persistForceOverrides();
-        updateChart(graphPayload.value);
-        isForceDialogVisible.value = false;
-    }
-
-    function resetForceSettings() {
-        forceOverrides.value = null;
-        persistedForce.value = null;
-        syncForceForm(forceDefaults.value);
-        if (hasGraphData.value) {
-            updateChart(graphPayload.value);
-        }
-        clearForceOverrides();
-    }
-
-    async function loadForceOverridesFromConfig() {
-        try {
-            const saved = await configRepository.getObject(forceConfigKey, null);
-            if (!saved || typeof saved !== 'object') {
-                return;
-            }
-            forceOverrides.value = saved.overrides || null;
-            persistedForce.value = saved.force || null;
-            if (forceOverrides.value) {
-                syncForceForm(forceOverrides.value);
-            }
-            if (graphReady.value) {
-                updateChart(graphPayload.value);
-            }
-        } catch (err) {
-            console.warn('[MutualNetworkGraph] Failed to load force settings', err);
-        }
-    }
-
-    function persistForceOverrides() {
-        if (!forceOverrides.value) {
-            clearForceOverrides();
-            return;
-        }
-        const payload = {
-            overrides: forceOverrides.value,
-            force: persistedForce.value
-        };
-        configRepository.setObject(forceConfigKey, payload).catch((err) => {
-            console.warn('[MutualNetworkGraph] Failed to save force settings', err);
-        });
-    }
-
-    function clearForceOverrides() {
-        configRepository.remove(forceConfigKey).catch((err) => {
-            console.warn('[MutualNetworkGraph] Failed to clear force settings', err);
-        });
+    function cancelFetch() {
+        chartsStore.requestMutualGraphCancel();
     }
 </script>
-
-<style scoped>
-    .mutual-graph {
-        margin-top: 0;
-        display: flex;
-        flex-direction: column;
-        min-height: calc(100vh - 140px);
-    }
-
-    .mutual-graph__toolbar {
-        display: flex;
-        justify-content: flex-end;
-        align-items: center;
-        margin-top: 8px;
-        margin-bottom: 0;
-        background: transparent;
-        border: none;
-        box-shadow: none;
-        padding: 0 0 8px 0;
-    }
-
-    .mutual-graph__actions {
-        display: flex;
-        gap: 8px;
-        align-items: center;
-    }
-
-    .mutual-graph__status {
-        margin-top: 12px;
-        padding: 12px 16px;
-        border-radius: 6px;
-        border: 1px solid var(--el-border-color);
-        background: transparent;
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-        gap: 8px 12px;
-        align-items: center;
-    }
-
-    .mutual-graph__status-row {
-        display: flex;
-        justify-content: space-between;
-        font-size: 13px;
-    }
-
-    .mutual-graph__status-row strong {
-        font-weight: 600;
-    }
-
-    .mutual-graph__canvas {
-        margin-top: 12px;
-        width: 100%;
-        flex: 1 1 auto;
-        height: calc(100vh - 260px);
-        min-height: 520px;
-    }
-
-    .mutual-graph__placeholder {
-        margin-top: 12px;
-        padding: 40px;
-        text-align: center;
-        border: 1px dashed var(--el-border-color);
-        border-radius: 8px;
-        flex: 1;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-
-    .mutual-graph__force-description {
-        margin: 0 0 12px 0;
-        color: var(--el-text-color-regular);
-        font-size: 13px;
-    }
-
-    .mutual-graph__force-form {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-        gap: 8px 16px;
-    }
-
-    .mutual-graph__number-input {
-        width: 100%;
-    }
-
-    .mutual-graph__dialog-footer {
-        display: flex;
-        justify-content: flex-end;
-        gap: 8px;
-    }
-
-    .mutual-graph__helper {
-        margin-top: 4px;
-        font-size: 12px;
-        color: var(--el-text-color-secondary);
-        line-height: 1.4;
-    }
-</style>

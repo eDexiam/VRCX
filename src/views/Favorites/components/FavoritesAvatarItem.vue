@@ -7,23 +7,23 @@
                 </div>
                 <div class="favorites-search-card__detail">
                     <div class="favorites-search-card__title">
-                        <span class="name">{{ localFavFakeRef.name }}</span>
+                        <span class="name text-sm">{{ localFavFakeRef.name }}</span>
                         <span class="favorites-search-card__badges">
                             <TooltipWrapper
                                 v-if="favorite.deleted"
                                 side="top"
                                 :content="t('view.favorite.unavailable_tooltip')">
-                                <i class="ri-error-warning-line"></i>
+                                <AlertTriangle class="h-4 w-4" />
                             </TooltipWrapper>
                             <TooltipWrapper
                                 v-if="!isLocalFavorite && favorite.ref?.releaseStatus === 'private'"
                                 side="top"
                                 :content="t('view.favorite.private')">
-                                <i class="ri-lock-line"></i>
+                                <Lock class="h-4 w-4" />
                             </TooltipWrapper>
                         </span>
                     </div>
-                    <span class="extra">{{ localFavFakeRef.authorName }}</span>
+                    <span class="text-xs text-muted-foreground">{{ localFavFakeRef.authorName }}</span>
                 </div>
             </div>
             <div class="favorites-search-card__actions">
@@ -55,9 +55,9 @@
                                 <Button
                                     size="icon-sm"
                                     variant="outline"
-                                    class="favorites-search-card__action-btn rounded-full text-xs h-6 w-6"
+                                    class="rounded-full text-xs h-6 w-6"
                                     @click.stop="handlePrimaryDeleteAction">
-                                    <i class="ri-delete-bin-line"></i>
+                                    <Trash2 class="h-4 w-4" />
                                 </Button>
                             </TooltipWrapper>
                         </div>
@@ -69,12 +69,12 @@
                             <TooltipWrapper side="top" :content="t('view.favorite.select_avatar_tooltip')">
                                 <Button
                                     size="icon-sm"
-                                    variant="outline"
+                                    variant="ghost"
                                     :disabled="currentUser.currentAvatar === favorite.id"
-                                    class="favorites-search-card__action-btn rounded-full text-xs h-6 w-6"
+                                    class="rounded-full text-xs h-6 w-6"
                                     @click.stop="selectAvatarWithConfirmation(favorite.id)"
-                                    ><i class="ri-check-line"></i
-                                ></Button>
+                                    ><Check class="h-4 w-4"
+                                /></Button>
                             </TooltipWrapper>
                         </div>
                         <div class="favorites-search-card__action">
@@ -85,19 +85,19 @@
                                 <Button
                                     size="icon-sm"
                                     variant="destructive"
-                                    class="favorites-search-card__action-btn rounded-full text-xs h-6 w-6"
+                                    class="rounded-full text-xs h-6 w-6"
                                     @click.stop="handlePrimaryDeleteAction"
-                                    ><i class="ri-delete-bin-line"></i
-                                ></Button>
+                                    ><Trash2 class="h-4 w-4"
+                                /></Button>
                             </TooltipWrapper>
                             <TooltipWrapper v-else side="bottom" :content="t('view.favorite.edit_favorite_tooltip')">
                                 <Button
                                     size="icon-sm"
-                                    variant="outline"
-                                    class="favorites-search-card__action-btn rounded-full text-xs h-6 w-6"
+                                    variant="ghost"
+                                    class="rounded-full text-xs h-6 w-6"
                                     @click.stop="showFavoriteDialog('avatar', favorite.id)"
-                                    ><i class="ri-star-line"></i
-                                ></Button>
+                                    ><Star class="h-4 w-4"
+                                /></Button>
                             </TooltipWrapper>
                         </div>
                     </div>
@@ -116,9 +116,9 @@
                     <Button
                         class="rounded-full text-xs h-6 w-6"
                         size="icon-sm"
-                        variant="outline"
+                        variant="ghost"
                         @click.stop="handlePrimaryDeleteAction">
-                        <i class="ri-delete-bin-line"></i>
+                        <Trash2 class="h-4 w-4" />
                     </Button>
                 </div>
             </div>
@@ -127,6 +127,7 @@
 </template>
 
 <script setup>
+    import { AlertTriangle, Check, Lock, Star, Trash2 } from 'lucide-vue-next';
     import { Button } from '@/components/ui/button';
     import { Checkbox } from '@/components/ui/checkbox';
     import { computed } from 'vue';

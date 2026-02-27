@@ -1,20 +1,29 @@
 import { computed, ref, watch } from 'vue';
-import { ElMessageBox } from 'element-plus';
 import { defineStore } from 'pinia';
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 
 import {
+    APP_FONT_DEFAULT_KEY,
+    APP_FONT_FAMILIES,
+    SEARCH_LIMIT_MAX,
+    SEARCH_LIMIT_MIN,
+    TABLE_MAX_SIZE_MAX,
+    TABLE_MAX_SIZE_MIN,
+    THEME_CONFIG
+} from '../../shared/constants';
+import {
     HueToHex,
+    applyAppFontFamily,
     changeAppThemeStyle,
     changeHtmlLangAttribute,
+    getThemeMode,
     updateTrustColorClasses
 } from '../../shared/utils/base/ui';
 import { database } from '../../service/database';
 import { getNameColour } from '../../shared/utils';
 import { languageCodes } from '../../localization';
 import { loadLocalizedStrings } from '../../plugin';
-import { useElementTheme } from '../../composables/useElementTheme';
 import { useFeedStore } from '../feed';
 import { useGameLogStore } from '../gameLog';
 import { useUiStore } from '../ui';
@@ -36,16 +45,16 @@ export const useAppearanceSettingsStore = defineStore(
         const userStore = useUserStore();
         const router = useRouter();
         const uiStore = useUiStore();
-
-        const { t, locale } = useI18n();
+        const { locale } = useI18n();
 
         const MAX_TABLE_PAGE_SIZE = 1000;
         const DEFAULT_TABLE_PAGE_SIZES = [10, 15, 20, 25, 50, 100];
-        const { initPrimaryColor } = useElementTheme();
 
         const appLanguage = ref('en');
         const themeMode = ref('');
         const isDarkMode = ref(false);
+        const lastDarkTheme = ref('dark');
+        const appFontFamily = ref('inter');
         const displayVRCPlusIconsAsAvatar = ref(false);
         const hideNicknames = ref(false);
         const showInstanceIdInLocation = ref(false);
@@ -64,16 +73,16 @@ export const useAppearanceSettingsStore = defineStore(
             'Sort by Time in Instance',
             'Sort by Last Active'
         ]);
-        const asideWidth = ref(300);
         const navWidth = ref(240);
         const isSidebarGroupByInstance = ref(true);
         const isHideFriendsInSameInstance = ref(false);
         const isSidebarDivideByFriendGroup = ref(false);
+        const sidebarFavoriteGroups = ref([]);
         const hideUserNotes = ref(false);
         const hideUserMemos = ref(false);
         const hideUnfriends = ref(false);
         const randomUserColours = ref(false);
-        const compactTableMode = ref(false);
+        const tableDensity = ref('standard');
         const TRUST_COLOR_DEFAULTS = Object.freeze({
             untrusted: '#CCCCCC',
             basic: '#1778FF',
@@ -89,11 +98,21 @@ export const useAppearanceSettingsStore = defineStore(
         const isNavCollapsed = ref(true);
         const isSideBarTabShow = computed(() => {
             const currentRouteName = router.currentRoute.value?.name;
-            return !(
-                currentRouteName === 'friends-locations' ||
-                currentRouteName === 'friend-list' ||
-                currentRouteName === 'charts'
-            );
+            return ![
+                'friends-locations',
+                'friend-list',
+                'charts',
+                'charts-instance',
+                'charts-mutual'
+            ].includes(currentRouteName);
+        });
+
+        const isDataTableStriped = ref(false);
+        const showPointerOnHover = ref(false);
+        const tableLimitsDialog = ref({
+            visible: false,
+            maxTableSize: 500,
+            searchLimit: 5000
         });
 
         const clampInt = (value, min, max) => {
@@ -101,10 +120,22 @@ export const useAppearanceSettingsStore = defineStore(
             return Math.min(max, Math.max(min, n));
         };
 
+        const resolveLastDarkTheme = (value, fallback = 'dark') => {
+            const normalized = String(value || '').trim();
+            return THEME_CONFIG[normalized]?.isDark === true
+                ? normalized
+                : fallback;
+        };
+
         async function initAppearanceSettings() {
+            const { initThemeMode, isDarkMode: initDarkMode } =
+                await getThemeMode(configRepository);
+            const fallbackDarkTheme =
+                THEME_CONFIG[initThemeMode]?.isDark === true
+                    ? initThemeMode
+                    : 'dark';
             const [
                 appLanguageConfig,
-                themeModeConfig,
                 displayVRCPlusIconsAsAvatarConfig,
                 hideNicknamesConfig,
                 showInstanceIdInLocationConfig,
@@ -116,22 +147,26 @@ export const useAppearanceSettingsStore = defineStore(
                 dtHour12Config,
                 dtIsoFormatConfig,
                 sidebarSortMethodsConfig,
-                asideWidthConfig,
                 navWidthConfig,
                 isSidebarGroupByInstanceConfig,
                 isHideFriendsInSameInstanceConfig,
                 isSidebarDivideByFriendGroupConfig,
+                sidebarFavoriteGroupsConfig,
                 hideUserNotesConfig,
                 hideUserMemosConfig,
                 hideUnfriendsConfig,
                 randomUserColoursConfig,
+                tableDensityConfig,
                 compactTableModeConfig,
                 trustColorConfig,
                 notificationIconDotConfig,
-                navIsCollapsedConfig
+                navIsCollapsedConfig,
+                dataTableStripedConfig,
+                showPointerOnHoverConfig,
+                appFontFamilyConfig,
+                lastDarkThemeConfig
             ] = await Promise.all([
                 configRepository.getString('VRCX_appLanguage'),
-                configRepository.getString('VRCX_ThemeMode', 'system'),
                 configRepository.getBool('displayVRCPlusIconsAsAvatar', true),
                 configRepository.getBool('VRCX_hideNicknames', false),
                 configRepository.getBool(
@@ -162,7 +197,6 @@ export const useAppearanceSettingsStore = defineStore(
                         'Sort by Last Active'
                     ])
                 ),
-                configRepository.getInt('VRCX_sidePanelWidth', 300),
                 configRepository.getInt('VRCX_navPanelWidth', 240),
                 configRepository.getBool('VRCX_sidebarGroupByInstance', true),
                 configRepository.getBool(
@@ -173,17 +207,29 @@ export const useAppearanceSettingsStore = defineStore(
                     'VRCX_sidebarDivideByFriendGroup',
                     true
                 ),
+                configRepository.getString('VRCX_sidebarFavoriteGroups', '[]'),
                 configRepository.getBool('VRCX_hideUserNotes', false),
                 configRepository.getBool('VRCX_hideUserMemos', false),
                 configRepository.getBool('VRCX_hideUnfriends', false),
                 configRepository.getBool('VRCX_randomUserColours', false),
+                configRepository.getString('VRCX_tableDensity'),
                 configRepository.getBool('VRCX_compactTableMode', false),
                 configRepository.getString(
                     'VRCX_trustColor',
                     JSON.stringify(TRUST_COLOR_DEFAULTS)
                 ),
                 configRepository.getBool('VRCX_notificationIconDot', true),
-                configRepository.getBool('VRCX_navIsCollapsed', true)
+                configRepository.getBool('VRCX_navIsCollapsed', false),
+                configRepository.getBool('VRCX_dataTableStriped', false),
+                configRepository.getBool('VRCX_showPointerOnHover', false),
+                configRepository.getString(
+                    'VRCX_fontFamily',
+                    APP_FONT_DEFAULT_KEY
+                ),
+                configRepository.getString(
+                    'VRCX_lastDarkTheme',
+                    fallbackDarkTheme
+                )
             ]);
 
             if (!appLanguageConfig) {
@@ -201,9 +247,14 @@ export const useAppearanceSettingsStore = defineStore(
                 await changeAppLanguage(appLanguageConfig);
             }
 
-            themeMode.value = themeModeConfig;
-            setThemeMode(themeModeConfig);
-            await initPrimaryColor();
+            themeMode.value = initThemeMode;
+            isDarkMode.value = initDarkMode;
+            lastDarkTheme.value = resolveLastDarkTheme(
+                lastDarkThemeConfig,
+                fallbackDarkTheme
+            );
+            appFontFamily.value = normalizeAppFontFamily(appFontFamilyConfig);
+            applyAppFontFamily(appFontFamily.value);
 
             displayVRCPlusIconsAsAvatar.value =
                 displayVRCPlusIconsAsAvatarConfig;
@@ -239,21 +290,37 @@ export const useAppearanceSettingsStore = defineStore(
                 );
             }
             trustColor.value = { ...TRUST_COLOR_DEFAULTS };
-            asideWidth.value = asideWidthConfig;
             navWidth.value = clampInt(navWidthConfig, 64, 480);
             isSidebarGroupByInstance.value = isSidebarGroupByInstanceConfig;
             isHideFriendsInSameInstance.value =
                 isHideFriendsInSameInstanceConfig;
             isSidebarDivideByFriendGroup.value =
                 isSidebarDivideByFriendGroupConfig;
+            sidebarFavoriteGroups.value = JSON.parse(
+                sidebarFavoriteGroupsConfig
+            );
             hideUserNotes.value = hideUserNotesConfig;
             hideUserMemos.value = hideUserMemosConfig;
             hideUnfriends.value = hideUnfriendsConfig;
             randomUserColours.value = randomUserColoursConfig;
             notificationIconDot.value = notificationIconDotConfig;
-            compactTableMode.value = compactTableModeConfig;
-            applyCompactTableMode(compactTableMode.value);
+            const resolvedTableDensity = normalizeTableDensity(
+                tableDensityConfig ||
+                    (compactTableModeConfig ? 'compact' : 'standard')
+            );
+            tableDensity.value = resolvedTableDensity;
+            applyTableDensity(tableDensity.value);
+            if (!tableDensityConfig) {
+                configRepository.setString(
+                    'VRCX_tableDensity',
+                    tableDensity.value
+                );
+            }
             isNavCollapsed.value = navIsCollapsedConfig;
+            isDataTableStriped.value = dataTableStripedConfig;
+            showPointerOnHover.value = showPointerOnHoverConfig;
+
+            applyPointerHoverClass();
 
             await configRepository.remove('VRCX_navWidth');
 
@@ -439,10 +506,35 @@ export const useAppearanceSettingsStore = defineStore(
         function setThemeMode(mode) {
             themeMode.value = mode;
             configRepository.setString('VRCX_ThemeMode', mode);
+            if (THEME_CONFIG[mode]?.isDark === true) {
+                const normalized = resolveLastDarkTheme(mode);
+                lastDarkTheme.value = normalized;
+                configRepository.setString('VRCX_lastDarkTheme', normalized);
+            }
             const { isDark } = changeAppThemeStyle(mode);
             isDarkMode.value = isDark;
             vrStore.updateVRConfigVars();
             updateTrustColor(undefined, undefined);
+        }
+
+        function toggleThemeMode() {
+            const nextMode = isDarkMode.value
+                ? 'light'
+                : resolveLastDarkTheme(lastDarkTheme.value);
+            setThemeMode(nextMode);
+        }
+
+        function normalizeAppFontFamily(value) {
+            return APP_FONT_FAMILIES.includes(value)
+                ? value
+                : APP_FONT_DEFAULT_KEY;
+        }
+
+        function setAppFontFamily(value) {
+            const normalized = normalizeAppFontFamily(value);
+            appFontFamily.value = normalized;
+            configRepository.setString('VRCX_fontFamily', normalized);
+            applyAppFontFamily(normalized);
         }
 
         function setDisplayVRCPlusIconsAsAvatar() {
@@ -592,22 +684,6 @@ export const useAppearanceSettingsStore = defineStore(
                 });
             }
         }
-        function setAsideWidth(widthOrArray) {
-            let width = null;
-            if (Array.isArray(widthOrArray) && widthOrArray.length) {
-                width = widthOrArray[widthOrArray.length - 1];
-            } else if (typeof widthOrArray === 'number') {
-                width = widthOrArray;
-            }
-            if (!Number.isFinite(width) || width === null) {
-                return;
-            }
-            const normalized = Math.max(0, Math.round(width));
-            requestAnimationFrame(() => {
-                asideWidth.value = normalized;
-                configRepository.setInt('VRCX_sidePanelWidth', normalized);
-            });
-        }
         function setIsSidebarGroupByInstance() {
             isSidebarGroupByInstance.value = !isSidebarGroupByInstance.value;
             configRepository.setBool(
@@ -631,6 +707,16 @@ export const useAppearanceSettingsStore = defineStore(
                 isSidebarDivideByFriendGroup.value
             );
         }
+        /**
+         * @param {string[]} value
+         */
+        function setSidebarFavoriteGroups(value) {
+            sidebarFavoriteGroups.value = value;
+            configRepository.setString(
+                'VRCX_sidebarFavoriteGroups',
+                JSON.stringify(value)
+            );
+        }
         function setHideUserNotes() {
             hideUserNotes.value = !hideUserNotes.value;
             configRepository.setBool('VRCX_hideUserNotes', hideUserNotes.value);
@@ -650,14 +736,51 @@ export const useAppearanceSettingsStore = defineStore(
                 randomUserColours.value
             );
         }
-        function setCompactTableMode() {
-            compactTableMode.value = !compactTableMode.value;
-            applyCompactTableMode(compactTableMode.value);
+        function normalizeTableDensity(value) {
+            if (
+                value === 'compact' ||
+                value === 'comfortable' ||
+                value === 'standard'
+            ) {
+                return value;
+            }
+            return 'standard';
+        }
+
+        function setTableDensity(density) {
+            const normalized = normalizeTableDensity(density);
+            tableDensity.value = normalized;
+            applyTableDensity(tableDensity.value);
+            configRepository.setString('VRCX_tableDensity', tableDensity.value);
+        }
+
+        function toggleStripedDataTable() {
+            isDataTableStriped.value = !isDataTableStriped.value;
             configRepository.setBool(
-                'VRCX_compactTableMode',
-                compactTableMode.value
+                'VRCX_dataTableStriped',
+                isDataTableStriped.value
             );
         }
+
+        // FIXME: this is nasty, there should be a better way of doing this
+        function applyPointerHoverClass() {
+            const classList = document.documentElement.classList;
+            classList.remove('force-pointer-on-hover');
+
+            if (showPointerOnHover.value) {
+                classList.add('force-pointer-on-hover');
+            }
+        }
+
+        function togglePointerOnHover() {
+            showPointerOnHover.value = !showPointerOnHover.value;
+            configRepository.setBool(
+                'VRCX_showPointerOnHover',
+                showPointerOnHover.value
+            );
+            applyPointerHoverClass();
+        }
+
         /**
          * @param {object} color
          */
@@ -745,36 +868,67 @@ export const useAppearanceSettingsStore = defineStore(
             }
         }
 
-        function promptMaxTableSizeDialog() {
-            ElMessageBox.prompt(
-                t('prompt.change_table_size.description'),
-                t('prompt.change_table_size.header'),
-                {
-                    distinguishCancelAndClose: true,
-                    confirmButtonText: t('prompt.change_table_size.save'),
-                    cancelButtonText: t('prompt.change_table_size.cancel'),
-                    inputValue: vrcxStore.maxTableSize.toString(),
-                    inputPattern: /\d+$/,
-                    inputErrorMessage: t('prompt.change_table_size.input_error')
-                }
-            )
-                .then(async ({ value }) => {
-                    if (value) {
-                        let processedValue = Number(value);
-                        if (processedValue > 10000) {
-                            processedValue = 10000;
-                        }
-                        vrcxStore.maxTableSize = processedValue;
-                        await configRepository.setString(
-                            'VRCX_maxTableSize',
-                            vrcxStore.maxTableSize.toString()
-                        );
-                        database.setMaxTableSize(vrcxStore.maxTableSize);
-                        feedStore.feedTableLookup();
-                        gameLogStore.gameLogTableLookup();
-                    }
-                })
-                .catch(() => {});
+        const clampLimit = (value, min, max) => {
+            const n = Number.parseInt(value, 10);
+            if (!Number.isFinite(n)) {
+                return null;
+            }
+            if (n < min || n > max) {
+                return null;
+            }
+            return n;
+        };
+
+        function showTableLimitsDialog() {
+            tableLimitsDialog.value.maxTableSize = Number(
+                vrcxStore.maxTableSize ?? 500
+            );
+            tableLimitsDialog.value.searchLimit = Number(
+                vrcxStore.searchLimit ?? 5000
+            );
+            tableLimitsDialog.value.visible = true;
+        }
+
+        function closeTableLimitsDialog() {
+            tableLimitsDialog.value.visible = false;
+        }
+
+        async function saveTableLimitsDialog() {
+            const nextMaxTableSize = clampLimit(
+                tableLimitsDialog.value.maxTableSize,
+                TABLE_MAX_SIZE_MIN,
+                TABLE_MAX_SIZE_MAX
+            );
+            if (nextMaxTableSize === null) {
+                return;
+            }
+
+            const nextSearchLimit = clampLimit(
+                tableLimitsDialog.value.searchLimit,
+                SEARCH_LIMIT_MIN,
+                SEARCH_LIMIT_MAX
+            );
+            if (nextSearchLimit === null) {
+                return;
+            }
+
+            vrcxStore.maxTableSize = nextMaxTableSize;
+            await configRepository.setString(
+                'VRCX_maxTableSize',
+                vrcxStore.maxTableSize.toString()
+            );
+            database.setMaxTableSize(vrcxStore.maxTableSize);
+
+            vrcxStore.searchLimit = nextSearchLimit;
+            await configRepository.setInt(
+                'VRCX_searchLimit',
+                vrcxStore.searchLimit
+            );
+            database.setSearchTableSize(vrcxStore.searchLimit);
+
+            feedStore.feedTableLookup();
+            gameLogStore.gameLogTableLookup();
+            tableLimitsDialog.value.visible = false;
         }
 
         async function tryInitUserColours() {
@@ -786,12 +940,14 @@ export const useAppearanceSettingsStore = defineStore(
             await userColourInit();
         }
 
-        function applyCompactTableMode(isCompact) {
-            const className = 'is-compact-table';
-            if (isCompact) {
-                document.documentElement.classList.add(className);
-            } else {
-                document.documentElement.classList.remove(className);
+        function applyTableDensity(density) {
+            const classList = document.documentElement.classList;
+            classList.remove('is-compact-table', 'is-comfortable-table');
+            if (density === 'compact') {
+                classList.add('is-compact-table');
+            }
+            if (density === 'comfortable') {
+                classList.add('is-comfortable-table');
             }
         }
 
@@ -799,6 +955,7 @@ export const useAppearanceSettingsStore = defineStore(
             appLanguage,
             themeMode,
             isDarkMode,
+            appFontFamily,
             displayVRCPlusIconsAsAvatar,
             hideNicknames,
             showInstanceIdInLocation,
@@ -813,21 +970,28 @@ export const useAppearanceSettingsStore = defineStore(
             sidebarSortMethod2,
             sidebarSortMethod3,
             sidebarSortMethods,
-            asideWidth,
             navWidth,
             isSidebarGroupByInstance,
             isHideFriendsInSameInstance,
             isSidebarDivideByFriendGroup,
+            sidebarFavoriteGroups,
             hideUserNotes,
             hideUserMemos,
             hideUnfriends,
             randomUserColours,
-            compactTableMode,
+            tableDensity,
             trustColor,
             currentCulture,
             isSideBarTabShow,
             notificationIconDot,
             isNavCollapsed,
+            isDataTableStriped,
+            showPointerOnHover,
+            tableLimitsDialog,
+            TABLE_MAX_SIZE_MIN,
+            TABLE_MAX_SIZE_MAX,
+            SEARCH_LIMIT_MIN,
+            SEARCH_LIMIT_MAX,
 
             setAppLanguage,
             setDisplayVRCPlusIconsAsAvatar,
@@ -845,27 +1009,33 @@ export const useAppearanceSettingsStore = defineStore(
             setSidebarSortMethod3,
             setSidebarSortMethods,
             setNavWidth,
-            setAsideWidth,
             setIsSidebarGroupByInstance,
             setIsHideFriendsInSameInstance,
             setIsSidebarDivideByFriendGroup,
+            setSidebarFavoriteGroups,
             setHideUserNotes,
             setHideUserMemos,
             setHideUnfriends,
             setRandomUserColours,
-            setCompactTableMode,
+            toggleStripedDataTable,
+            togglePointerOnHover,
+            setTableDensity,
             setTrustColor,
             tryInitUserColours,
             updateTrustColor,
             userColourInit,
             applyUserTrustLevel,
             changeAppLanguage,
-            promptMaxTableSizeDialog,
+            showTableLimitsDialog,
+            closeTableLimitsDialog,
+            saveTableLimitsDialog,
             setNotificationIconDot,
-            applyCompactTableMode,
+            applyTableDensity,
             setNavCollapsed,
             toggleNavCollapsed,
-            setThemeMode
+            setAppFontFamily,
+            setThemeMode,
+            toggleThemeMode
         };
     }
 );

@@ -1,5 +1,4 @@
 import { reactive, ref, watch } from 'vue';
-import { ElMessageBox } from 'element-plus';
 import { defineStore } from 'pinia';
 import { toast } from 'vue-sonner';
 import { useI18n } from 'vue-i18n';
@@ -9,6 +8,7 @@ import { database } from '../../service/database';
 import { languageCodes } from '../../localization';
 import { useGameStore } from '../game';
 import { useModalStore } from '../modal';
+import { useUpdateLoopStore } from '../updateLoop';
 import { useVRCXUpdaterStore } from '../vrcxUpdater';
 import { useVrcxStore } from '../vrcx';
 import { watchState } from '../../service/watchState';
@@ -21,6 +21,7 @@ export const useAdvancedSettingsStore = defineStore('AdvancedSettings', () => {
     const vrcxStore = useVrcxStore();
     const VRCXUpdaterStore = useVRCXUpdaterStore();
     const modalStore = useModalStore();
+    const updateLoopStore = useUpdateLoopStore();
 
     const { t } = useI18n();
 
@@ -391,6 +392,97 @@ export const useAdvancedSettingsStore = defineStore('AdvancedSettings', () => {
             translationApiPrompt.value
         );
     }
+
+    async function fetchAvailableModels(overrides = {}) {
+        const baseURL = overrides.endpoint || translationApiEndpoint.value;
+
+        if (!baseURL) {
+            toast.warning('Translation endpoint not configured');
+            return [];
+        }
+
+        let modelsURL = '';
+        try {
+            const url = new URL(baseURL);
+            const basePath = url.pathname.replace(/\/+$/, '');
+
+            if (basePath.endsWith('/chat/completions')) {
+                url.pathname = basePath.replace(
+                    /\/chat\/completions$/,
+                    '/models'
+                );
+            } else if (basePath.endsWith('/models')) {
+                url.pathname = basePath;
+            } else {
+                url.pathname = `${basePath}/models`;
+            }
+
+            url.search = '';
+            url.hash = '';
+            modelsURL = url.toString();
+        } catch {
+            const normalizedBaseURL = baseURL.endsWith('/')
+                ? baseURL.slice(0, -1)
+                : baseURL;
+
+            if (normalizedBaseURL.includes('/chat/completions')) {
+                modelsURL = normalizedBaseURL.replace(
+                    /\/chat\/completions$/,
+                    '/models'
+                );
+            } else if (normalizedBaseURL.endsWith('/models')) {
+                modelsURL = normalizedBaseURL;
+            } else {
+                modelsURL = `${normalizedBaseURL}/models`;
+            }
+        }
+
+        const headers = {};
+        const keyToUse = overrides.key ?? translationApiKey.value;
+        if (keyToUse) {
+            headers.Authorization = `Bearer ${keyToUse}`;
+        }
+
+        try {
+            const response = await webApiService.execute({
+                url: modelsURL,
+                method: 'GET',
+                headers
+            });
+
+            if (response.status !== 200) {
+                throw new Error(
+                    `Failed to fetch models: ${response.status} - ${response.data}`
+                );
+            }
+
+            const data = JSON.parse(response.data);
+            if (AppDebug.debugWebRequests) {
+                console.log(modelsURL, data, response);
+            }
+
+            if (data.data && Array.isArray(data.data)) {
+                return data.data
+                    .map((model) => model.id)
+                    .filter((id) => id && typeof id === 'string')
+                    .sort();
+            }
+
+            if (Array.isArray(data)) {
+                return data
+                    .map((model) => model.id || model.name)
+                    .filter((id) => id && typeof id === 'string')
+                    .sort();
+            }
+
+            throw new Error('Unexpected API response format');
+        } catch (error) {
+            console.error('Failed to fetch models:', error);
+            toast.error(`Failed to fetch models: ${error.message}`);
+            return [];
+        }
+    }
+
     function setBioLanguage(language) {
         bioLanguage.value = language;
         configRepository.setString('VRCX_bioLanguage', language);
@@ -470,23 +562,23 @@ export const useAdvancedSettingsStore = defineStore('AdvancedSettings', () => {
     async function checkSentryConsent() {
         modalStore
             .confirm({
-                description:
-                    'Help improve VRCX by allowing anonymous error reporting?</br></br>' +
-                    '• Only collects crash and error information.</br>' +
-                    '• No personal data or VRChat information is collected.</br>' +
-                    '• Only enabled in nightly builds.</br>' +
-                    '• Can be disabled at anytime in Advanced Settings.',
-                title: 'Anonymous Error Reporting'
+                description: t(
+                    'view.settings.advanced.advanced.anonymous_error_reporting.consent_description'
+                ),
+                title: t(
+                    'view.settings.advanced.advanced.anonymous_error_reporting.consent_title'
+                )
             })
             .then(async ({ ok }) => {
                 if (!ok) return;
                 modalStore
                     .confirm({
-                        description:
-                            'Error reporting setting has been enabled. Would you like to restart VRCX now for the change to take effect?',
-                        title: 'Restart Required',
-                        confirmText: 'Restart Now',
-                        cancelText: 'Later'
+                        description: t(
+                            'view.settings.advanced.advanced.anonymous_error_reporting.enabled_restart_description'
+                        ),
+                        title: t('confirm.restart_required_title'),
+                        confirmText: t('confirm.restart_now'),
+                        cancelText: t('confirm.restart_later')
                     })
                     .then(async ({ ok }) => {
                         if (!ok) return;
@@ -504,11 +596,12 @@ export const useAdvancedSettingsStore = defineStore('AdvancedSettings', () => {
 
         modalStore
             .confirm({
-                description:
-                    'Error reporting setting has been disabled. Would you like to restart VRCX now for the change to take effect?',
-                title: 'Restart Required',
-                confirmText: 'Restart Now',
-                cancelText: 'Later'
+                description: t(
+                    'view.settings.advanced.advanced.anonymous_error_reporting.disabled_restart_description'
+                ),
+                title: t('confirm.restart_required_title'),
+                confirmText: t('confirm.restart_now'),
+                cancelText: t('confirm.restart_later')
             })
             .then(async ({ ok }) => {
                 if (!ok) return;
@@ -592,10 +685,11 @@ export const useAdvancedSettingsStore = defineStore('AdvancedSettings', () => {
             apiKey = youTubeApiKey.value;
         }
         try {
+            const url = `https://www.googleapis.com/youtube/v3/videos?id=${encodeURIComponent(
+                videoId
+            )}&part=snippet,contentDetails&key=${apiKey}`;
             const response = await webApiService.execute({
-                url: `https://www.googleapis.com/youtube/v3/videos?id=${encodeURIComponent(
-                    videoId
-                )}&part=snippet,contentDetails&key=${apiKey}`,
+                url,
                 method: 'GET',
                 headers: {
                     Referer: 'https://vrcx.app'
@@ -603,7 +697,7 @@ export const useAdvancedSettingsStore = defineStore('AdvancedSettings', () => {
             });
             const json = JSON.parse(response.data);
             if (AppDebug.debugWebRequests) {
-                console.log(json, response);
+                console.log(url, json, response);
             }
             if (response.status === 200) {
                 data = json;
@@ -632,8 +726,9 @@ export const useAdvancedSettingsStore = defineStore('AdvancedSettings', () => {
                 return null;
             }
             try {
+                const url = `https://translation.googleapis.com/language/translate/v2?key=${keyToUse}`;
                 const response = await webApiService.execute({
-                    url: `https://translation.googleapis.com/language/translate/v2?key=${keyToUse}`,
+                    url,
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -652,7 +747,7 @@ export const useAdvancedSettingsStore = defineStore('AdvancedSettings', () => {
                 }
                 const data = JSON.parse(response.data);
                 if (AppDebug.debugWebRequests) {
-                    console.log(data, response);
+                    console.log(url, data, response);
                 }
                 return data.data.translations[0].translatedText;
             } catch (err) {
@@ -679,7 +774,9 @@ export const useAdvancedSettingsStore = defineStore('AdvancedSettings', () => {
 
         const headers = {
             'Content-Type': 'application/json',
-            Referer: 'https://vrcx.app'
+            Referer: 'https://vrcx.app',
+            'HTTP-Referer': 'https://vrcx.app',
+            'X-Title': 'VRCX'
         };
         const keyToUse = overrides?.key ?? translationApiKey.value;
         if (keyToUse) {
@@ -714,13 +811,13 @@ export const useAdvancedSettingsStore = defineStore('AdvancedSettings', () => {
 
             const data = JSON.parse(response.data);
             if (AppDebug.debugWebRequests) {
-                console.log(data, response);
+                console.log(endpoint, data, response);
             }
 
             const translated = data?.choices?.[0]?.message?.content;
             return typeof translated === 'string' ? translated.trim() : null;
         } catch (err) {
-            toast.error(`Translation failed: ${err.message}`);
+            toast.error(`Translation failed`);
             return null;
         }
     }
@@ -855,26 +952,28 @@ export const useAdvancedSettingsStore = defineStore('AdvancedSettings', () => {
     }
 
     function promptAutoClearVRCXCacheFrequency() {
-        ElMessageBox.prompt(
-            t('prompt.auto_clear_cache.description'),
-            t('prompt.auto_clear_cache.header'),
-            {
-                distinguishCancelAndClose: true,
-                confirmButtonText: t('prompt.auto_clear_cache.ok'),
-                cancelButtonText: t('prompt.auto_clear_cache.cancel'),
+        modalStore
+            .prompt({
+                title: t('prompt.auto_clear_cache.header'),
+                description: t('prompt.auto_clear_cache.description'),
+                confirmText: t('prompt.auto_clear_cache.ok'),
+                cancelText: t('prompt.auto_clear_cache.cancel'),
                 inputValue: (
                     vrcxStore.clearVRCXCacheFrequency /
                     3600 /
                     2
                 ).toString(),
-                inputPattern: /\d+$/,
-                inputErrorMessage: t('prompt.auto_clear_cache.input_error')
-            }
-        )
-            .then(async ({ value }) => {
+                pattern: /\d+$/,
+                errorMessage: t('prompt.auto_clear_cache.input_error')
+            })
+            .then(async ({ ok, value }) => {
+                if (!ok) return;
                 if (value && !isNaN(parseInt(value, 10))) {
                     vrcxStore.clearVRCXCacheFrequency = Math.trunc(
                         parseInt(value, 10) * 3600 * 2
+                    );
+                    updateLoopStore.setNextClearVRCXCacheCheck(
+                        vrcxStore.clearVRCXCacheFrequency / 2
                     );
                     await configRepository.setString(
                         'VRCX_clearVRCXCacheFrequency',
@@ -963,6 +1062,7 @@ export const useAdvancedSettingsStore = defineStore('AdvancedSettings', () => {
         handleSetAppLauncherSettings,
         lookupYouTubeVideo,
         translateText,
+        fetchAvailableModels,
         resetUGCFolder,
         openUGCFolder,
         openUGCFolderSelector,

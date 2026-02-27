@@ -1,45 +1,45 @@
 <template>
-    <el-dialog
-        class="x-dialog"
-        :model-value="isEditInviteMessagesDialogVisible"
-        :title="t('dialog.edit_invite_messages.header')"
-        width="1000px"
-        @close="closeDialog">
-        <el-tabs v-model="activeTab" style="margin-top: 10px">
-            <el-tab-pane :label="t('dialog.edit_invite_messages.invite_message_tab')" name="message">
-                <DataTableLayout
-                    style="margin-top: 10px; cursor: pointer"
-                    :table="inviteMessageTanstackTable"
-                    :loading="false"
-                    :show-pagination="false"
-                    :on-row-click="handleEditInviteMessageRowClick" />
-            </el-tab-pane>
-            <el-tab-pane :label="t('dialog.edit_invite_messages.invite_request_tab')" name="request">
-                <DataTableLayout
-                    style="margin-top: 10px; cursor: pointer"
-                    :table="inviteRequestTanstackTable"
-                    :loading="false"
-                    :show-pagination="false"
-                    :on-row-click="handleEditInviteMessageRowClick" />
-            </el-tab-pane>
-            <el-tab-pane :label="t('dialog.edit_invite_messages.invite_request_response_tab')" name="requestResponse">
-                <DataTableLayout
-                    style="margin-top: 10px; cursor: pointer"
-                    :table="inviteRequestResponseTanstackTable"
-                    :loading="false"
-                    :show-pagination="false"
-                    :on-row-click="handleEditInviteMessageRowClick" />
-            </el-tab-pane>
-            <el-tab-pane :label="t('dialog.edit_invite_messages.invite_response_tab')" name="response">
-                <DataTableLayout
-                    style="margin-top: 10px; cursor: pointer"
-                    :table="inviteResponseTanstackTable"
-                    :loading="false"
-                    :show-pagination="false"
-                    :on-row-click="handleEditInviteMessageRowClick" />
-            </el-tab-pane>
-        </el-tabs>
-    </el-dialog>
+    <Dialog :open="isEditInviteMessagesDialogVisible" @update:open="(open) => !open && closeDialog()">
+        <DialogContent class="sm:max-w-5xl">
+            <DialogHeader>
+                <DialogTitle>{{ t('dialog.edit_invite_messages.header') }}</DialogTitle>
+            </DialogHeader>
+            <TabsUnderline v-model="activeTab" :items="editInviteTabs" :unmount-on-hide="false" class="mt-2.5">
+                <template #message>
+                    <DataTableLayout
+                        style="margin-top: 10px; cursor: pointer"
+                        :table="inviteMessageTanstackTable"
+                        :loading="false"
+                        :show-pagination="false"
+                        :on-row-click="handleEditInviteMessageRowClick" />
+                </template>
+                <template #request>
+                    <DataTableLayout
+                        style="margin-top: 10px; cursor: pointer"
+                        :table="inviteRequestTanstackTable"
+                        :loading="false"
+                        :show-pagination="false"
+                        :on-row-click="handleEditInviteMessageRowClick" />
+                </template>
+                <template #requestResponse>
+                    <DataTableLayout
+                        style="margin-top: 10px; cursor: pointer"
+                        :table="inviteRequestResponseTanstackTable"
+                        :loading="false"
+                        :show-pagination="false"
+                        :on-row-click="handleEditInviteMessageRowClick" />
+                </template>
+                <template #response>
+                    <DataTableLayout
+                        style="margin-top: 10px; cursor: pointer"
+                        :table="inviteResponseTanstackTable"
+                        :loading="false"
+                        :show-pagination="false"
+                        :on-row-click="handleEditInviteMessageRowClick" />
+                </template>
+            </TabsUnderline>
+        </DialogContent>
+    </Dialog>
     <template v-if="isEditInviteMessagesDialogVisible">
         <EditInviteMessageDialog
             v-model:isEditInviteMessageDialogVisible="isEditInviteMessageDialogVisible"
@@ -50,8 +50,10 @@
 </template>
 
 <script setup>
+    import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
     import { computed, ref, watch } from 'vue';
     import { DataTableLayout } from '@/components/ui/data-table';
+    import { TabsUnderline } from '@/components/ui/tabs';
     import { storeToRefs } from 'pinia';
     import { toast } from 'vue-sonner';
     import { useI18n } from 'vue-i18n';
@@ -82,6 +84,12 @@
     });
 
     const activeTab = ref('message');
+    const editInviteTabs = computed(() => [
+        { value: 'message', label: t('dialog.edit_invite_messages.invite_message_tab') },
+        { value: 'request', label: t('dialog.edit_invite_messages.invite_request_tab') },
+        { value: 'requestResponse', label: t('dialog.edit_invite_messages.invite_request_response_tab') },
+        { value: 'response', label: t('dialog.edit_invite_messages.invite_response_tab') }
+    ]);
 
     const isEditInviteMessageDialogVisible = ref(false);
     const inviteMessage = ref({});
@@ -111,7 +119,9 @@
 
     const { table: inviteMessageTanstackTable } = useVrcxVueTable({
         persistKey: 'edit-invite-messages:message',
-        data: inviteMessageRows,
+        get data() {
+            return inviteMessageRows.value;
+        },
         columns: inviteMessageColumns,
         getRowId: (row) => String(row?.slot ?? ''),
         enablePagination: false,
@@ -120,7 +130,9 @@
 
     const { table: inviteRequestTanstackTable } = useVrcxVueTable({
         persistKey: 'edit-invite-messages:request',
-        data: inviteRequestRows,
+        get data() {
+            return inviteRequestRows.value;
+        },
         columns: inviteRequestColumns,
         getRowId: (row) => String(row?.slot ?? ''),
         enablePagination: false,
@@ -129,7 +141,9 @@
 
     const { table: inviteRequestResponseTanstackTable } = useVrcxVueTable({
         persistKey: 'edit-invite-messages:request-response',
-        data: inviteRequestResponseRows,
+        get data() {
+            return inviteRequestResponseRows.value;
+        },
         columns: inviteRequestResponseColumns,
         getRowId: (row) => String(row?.slot ?? ''),
         enablePagination: false,
@@ -138,7 +152,9 @@
 
     const { table: inviteResponseTanstackTable } = useVrcxVueTable({
         persistKey: 'edit-invite-messages:response',
-        data: inviteResponseRows,
+        get data() {
+            return inviteResponseRows.value;
+        },
         columns: inviteResponseColumns,
         getRowId: (row) => String(row?.slot ?? ''),
         enablePagination: false,

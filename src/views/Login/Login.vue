@@ -1,17 +1,31 @@
 <template>
-    <div style="float: left; margin: 5px; z-index: 3000">
-        <TooltipWrapper v-if="!noUpdater" side="top" :content="t('view.login.updater')">
-            <Button class="rounded-full mr-2 text-xs" size="icon-sm" variant="ghost" @click="showVRCXUpdateDialog"
-                ><CircleArrowDown
-            /></Button>
-        </TooltipWrapper>
-        <TooltipWrapper side="top" :content="t('view.login.proxy_settings')">
-            <Button class="rounded-full text-xs" size="icon-sm" variant="ghost" @click="promptProxySettings"
-                ><Route
-            /></Button>
-        </TooltipWrapper>
-    </div>
-    <div v-loading="loginForm.loading" class="x-login-container">
+    <div class="x-login-container">
+        <div style="position: absolute; top: 0; left: 0; margin: 5px">
+            <LoginSettingsDialog />
+            <TooltipWrapper v-if="!noUpdater" side="top" :content="t('view.login.updater')">
+                <Button class="rounded-full mr-2 text-xs" size="icon-sm" variant="ghost" @click="showVRCXUpdateDialog"
+                    ><ArrowBigDownDash
+                /></Button>
+            </TooltipWrapper>
+            <DropdownMenu>
+                <DropdownMenuTrigger as-child>
+                    <TooltipWrapper side="top" :content="t('view.login.language')">
+                        <Button class="rounded-full text-xs" size="icon-sm" variant="ghost">
+                            <Languages />
+                        </Button>
+                    </TooltipWrapper>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent class="max-h-80 overflow-y-auto text-xs">
+                    <DropdownMenuCheckboxItem
+                        v-for="language in languageCodes"
+                        :key="language"
+                        :model-value="appLanguage === language"
+                        @select="changeAppLanguage(language)">
+                        {{ getLanguageName(language) }}
+                    </DropdownMenuCheckboxItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
+        </div>
         <div class="x-login">
             <div class="x-login-form-container">
                 <div>
@@ -27,6 +41,7 @@
                                         <InputGroupField
                                             id="login-form-username"
                                             :model-value="field.value"
+                                            autocomplete="off"
                                             name="username"
                                             :placeholder="t('view.login.field.username')"
                                             :aria-invalid="!!errors.length"
@@ -47,11 +62,11 @@
                                             id="login-form-password"
                                             :model-value="field.value"
                                             type="password"
+                                            autocomplete="off"
                                             name="password"
                                             :placeholder="t('view.login.field.password')"
                                             :aria-invalid="!!errors.length"
                                             clearable
-                                            show-password
                                             @update:modelValue="field.onChange"
                                             @blur="field.onBlur" />
                                         <FieldError v-if="errors.length" :errors="errors" />
@@ -59,54 +74,11 @@
                                 </Field>
                             </VeeField>
                         </FieldGroup>
-                        <label class="inline-flex items-center gap-2 mr-2">
+                        <label class="inline-flex items-center gap-2 mr-2 text-sm">
                             <Checkbox v-model="loginForm.saveCredentials" />
                             <span>{{ t('view.login.field.saveCredentials') }}</span>
                         </label>
-                        <label class="inline-flex items-center gap-2" style="margin-top: 10px">
-                            <Checkbox v-model="enableCustomEndpoint" @update:modelValue="handleCustomEndpointToggle" />
-                            <span>{{ t('view.login.field.devEndpoint') }}</span>
-                        </label>
-                        <FieldGroup v-if="enableCustomEndpoint" class="mt-3 gap-3">
-                            <VeeField v-slot="{ field, errors }" name="endpoint">
-                                <Field :data-invalid="!!errors.length">
-                                    <FieldLabel for="login-form-endpoint">
-                                        {{ t('view.login.field.endpoint') }}
-                                    </FieldLabel>
-                                    <FieldContent>
-                                        <InputGroupField
-                                            id="login-form-endpoint"
-                                            :model-value="field.value"
-                                            name="endpoint"
-                                            :placeholder="AppDebug.endpointDomainVrchat"
-                                            :aria-invalid="!!errors.length"
-                                            clearable
-                                            @update:modelValue="field.onChange"
-                                            @blur="field.onBlur" />
-                                        <FieldError v-if="errors.length" :errors="errors" />
-                                    </FieldContent>
-                                </Field>
-                            </VeeField>
-                            <VeeField v-slot="{ field, errors }" name="websocket">
-                                <Field :data-invalid="!!errors.length">
-                                    <FieldLabel for="login-form-websocket">
-                                        {{ t('view.login.field.websocket') }}
-                                    </FieldLabel>
-                                    <FieldContent>
-                                        <InputGroupField
-                                            id="login-form-websocket"
-                                            :model-value="field.value"
-                                            name="websocket"
-                                            :placeholder="AppDebug.websocketDomainVrchat"
-                                            :aria-invalid="!!errors.length"
-                                            clearable
-                                            @update:modelValue="field.onChange"
-                                            @blur="field.onBlur" />
-                                        <FieldError v-if="errors.length" :errors="errors" />
-                                    </FieldContent>
-                                </Field>
-                            </VeeField>
-                        </FieldGroup>
+
                         <Field class="mt-2">
                             <Button type="submit" size="lg" style="width: 100%">{{ t('view.login.login') }}</Button>
                         </Field>
@@ -131,24 +103,23 @@
                             <div
                                 v-for="user in savedCredentials"
                                 :key="user.user.id"
-                                class="x-friend-item"
+                                class="x-friend-item hover:bg-muted rounded-xs"
                                 @click="clickSavedLogin(user)">
                                 <div class="avatar">
                                     <img :src="userImage(user.user)" loading="lazy" />
                                 </div>
                                 <div class="detail">
                                     <span class="name" v-text="user.user.displayName"></span>
-                                    <span class="extra" v-text="user.user.username"></span>
-                                    <span class="extra" v-text="user.loginParams.endpoint"></span>
+                                    <span class="block truncate text-xs" v-text="user.user.username"></span>
+                                    <span class="block truncate text-xs" v-text="user.loginParams.endpoint"></span>
                                 </div>
                                 <Button
-                                    class="rounded-full"
                                     size="icon-sm"
                                     variant="ghost"
-                                    style="margin-left: 10px"
+                                    class="cursor-pointer ml-2"
                                     @click.stop="clickDeleteSavedLogin(user.user.id)"
-                                    ><i class="ri-delete-bin-line h-3 w-3"></i
-                                ></Button>
+                                    ><Trash2 class="text-sm"
+                                /></Button>
                             </div>
                         </div>
                     </div>
@@ -158,14 +129,19 @@
             <div class="x-legal-notice-container">
                 <div style="text-align: center; font-size: 12px">
                     <p>
-                        <a class="x-link" @click="openExternalLink('https://vrchat.com/home/password')">{{
+                        <a class="cursor-pointer" @click="openExternalLink('https://vrchat.com/home/password')">{{
                             t('view.login.forgotPassword')
                         }}</a>
                     </p>
                     <p>
                         &copy; 2019-2026
-                        <a class="x-link" @click="openExternalLink('https://github.com/pypy-vrc')">pypy</a> &amp;
-                        <a class="x-link" @click="openExternalLink('https://github.com/Natsumi-sama')">Natsumi</a>
+                        <a class="cursor-pointer" @click="openExternalLink('https://github.com/pypy-vrc')">pypy</a>
+                        &amp;
+                        <a class="cursor-pointer" @click="openExternalLink('https://github.com/Natsumi-sama')"
+                            >Natsumi</a
+                        >
+                        &amp;
+                        <a class="cursor-pointer" @click="openExternalLink('https://github.com/Map1en')">Map1en</a>
                     </p>
                     <p>{{ t('view.settings.general.legal_notice.info') }}</p>
                     <p>{{ t('view.settings.general.legal_notice.disclaimer1') }}</p>
@@ -178,8 +154,14 @@
 
 <script setup>
     import { Field, FieldContent, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+    import {
+        DropdownMenu,
+        DropdownMenuCheckboxItem,
+        DropdownMenuContent,
+        DropdownMenuTrigger
+    } from '@/components/ui/dropdown-menu';
     import { onBeforeMount, onBeforeUnmount, ref, watch } from 'vue';
-    import { CircleArrowDown, Route } from 'lucide-vue-next';
+    import { ArrowBigDownDash, Languages, Trash2 } from 'lucide-vue-next';
     import { Field as VeeField, useForm } from 'vee-validate';
     import { useRoute, useRouter } from 'vue-router';
     import { Button } from '@/components/ui/button';
@@ -190,18 +172,23 @@
     import { useI18n } from 'vue-i18n';
     import { z } from 'zod';
 
-    import { useAuthStore, useGeneralSettingsStore, useVRCXUpdaterStore } from '../../stores';
+    import { useAppearanceSettingsStore, useAuthStore, useVRCXUpdaterStore } from '../../stores';
+    import { getLanguageName, languageCodes } from '../../localization';
     import { openExternalLink, userImage } from '../../shared/utils';
-    import { AppDebug } from '../../service/appConfig';
     import { watchState } from '../../service/watchState';
+
+    import LoginSettingsDialog from './Dialog/LoginSettingsDialog.vue';
 
     const { showVRCXUpdateDialog } = useVRCXUpdaterStore();
     const router = useRouter();
     const route = useRoute();
-    const { loginForm, enableCustomEndpoint } = storeToRefs(useAuthStore());
-    const { toggleCustomEndpoint, relogin, deleteSavedLogin, login, getAllSavedCredentials } = useAuthStore();
-    const { promptProxySettings } = useGeneralSettingsStore();
+    const { loginForm } = storeToRefs(useAuthStore());
+    const { relogin, deleteSavedLogin, login, getAllSavedCredentials } = useAuthStore();
     const { noUpdater } = storeToRefs(useVRCXUpdaterStore());
+
+    const appearanceSettingsStore = useAppearanceSettingsStore();
+    const { appLanguage } = storeToRefs(appearanceSettingsStore);
+    const { changeAppLanguage } = appearanceSettingsStore;
 
     const { t } = useI18n();
 
@@ -211,19 +198,15 @@
     const formSchema = toTypedSchema(
         z.object({
             username: z.string().min(1, requiredMessage),
-            password: z.string().min(1, requiredMessage),
-            endpoint: z.string().optional(),
-            websocket: z.string().optional()
+            password: z.string().min(1, requiredMessage)
         })
     );
 
-    const { handleSubmit, resetForm, setValues, values } = useForm({
+    const { handleSubmit, resetForm, values } = useForm({
         validationSchema: formSchema,
         initialValues: {
             username: loginForm.value.username,
-            password: loginForm.value.password,
-            endpoint: loginForm.value.endpoint,
-            websocket: loginForm.value.websocket
+            password: loginForm.value.password
         }
     });
 
@@ -240,20 +223,9 @@
     const onSubmit = handleSubmit(async (formValues) => {
         loginForm.value.username = formValues.username ?? '';
         loginForm.value.password = formValues.password ?? '';
-        loginForm.value.endpoint = formValues.endpoint ?? '';
-        loginForm.value.websocket = formValues.websocket ?? '';
         await login();
         await updateSavedCredentials();
     });
-
-    async function handleCustomEndpointToggle() {
-        await toggleCustomEndpoint();
-        setValues({
-            ...values,
-            endpoint: loginForm.value.endpoint,
-            websocket: loginForm.value.websocket
-        });
-    }
 
     async function updateSavedCredentials() {
         if (watchState.isLoggedIn) {
@@ -279,6 +251,15 @@
         }
     );
 
+    watch(
+        () => loginForm.value.loading,
+        (loading) => {
+            if (!loading) {
+                updateSavedCredentials();
+            }
+        }
+    );
+
     onBeforeMount(async () => {
         updateSavedCredentials();
     });
@@ -287,9 +268,7 @@
         resetForm({
             values: {
                 username: '',
-                password: '',
-                endpoint: '',
-                websocket: ''
+                password: ''
             }
         });
         loginForm.value.username = '';
@@ -304,9 +283,68 @@
         (formValues) => {
             loginForm.value.username = formValues.username ?? '';
             loginForm.value.password = formValues.password ?? '';
-            loginForm.value.endpoint = formValues.endpoint ?? '';
-            loginForm.value.websocket = formValues.websocket ?? '';
         },
         { deep: true }
     );
 </script>
+
+<style scoped>
+    .x-login-container {
+        position: absolute;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        height: 100%;
+    }
+
+    .x-login {
+        display: grid;
+        grid-template-rows: repeat(2, auto);
+        align-items: center;
+        max-width: clamp(600px, 60svw, 800px);
+    }
+
+    .x-login-form-container {
+        display: grid;
+        gap: 8px;
+        height: 380px;
+    }
+
+    .x-login-form-container:has(> div:nth-child(3)) {
+        grid-template-columns: 1fr 1px 1fr;
+    }
+
+    .x-login-form-container > div {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        padding: 16px;
+        overflow-y: auto;
+    }
+
+    .x-scroll-wrapper {
+        width: 100%;
+        height: 100%;
+        overflow-y: auto;
+    }
+
+    hr.x-vertical-divider {
+        height: 100%;
+        width: 100%;
+        margin: 0;
+        border: 0;
+    }
+
+    .x-saved-account-list {
+        display: grid;
+    }
+
+    .x-saved-account-list > .x-friend-item {
+        width: 100%;
+    }
+
+    .x-legal-notice-container {
+        margin-top: 8px;
+    }
+</style>

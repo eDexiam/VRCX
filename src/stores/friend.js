@@ -2,6 +2,7 @@ import { computed, reactive, ref, watch } from 'vue';
 import { defineStore } from 'pinia';
 import { toast } from 'vue-sonner';
 import { useI18n } from 'vue-i18n';
+import { useRouter } from 'vue-router';
 
 import {
     compareByCreatedAtAscending,
@@ -54,6 +55,8 @@ export const useFriendStore = defineStore('Friend', () => {
     const modalStore = useModalStore();
     const { t } = useI18n();
 
+    const router = useRouter();
+
     const state = reactive({
         friendNumber: 0
     });
@@ -63,6 +66,38 @@ export const useFriendStore = defineStore('Friend', () => {
     const friends = reactive(new Map());
 
     const localFavoriteFriends = reactive(new Set());
+
+    const allFavoriteFriendIds = computed(() => {
+        const favoriteStore = useFavoriteStore();
+        const set = new Set();
+        for (const ref of favoriteStore.cachedFavorites.values()) {
+            if (ref.type === 'friend') {
+                set.add(ref.favoriteId);
+            }
+        }
+        for (const groupName in favoriteStore.localFriendFavorites) {
+            const userIds = favoriteStore.localFriendFavorites[groupName];
+            if (userIds) {
+                for (const id of userIds) {
+                    set.add(id);
+                }
+            }
+        }
+        return set;
+    });
+
+    const allFavoriteOnlineFriends = computed(() => {
+        return Array.from(friends.values())
+            .filter(
+                (f) =>
+                    f.state === 'online' && allFavoriteFriendIds.value.has(f.id)
+            )
+            .sort(
+                getFriendsSortFunction(
+                    appearanceSettingsStore.sidebarSortMethods
+                )
+            );
+    });
 
     const isRefreshFriendsLoading = ref(false);
     const onlineFriendCount = ref(0);
@@ -89,9 +124,21 @@ export const useFriendStore = defineStore('Friend', () => {
                     !(filter.value && row.type === 'Unfriend')
             }
         ],
-        pageSize: 20,
-        pageSizeLinked: true
+        pageSizeLinked: true,
+        loading: false
     });
+
+    watch(
+        router.currentRoute,
+        (value) => {
+            if (value.name === 'friend-log') {
+                initFriendLogHistoryTable();
+            } else {
+                friendLogTable.value.data = [];
+            }
+        },
+        { immediate: true }
+    );
 
     const vipFriends = computed(() => {
         return Array.from(friends.values())
@@ -290,16 +337,26 @@ export const useFriendStore = defineStore('Friend', () => {
     function updateLocalFavoriteFriends() {
         const favoriteStore = useFavoriteStore();
         localFavoriteFriends.clear();
+        const groups = generalSettingsStore.localFavoriteFriendsGroups;
+        const hasRemoteGroupFilter = groups.some(
+            (key) => !key.startsWith('local:')
+        );
+        // Remote favorites: filter by selected remote groups
         for (const ref of favoriteStore.cachedFavorites.values()) {
             if (
                 ref.type === 'friend' &&
-                (generalSettingsStore.localFavoriteFriendsGroups.includes(
-                    ref.$groupKey
-                ) ||
-                    generalSettingsStore.localFavoriteFriendsGroups.length ===
-                        0)
+                (!hasRemoteGroupFilter || groups.includes(ref.$groupKey))
             ) {
                 localFavoriteFriends.add(ref.favoriteId);
+            }
+        }
+        // Local favorites: always include all
+        for (const groupName in favoriteStore.localFriendFavorites) {
+            const userIds = favoriteStore.localFriendFavorites[groupName];
+            if (userIds) {
+                for (let i = 0; i < userIds.length; ++i) {
+                    localFavoriteFriends.add(userIds[i]);
+                }
             }
         }
         updateSidebarFavorites();
@@ -993,6 +1050,7 @@ export const useFriendStore = defineStore('Friend', () => {
                     friendLogTable.value.data.push(friendLogHistory);
                     database.addFriendLogHistory(friendLogHistory);
                     notificationStore.queueFriendLogNoty(friendLogHistory);
+                    sharedFeedStore.addEntry(friendLogHistory);
                     const friendLogCurrent = {
                         userId: id,
                         displayName: ref.displayName,
@@ -1003,7 +1061,6 @@ export const useFriendStore = defineStore('Friend', () => {
                     database.setFriendLogCurrent(friendLogCurrent);
                     uiStore.notifyMenu('friend-log');
                     deleteFriendRequest(id);
-                    sharedFeedStore.updateSharedFeed(true);
                     userRequest
                         .getUser({
                             userId: id
@@ -1067,13 +1124,13 @@ export const useFriendStore = defineStore('Friend', () => {
                     friendLogTable.value.data.push(friendLogHistory);
                     database.addFriendLogHistory(friendLogHistory);
                     notificationStore.queueFriendLogNoty(friendLogHistory);
+                    sharedFeedStore.addEntry(friendLogHistory);
                     friendLog.delete(id);
                     database.deleteFriendLogCurrent(id);
                     favoriteStore.handleFavoriteDelete(id);
                     if (!appearanceSettingsStore.hideUnfriends) {
                         uiStore.notifyMenu('friend-log');
                     }
-                    sharedFeedStore.updateSharedFeed(true);
                     deleteFriend(id);
                 }
             });
@@ -1130,6 +1187,7 @@ export const useFriendStore = defineStore('Friend', () => {
                 notificationStore.queueFriendLogNoty(
                     friendLogHistoryDisplayName
                 );
+                sharedFeedStore.addEntry(friendLogHistoryDisplayName);
                 const friendLogCurrent = {
                     userId: ref.id,
                     displayName: ref.displayName,
@@ -1140,7 +1198,6 @@ export const useFriendStore = defineStore('Friend', () => {
                 database.setFriendLogCurrent(friendLogCurrent);
                 ctx.displayName = ref.displayName;
                 uiStore.notifyMenu('friend-log');
-                sharedFeedStore.updateSharedFeed(true);
             }
         }
         if (
@@ -1176,6 +1233,7 @@ export const useFriendStore = defineStore('Friend', () => {
             friendLogTable.value.data.push(friendLogHistoryTrustLevel);
             database.addFriendLogHistory(friendLogHistoryTrustLevel);
             notificationStore.queueFriendLogNoty(friendLogHistoryTrustLevel);
+            sharedFeedStore.addEntry(friendLogHistoryTrustLevel);
             const friendLogCurrent2 = {
                 userId: ref.id,
                 displayName: ref.displayName,
@@ -1185,7 +1243,6 @@ export const useFriendStore = defineStore('Friend', () => {
             friendLog.set(ref.id, friendLogCurrent2);
             database.setFriendLogCurrent(friendLogCurrent2);
             uiStore.notifyMenu('friend-log');
-            sharedFeedStore.updateSharedFeed(true);
         }
         ctx.trustLevel = ref.$trustLevel;
     }
@@ -1269,7 +1326,9 @@ export const useFriendStore = defineStore('Friend', () => {
     }
 
     async function initFriendLogHistoryTable() {
+        friendLogTable.value.loading = true;
         friendLogTable.value.data = await database.getFriendLogHistory();
+        friendLogTable.value.loading = false;
     }
 
     /**
@@ -1581,8 +1640,8 @@ export const useFriendStore = defineStore('Friend', () => {
     function confirmDeleteFriend(id) {
         modalStore
             .confirm({
-                description: 'Continue? Unfriend',
-                title: 'Confirm'
+                description: t('confirm.unfriend'),
+                title: t('confirm.title')
             })
             .then(async ({ ok }) => {
                 if (!ok) return;
@@ -1599,7 +1658,6 @@ export const useFriendStore = defineStore('Friend', () => {
         isRefreshFriendsLoading.value = true;
         watchState.isFriendsLoaded = false;
         friendLog = new Map();
-        await initFriendLogHistoryTable();
 
         try {
             if (await configRepository.getBool(`friendLogInit_${userId}`)) {
@@ -1637,6 +1695,8 @@ export const useFriendStore = defineStore('Friend', () => {
         offlineFriends,
         friendsInSameInstance,
 
+        allFavoriteFriendIds,
+        allFavoriteOnlineFriends,
         localFavoriteFriends,
         isRefreshFriendsLoading,
         onlineFriendCount,
@@ -1664,6 +1724,7 @@ export const useFriendStore = defineStore('Friend', () => {
         updateFriendships,
         updateUserCurrentStatus,
         handleFriendAdd,
-        handleFriendDelete
+        handleFriendDelete,
+        initFriendLogHistoryTable
     };
 });

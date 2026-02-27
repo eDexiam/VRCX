@@ -1,82 +1,116 @@
 <template>
-    <Card class="event-card p-0 gap-0" :class="cardClass">
-        <img :src="bannerUrl" @click="showFullscreenImageDialog(bannerUrl)" class="banner" />
-        <div class="event-content">
-            <div class="event-title">
-                <div v-if="showGroupName" class="event-group-name" @click="onGroupClick">
-                    {{ groupName }}
-                </div>
-                <el-popover placement="right" :width="500" trigger="hover">
-                    <el-descriptions :title="event.title" size="small" :column="2" class="event-title-popover">
-                        <template #extra>
-                            <div>
-                                {{ formatTimeRange(event.startsAt, event.endsAt) }}
-                            </div>
-                        </template>
-
-                        <el-descriptions-item>
-                            <Button variant="outline" size="sm" @click="openCalendarEvent(event)">
-                                <Calendar />
-                                {{ t('dialog.group_calendar.event_card.export_to_calendar') }}
-                            </Button>
-                        </el-descriptions-item>
-                        <el-descriptions-item>
-                            <Button variant="outline" size="sm" @click="downloadEventIcs(event)">
-                                <Download />
-                                {{ t('dialog.group_calendar.event_card.download_ics') }}
-                            </Button>
-                        </el-descriptions-item>
-                        <el-descriptions-item :label="t('dialog.group_calendar.event_card.category')">
-                            {{ capitalizeFirst(event.category) }}
-                        </el-descriptions-item>
-                        <el-descriptions-item :label="t('dialog.group_calendar.event_card.interested_user')">
-                            {{ event.interestedUserCount }}
-                        </el-descriptions-item>
-                        <el-descriptions-item :label="t('dialog.group_calendar.event_card.close_time')">
-                            {{ event.closeInstanceAfterEndMinutes + ' min' }}
-                        </el-descriptions-item>
-                        <el-descriptions-item :label="t('dialog.group_calendar.event_card.created')">
-                            {{ formatDateFilter(event.createdAt, 'long') }}
-                        </el-descriptions-item>
-                        <el-descriptions-item :label="t('dialog.group_calendar.event_card.description')">
-                            {{ event.description }}
-                        </el-descriptions-item>
-                    </el-descriptions>
-                    <template #reference>
+    <Popover :open="eventPopoverOpen">
+        <PopoverTrigger as-child>
+            <Card
+                class="event-card p-0 gap-0"
+                :class="cardClass"
+                @mouseenter="openEventPopover"
+                @mouseleave="scheduleCloseEventPopover">
+                <img :src="bannerUrl" @click="showFullscreenImageDialog(bannerUrl)" class="banner" />
+                <div class="event-content">
+                    <div class="event-title">
+                        <div v-if="showGroupName" class="event-group-name" @click="onGroupClick">
+                            {{ groupName }}
+                        </div>
                         <div class="event-title-content" @click="onGroupClick">
                             {{ event.title }}
                         </div>
-                    </template>
-                </el-popover>
-            </div>
-            <div class="event-info">
-                <div :class="timeClass">
-                    {{ formattedTime }}
+                    </div>
+                    <div class="event-info">
+                        <div :class="timeClass">
+                            {{ formattedTime }}
+                        </div>
+                        <div>
+                            {{ capitalizeFirst(event.accessType) }}
+                        </div>
+                    </div>
                 </div>
-                <div>
-                    {{ capitalizeFirst(event.accessType) }}
+                <div class="badges">
+                    <Button @click="copyEventLink(event)" size="icon" variant="secondary" class="rounded-full badge">
+                        <Share2 />
+                    </Button>
+                    <Button
+                        @click="toggleEventFollow(event)"
+                        size="icon"
+                        :variant="isFollowing ? 'default' : 'secondary'"
+                        class="rounded-full badge">
+                        <Star />
+                    </Button>
+                </div>
+            </Card>
+        </PopoverTrigger>
+        <PopoverContent
+            side="right"
+            align="start"
+            class="w-125 p-3"
+            @mouseenter="openEventPopover"
+            @mouseleave="scheduleCloseEventPopover">
+            <div class="flex items-baseline justify-between gap-3 text-xs">
+                <div class="text-[13px] font-semibold">{{ event.title }}</div>
+                <div class="whitespace-nowrap">
+                    {{ formatTimeRange(event.startsAt, event.endsAt) }}
                 </div>
             </div>
-        </div>
-        <div class="badges">
-            <div @click="copyEventLink(event)" class="share-badge">
-                <el-icon><Share /></el-icon>
+            <div class="mt-2 grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
+                <div class="flex min-w-0 flex-col gap-1">
+                    <Button variant="outline" size="sm" @click="openCalendarEvent(event)">
+                        <Calendar />
+                        {{ t('dialog.group_calendar.event_card.export_to_calendar') }}
+                    </Button>
+                </div>
+                <div class="flex min-w-0 flex-col gap-1">
+                    <Button variant="outline" size="sm" @click="downloadEventIcs(event)">
+                        <Download />
+                        {{ t('dialog.group_calendar.event_card.download_ics') }}
+                    </Button>
+                </div>
+                <div class="flex min-w-0 flex-col gap-1">
+                    <div>
+                        {{ t('dialog.group_calendar.event_card.category') }}
+                    </div>
+                    <div class="font-medium">{{ capitalizeFirst(event.category) }}</div>
+                </div>
+                <div class="flex min-w-0 flex-col gap-1">
+                    <div>
+                        {{ t('dialog.group_calendar.event_card.interested_user') }}
+                    </div>
+                    <div class="font-medium">{{ event.interestedUserCount }}</div>
+                </div>
+                <div class="flex min-w-0 flex-col gap-1">
+                    <div>
+                        {{ t('dialog.group_calendar.event_card.close_time') }}
+                    </div>
+                    <div class="font-medium">
+                        {{ event.closeInstanceAfterEndMinutes + ' min' }}
+                    </div>
+                </div>
+                <div class="flex min-w-0 flex-col gap-1">
+                    <div>
+                        {{ t('dialog.group_calendar.event_card.created') }}
+                    </div>
+                    <div class="font-medium">
+                        {{ formatDateFilter(event.createdAt, 'long') }}
+                    </div>
+                </div>
+                <div class="col-span-2 flex min-w-0 flex-col gap-1">
+                    <div>
+                        {{ t('dialog.group_calendar.event_card.description') }}
+                    </div>
+                    <div class="whitespace-pre-wrap break-words font-normal leading-snug">
+                        {{ event.description }}
+                    </div>
+                </div>
             </div>
-            <div v-if="isFollowing" @click="toggleEventFollow(event)" class="following-badge is-following">
-                <el-icon><Star /></el-icon>
-            </div>
-            <div v-else @click="toggleEventFollow(event)" class="following-badge">
-                <el-icon><StarFilled /></el-icon>
-            </div>
-        </div>
-    </Card>
+        </PopoverContent>
+    </Popover>
 </template>
 
 <script setup>
-    import { Calendar, Download, Share, Star, StarFilled } from '@element-plus/icons-vue';
+    import { Calendar, Download, Share2, Star } from 'lucide-vue-next';
+    import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+    import { computed, ref } from 'vue';
     import { Button } from '@/components/ui/button';
     import { Card } from '@/components/ui/card';
-    import { computed } from 'vue';
     import { toast } from 'vue-sonner';
     import { useI18n } from 'vue-i18n';
 
@@ -116,6 +150,8 @@
     const showGroupName = computed(() => props.mode === 'timeline');
 
     const timeClass = computed(() => (props.mode === 'grid' ? 'event-time' : ''));
+    const eventPopoverOpen = ref(false);
+    let eventPopoverCloseTimer = null;
 
     const bannerUrl = computed(() => {
         if (!props.event) return '';
@@ -198,6 +234,23 @@
     const onGroupClick = () => {
         emit('click-action');
     };
+
+    const openEventPopover = () => {
+        if (eventPopoverCloseTimer) {
+            clearTimeout(eventPopoverCloseTimer);
+            eventPopoverCloseTimer = null;
+        }
+        eventPopoverOpen.value = true;
+    };
+
+    const scheduleCloseEventPopover = () => {
+        if (eventPopoverCloseTimer) {
+            clearTimeout(eventPopoverCloseTimer);
+        }
+        eventPopoverCloseTimer = setTimeout(() => {
+            eventPopoverOpen.value = false;
+        }, 100);
+    };
 </script>
 
 <style scoped>
@@ -211,7 +264,6 @@
 
     .event-card:hover {
         transform: translateY(-2px);
-        box-shadow: var(--el-box-shadow-light);
     }
 
     .event-card.grouped-card {
@@ -252,37 +304,15 @@
         font-size: 15px;
     }
 
-    .event-card .badges .following-badge {
+    .event-card .badges .badge {
         display: flex;
         align-items: center;
         justify-content: center;
         width: 24px;
         height: 24px;
         gap: 4px;
-        border-radius: 50%;
-        background-color: var(--el-text-color-regular);
-        color: var(--el-bg-color);
-        box-shadow: var(--el-box-shadow-lighter);
         cursor: pointer;
-    }
-
-    .event-card .badges .following-badge.is-following {
-        background-color: var(--group-calendar-badge-following, var(--el-color-success));
-    }
-
-    .event-card .badges .share-badge {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 24px;
-        height: 24px;
-        gap: 4px;
-        border-radius: 50%;
-        background-color: var(--el-text-color-regular);
-        color: var(--el-bg-color);
-        box-shadow: var(--el-box-shadow-lighter);
-        cursor: pointer;
-        margin-right: 5px;
+        margin-left: 5px;
     }
 
     .event-card .event-content {
@@ -325,10 +355,6 @@
         margin-bottom: 2px;
     }
 
-    .event-card .event-title-content:hover {
-        color: var(--el-color-primary);
-    }
-
     .event-card .event-info {
         display: flex;
         justify-content: space-between;
@@ -341,12 +367,9 @@
 
     .grid-view .event-card .event-info {
         font-size: 11px;
-        color: var(--el-text-color-regular);
     }
 
     .event-card .event-time {
         font-weight: 500;
-        color: var(--el-color-primary);
     }
-
 </style>

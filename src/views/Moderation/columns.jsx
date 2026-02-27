@@ -3,17 +3,16 @@ import { Button } from '../../components/ui/button';
 import {
     Tooltip,
     TooltipContent,
-    TooltipProvider,
     TooltipTrigger
 } from '../../components/ui/tooltip';
-import { ArrowUpDown } from 'lucide-vue-next';
+import { ArrowUpDown, Trash2, X } from 'lucide-vue-next';
 import { storeToRefs } from 'pinia';
 
 import { formatDateFilter } from '../../shared/utils';
 import { i18n } from '../../plugin';
 import { useUiStore, useUserStore } from '../../stores';
 
-const { t } = i18n.global;
+const { t, te } = i18n.global;
 
 export const createColumns = ({ onDelete, onDeletePrompt }) => {
     const { showUserDialog } = useUserStore();
@@ -32,7 +31,7 @@ export const createColumns = ({ onDelete, onDeletePrompt }) => {
         },
         {
             accessorKey: 'created',
-            size: 90,
+            size: 120,
             header: ({ column }) => (
                 <Button
                     variant="ghost"
@@ -50,28 +49,29 @@ export const createColumns = ({ onDelete, onDeletePrompt }) => {
                 const longText = formatDateFilter(createdAt, 'long');
 
                 return (
-                    <TooltipProvider>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <span>{shortText}</span>
-                            </TooltipTrigger>
-                            <TooltipContent side="right">
-                                <span>{longText}</span>
-                            </TooltipContent>
-                        </Tooltip>
-                    </TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <span>{shortText}</span>
+                        </TooltipTrigger>
+                        <TooltipContent side="right">
+                            <span>{longText}</span>
+                        </TooltipContent>
+                    </Tooltip>
                 );
             }
         },
         {
             accessorKey: 'type',
-            size: 90,
+            size: 140,
             header: () => t('table.moderation.type'),
             cell: ({ row }) => {
                 const type = row.getValue('type');
+                const typeKey = `view.moderation.filters.${type}`;
+                const label = te(typeKey) ? t(typeKey) : type;
+
                 return (
                     <Badge variant="outline" class="text-muted-foreground">
-                        {t(`view.moderation.filters.${type}`)}
+                        {label}
                     </Badge>
                 );
             }
@@ -87,7 +87,7 @@ export const createColumns = ({ onDelete, onDeletePrompt }) => {
                 const original = row.original;
                 return (
                     <span
-                        class="x-link block w-full min-w-0 truncate pr-2.5"
+                        class="cursor-pointer block w-full min-w-0 truncate pr-2.5 cursor-pointer"
                         onClick={() => showUserDialog(original.sourceUserId)}
                     >
                         {original.sourceDisplayName}
@@ -107,7 +107,7 @@ export const createColumns = ({ onDelete, onDeletePrompt }) => {
                 const original = row.original;
                 return (
                     <span
-                        class="x-link block w-full whitespace-normal break-words pr-2.5"
+                        class="cursor-pointer block w-full whitespace-normal wrap-break-word pr-2.5 cursor-pointer"
                         onClick={() => showUserDialog(original.targetUserId)}
                     >
                         {original.targetDisplayName}
@@ -124,7 +124,6 @@ export const createColumns = ({ onDelete, onDeletePrompt }) => {
             minSize: 80,
             maxSize: 80,
             enableSorting: false,
-            enableResizing: false,
             header: () => t('table.moderation.action'),
             cell: ({ row }) => {
                 const original = row.original;
@@ -143,13 +142,11 @@ export const createColumns = ({ onDelete, onDeletePrompt }) => {
                                     : onDeletePrompt(original)
                             }
                         >
-                            <i
-                                class={
-                                    shiftHeld.value
-                                        ? 'ri-close-line text-red-600'
-                                        : 'ri-delete-bin-line'
-                                }
-                            />
+                            {shiftHeld.value ? (
+                                <X class="h-4 w-4 text-red-600" />
+                            ) : (
+                                <Trash2 class="h-4 w-4" />
+                            )}
                         </button>
                     </div>
                 );

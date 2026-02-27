@@ -18,9 +18,17 @@ import {
     parseLocation,
     replaceBioSymbols
 } from '../shared/utils';
-import { instanceRequest, userRequest, worldRequest } from '../api';
+import {
+    groupRequest,
+    instanceRequest,
+    userRequest,
+    worldRequest
+} from '../api';
+import {
+    accessTypeLocaleKeyMap,
+    instanceContentSettings
+} from '../shared/constants';
 import { database } from '../service/database';
-import { instanceContentSettings } from '../shared/constants';
 import { useAppearanceSettingsStore } from './settings/appearance';
 import { useFriendStore } from './friend';
 import { useGroupStore } from './group';
@@ -55,6 +63,32 @@ export const useInstanceStore = defineStore('Instance', () => {
 
     let cachedInstances = new Map();
 
+    function cleanInstanceCache() {
+        const maxSize = 200;
+        if (cachedInstances.size <= maxSize) {
+            return;
+        }
+        const removable = [];
+        cachedInstances.forEach((ref, id) => {
+            if (
+                [...friendStore.friends.values()].some(
+                    (f) => f.$location?.tag === id
+                )
+            ) {
+                return;
+            }
+            removable.push({
+                id,
+                fetchedAt: Date.parse(ref.$fetchedAt) || 0
+            });
+        });
+        removable.sort((a, b) => a.fetchedAt - b.fetchedAt);
+        const overBy = cachedInstances.size - maxSize;
+        for (let i = 0; i < overBy && i < removable.length; i++) {
+            cachedInstances.delete(removable[i].id);
+        }
+    }
+
     const lastInstanceApplied = ref('');
 
     const currentInstanceWorld = ref({
@@ -67,8 +101,7 @@ export const useInstanceStore = defineStore('Instance', () => {
         focusViewDisabled: false,
         inCache: false,
         cacheSize: '',
-        bundleSizes: [],
-        lastUpdated: ''
+        fileAnalysis: {}
     });
 
     /** @type {import('vue').Ref<any>} */
@@ -76,9 +109,57 @@ export const useInstanceStore = defineStore('Instance', () => {
 
     const queuedInstances = reactive(new Map());
 
-    const previousInstancesInfoDialogVisible = ref(false);
+    const previousInstancesInfoDialog = ref({
+        instanceId: '',
+        lastId: '',
+        visible: false
+    });
 
-    const previousInstancesInfoDialogInstanceId = ref('');
+    const previousInstancesListDialog = ref({
+        visible: false,
+        variant: 'user',
+        userRef: {
+            id: '',
+            displayName: ''
+        },
+        worldRef: {
+            id: '',
+            name: ''
+        },
+        groupRef: {
+            id: '',
+            name: ''
+        },
+        lastId: ''
+    });
+
+    const previousInstancesInfoState = ref({
+        sortBy: [{ id: 'created_at', desc: true }],
+        search: '',
+        pageSize: 10,
+        pageIndex: 0
+    });
+
+    const previousInstancesListState = ref({
+        user: {
+            sortBy: [{ id: 'created_at', desc: true }],
+            search: '',
+            pageSize: 10,
+            pageIndex: 0
+        },
+        world: {
+            sortBy: [{ id: 'created_at', desc: true }],
+            search: '',
+            pageSize: 10,
+            pageIndex: 0
+        },
+        group: {
+            sortBy: [{ id: 'created_at', desc: true }],
+            search: '',
+            pageSize: 10,
+            pageIndex: 0
+        }
+    });
 
     const instanceJoinHistory = reactive(new Map());
 
@@ -89,7 +170,7 @@ export const useInstanceStore = defineStore('Instance', () => {
         (isLoggedIn) => {
             currentInstanceUsersData.value = [];
             instanceJoinHistory.clear();
-            previousInstancesInfoDialogVisible.value = false;
+            hidePreviousInstancesDialogs();
             cachedInstances.clear();
             queuedInstances.clear();
             if (isLoggedIn) {
@@ -124,9 +205,167 @@ export const useInstanceStore = defineStore('Instance', () => {
         instanceJoinHistory.set(location, epoch);
     }
 
+    function hidePreviousInstancesDialogs() {
+        previousInstancesInfoDialog.value.visible = false;
+        previousInstancesListDialog.value.visible = false;
+    }
+
+    async function resolveUserRef(input) {
+        if (!input) {
+            return { id: '', displayName: '' };
+        }
+        if (typeof input === 'string') {
+            input = { id: input, displayName: '' };
+        }
+        const id = input.id || input.userId || '';
+        let displayName = input.displayName || '';
+        if (id && !displayName) {
+            try {
+                const args = await userRequest.getCachedUser({ userId: id });
+                displayName = args?.ref?.displayName || displayName;
+                return { ...args.ref, id, displayName };
+            } catch {
+                return { ...input, id, displayName };
+            }
+        }
+        return { ...input, id, displayName };
+    }
+
+    async function resolveWorldRef(input) {
+        if (!input) {
+            return { id: '', name: '' };
+        }
+        if (typeof input === 'string') {
+            input = { id: input, name: '' };
+        }
+        const id = input.id || input.worldId || '';
+        let name = input.name || '';
+        if (id && !name) {
+            try {
+                const args = await worldRequest.getCachedWorld({ worldId: id });
+                name = args?.ref?.name || name;
+                return { ...args.ref, id, name };
+            } catch {
+                return { ...input, id, name };
+            }
+        }
+        return { ...input, id, name };
+    }
+
+    async function resolveGroupRef(input) {
+        if (!input) {
+            return { id: '', name: '' };
+        }
+        if (typeof input === 'string') {
+            input = { id: input, name: '' };
+        }
+        const id = input.id || input.groupId || '';
+        let name = input.name || '';
+        if (id && !name) {
+            try {
+                const args = await groupRequest.getCachedGroup({ groupId: id });
+                name = args?.ref?.name || name;
+                return { ...args.ref, id, name };
+            } catch {
+                return { ...input, id, name };
+            }
+        }
+        return { ...input, id, name };
+    }
+
+    function translateAccessType(accessTypeNameRaw) {
+        const key = accessTypeLocaleKeyMap[accessTypeNameRaw];
+        if (!key) {
+            return accessTypeNameRaw;
+        }
+        if (
+            accessTypeNameRaw === 'groupPublic' ||
+            accessTypeNameRaw === 'groupPlus'
+        ) {
+            const groupKey = accessTypeLocaleKeyMap.group;
+            return `${t(groupKey)} ${t(key)}`;
+        }
+        return t(key);
+    }
+
+    function formatPreviousInstancesInfoLabel(
+        instanceId,
+        worldNameOverride = ''
+    ) {
+        const location = parseLocation(instanceId);
+        const worldId = location.worldId;
+        const worldName =
+            worldNameOverride ||
+            (worldId ? worldStore.cachedWorlds.get(worldId)?.name : '') ||
+            '';
+        const baseLabel = worldName || worldId || instanceId || '';
+        const accessTypeLabel = translateAccessType(
+            location.accessTypeName || ''
+        );
+        if (!accessTypeLabel || !location.instanceId) {
+            return baseLabel;
+        }
+        return `${baseLabel} · ${accessTypeLabel}`;
+    }
+
     function showPreviousInstancesInfoDialog(instanceId) {
-        previousInstancesInfoDialogVisible.value = true;
-        previousInstancesInfoDialogInstanceId.value = instanceId;
+        previousInstancesInfoDialog.value.visible = true;
+        previousInstancesInfoDialog.value.instanceId = instanceId;
+        uiStore.openDialog({
+            type: 'previous-instances-info',
+            id: instanceId || '',
+            label: instanceId
+                ? formatPreviousInstancesInfoLabel(instanceId)
+                : ''
+        });
+        if (instanceId) {
+            const location = parseLocation(instanceId);
+            if (
+                location.worldId &&
+                !worldStore.cachedWorlds.get(location.worldId)?.name
+            ) {
+                worldRequest
+                    .getCachedWorld({ worldId: location.worldId })
+                    .then((args) => {
+                        uiStore.setDialogCrumbLabel(
+                            'previous-instances-info',
+                            instanceId,
+                            formatPreviousInstancesInfoLabel(
+                                instanceId,
+                                args?.ref?.name || ''
+                            )
+                        );
+                    })
+                    .catch(() => {});
+            }
+        }
+    }
+
+    async function showPreviousInstancesListDialog(variant, targetRef) {
+        previousInstancesListDialog.value.variant = variant;
+        let resolved = null;
+        if (variant === 'user') {
+            resolved = await resolveUserRef(targetRef);
+            previousInstancesListDialog.value.userRef = resolved;
+        } else if (variant === 'world') {
+            resolved = await resolveWorldRef(targetRef);
+            previousInstancesListDialog.value.worldRef = resolved;
+        } else {
+            resolved = await resolveGroupRef(targetRef);
+            previousInstancesListDialog.value.groupRef = resolved;
+        }
+        previousInstancesListDialog.value.visible = true;
+        const dialogId = resolved?.id || '';
+        const label = resolved?.id
+            ? variant === 'user'
+                ? resolved.displayName || resolved.id
+                : resolved.name || resolved.id
+            : '';
+        uiStore.openDialog({
+            type: `previous-instances-${variant}`,
+            id: dialogId,
+            label
+        });
     }
 
     function updateCurrentInstanceWorld() {
@@ -146,8 +385,7 @@ export const useInstanceStore = defineStore('Instance', () => {
                 focusViewDisabled: false,
                 inCache: false,
                 cacheSize: '',
-                bundleSizes: [],
-                lastUpdated: ''
+                fileAnalysis: {}
             };
             currentInstanceLocation.value = {};
         } else if (instanceId !== currentInstanceLocation.value.tag) {
@@ -161,8 +399,7 @@ export const useInstanceStore = defineStore('Instance', () => {
                 focusViewDisabled: false,
                 inCache: false,
                 cacheSize: '',
-                bundleSizes: [],
-                lastUpdated: ''
+                fileAnalysis: {}
             };
             L = parseLocation(instanceId);
             currentInstanceLocation.value = L;
@@ -199,17 +436,7 @@ export const useInstanceStore = defineStore('Instance', () => {
                                 error
                             );
                         });
-                    getBundleDateSize(args.ref)
-                        .then((bundleSizes) => {
-                            currentInstanceWorld.value.bundleSizes =
-                                bundleSizes;
-                        })
-                        .catch((error) => {
-                            console.error(
-                                'Error fetching bundle sizes:',
-                                error
-                            );
-                        });
+                    getBundleDateSize(args.ref);
                     return args;
                 })
                 .catch((error) => {
@@ -326,6 +553,7 @@ export const useInstanceStore = defineStore('Instance', () => {
                 ...json
             };
             cachedInstances.set(ref.id, ref);
+            cleanInstanceCache();
         } else {
             Object.assign(ref, json);
         }
@@ -387,11 +615,15 @@ export const useInstanceStore = defineStore('Instance', () => {
 
         const L = parseLocation(location);
         if (L.isRealInstance && L.worldId && L.instanceId) {
-            const args = await instanceRequest.getCachedInstance({
-                worldId: L.worldId,
-                instanceId: L.instanceId
-            });
-            instanceName = args.ref.displayName;
+            try {
+                const args = await instanceRequest.getCachedInstance({
+                    worldId: L.worldId,
+                    instanceId: L.instanceId
+                });
+                instanceName = args.ref.displayName;
+            } catch (e) {
+                console.error('getInstanceName failed location', location, e);
+            }
         }
 
         return instanceName;
@@ -964,6 +1196,7 @@ export const useInstanceStore = defineStore('Instance', () => {
             imageUrl: group?.iconUrl,
             message: `Instance ready to join ${location}`,
             location: instanceId,
+            senderUserId: L.groupId,
             groupName,
             worldName
         };
@@ -976,8 +1209,8 @@ export const useInstanceStore = defineStore('Instance', () => {
             uiStore.notifyMenu('notification');
         }
         notificationStore.queueNotificationNoty(noty);
+        sharedFeedStore.addEntry(noty);
         notificationStore.notificationTable.data.push(noty);
-        sharedFeedStore.updateSharedFeed(true);
     }
 
     /**
@@ -1204,8 +1437,10 @@ export const useInstanceStore = defineStore('Instance', () => {
         currentInstanceWorld,
         currentInstanceLocation,
         queuedInstances,
-        previousInstancesInfoDialogVisible,
-        previousInstancesInfoDialogInstanceId,
+        previousInstancesInfoDialog,
+        previousInstancesInfoState,
+        previousInstancesListDialog,
+        previousInstancesListState,
         instanceJoinHistory,
         currentInstanceUsersData,
 
@@ -1219,7 +1454,9 @@ export const useInstanceStore = defineStore('Instance', () => {
         applyQueuedInstance,
         instanceQueueReady,
         instanceQueueUpdate,
+        hidePreviousInstancesDialogs,
         showPreviousInstancesInfoDialog,
+        showPreviousInstancesListDialog,
         addInstanceJoinHistory,
         getCurrentInstanceUserList,
         getInstanceJoinHistory,

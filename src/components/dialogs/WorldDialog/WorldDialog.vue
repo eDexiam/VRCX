@@ -1,40 +1,38 @@
 <template>
-    <el-dialog
-        :z-index="worldDialogIndex"
-        class="x-dialog x-world-dialog"
-        v-model="isDialogVisible"
-        top="10vh"
-        :show-close="false"
-        width="940px">
-        <div v-loading="worldDialog.loading">
+    <div class="w-223">
+        <DialogHeader class="sr-only">
+            <DialogTitle>{{ worldDialog.ref?.name || t('dialog.world.info.header') }}</DialogTitle>
+            <DialogDescription>
+                {{ worldDialog.ref?.description || worldDialog.ref?.name || t('dialog.world.info.header') }}
+            </DialogDescription>
+        </DialogHeader>
+        <div>
             <div style="display: flex">
-                <img
-                    :src="worldDialog.ref.thumbnailImageUrl"
-                    class="x-link"
-                    style="flex: none; width: 160px; height: 120px; border-radius: 12px"
-                    @click="showFullscreenImageDialog(worldDialog.ref.imageUrl)"
-                    loading="lazy" />
-                <div style="flex: 1; display: flex; align-items: center; margin-left: 15px">
+                <div style="flex: none; width: 160px; height: 120px">
+                    <img
+                        v-if="!worldDialog.loading"
+                        :src="worldDialog.ref.thumbnailImageUrl"
+                        class="cursor-pointer"
+                        style="width: 160px; height: 120px; border-radius: 12px"
+                        @click="showFullscreenImageDialog(worldDialog.ref.imageUrl)"
+                        loading="lazy" />
+                </div>
+                <div style="flex: 1; display: flex; align-items: flex-start; margin-left: 15px">
                     <div style="flex: 1">
                         <div>
-                            <span
-                                class="dialog-title"
-                                style="margin-right: 5px; cursor: pointer"
-                                @click="copyWorldName">
-                                <el-icon
+                            <span class="font-bold" style="margin-right: 5px; cursor: pointer" @click="copyWorldName">
+                                <Home
                                     v-if="
                                         currentUser.$homeLocation &&
                                         currentUser.$homeLocation.worldId === worldDialog.id
                                     "
-                                    style="margin-right: 5px"
-                                    ><HomeFilled
-                                /></el-icon>
+                                    class="inline-block" />
                                 {{ worldDialog.ref.name }}
                             </span>
                         </div>
                         <div style="margin-top: 5px">
                             <span
-                                class="x-link x-grey"
+                                class="cursor-pointer x-grey"
                                 style="font-family: monospace"
                                 @click="showUserDialog(worldDialog.ref.authorId)"
                                 v-text="worldDialog.ref.authorName" />
@@ -60,11 +58,11 @@
                                     class="x-tag-platform-pc"
                                     variant="outline"
                                     style="margin-right: 5px; margin-top: 5px">
-                                    <i class="ri-computer-line"></i
-                                    ><span
-                                        v-if="worldDialog.bundleSizes['standalonewindows']"
+                                    <Monitor class="h-4 w-4 x-tag-platform-pc" />
+                                    <span
+                                        v-if="worldDialog.fileAnalysis.standalonewindows?._fileSize"
                                         :class="['x-grey', 'x-tag-platform-pc', 'x-tag-border-left']">
-                                        {{ worldDialog.bundleSizes['standalonewindows'].fileSize }}
+                                        {{ worldDialog.fileAnalysis.standalonewindows._fileSize }}
                                     </span>
                                 </Badge>
                             </TooltipWrapper>
@@ -74,25 +72,25 @@
                                     class="x-tag-platform-quest"
                                     variant="outline"
                                     style="margin-right: 5px; margin-top: 5px">
-                                    <i class="ri-android-line"></i
-                                    ><span
-                                        v-if="worldDialog.bundleSizes['android']"
+                                    <Smartphone class="h-4 w-4 x-tag-platform-quest" />
+                                    <span
+                                        v-if="worldDialog.fileAnalysis.android?._fileSize"
                                         :class="['x-grey', 'x-tag-platform-quest', 'x-tag-border-left']">
-                                        {{ worldDialog.bundleSizes['android'].fileSize }}
+                                        {{ worldDialog.fileAnalysis.android._fileSize }}
                                     </span>
                                 </Badge>
                             </TooltipWrapper>
 
                             <TooltipWrapper v-if="worldDialog.isIos" side="top" content="iOS">
                                 <Badge
-                                    class="x-tag-platform-ios"
+                                    class="text-[#8e8e93] border-[#8e8e93]"
                                     variant="outline"
                                     style="margin-right: 5px; margin-top: 5px">
-                                    <i class="ri-apple-line"></i
-                                    ><span
-                                        v-if="worldDialog.bundleSizes['ios']"
-                                        :class="['x-grey', 'x-tag-platform-ios', 'x-tag-border-left']">
-                                        {{ worldDialog.bundleSizes['ios'].fileSize }}
+                                    <Apple class="h-4 w-4 text-[#8e8e93]" />
+                                    <span
+                                        v-if="worldDialog.fileAnalysis.ios?._fileSize"
+                                        :class="['x-grey', 'x-tag-border-left', 'text-[#8e8e93]', 'border-[#8e8e93]']">
+                                        {{ worldDialog.fileAnalysis.ios._fileSize }}
                                     </span>
                                 </Badge>
                             </TooltipWrapper>
@@ -118,7 +116,7 @@
                             <Badge
                                 v-if="worldDialog.inCache"
                                 variant="outline"
-                                class="x-link"
+                                class="cursor-pointer"
                                 style="margin-right: 5px; margin-top: 5px"
                                 @click="openFolderGeneric(worldDialog.cachePath)">
                                 <span v-text="worldDialog.cacheSize" />
@@ -152,15 +150,28 @@
                                 </Badge>
                             </template>
                         </div>
-                        <div style="margin-top: 5px">
+                        <div style="margin-top: 5px; display: flex; align-items: center">
                             <span
                                 v-show="worldDialog.ref.name !== worldDialog.ref.description"
-                                style="font-size: 12px"
-                                >{{ worldDialog.ref.description }}</span
+                                style="font-size: 12px; flex: 1; margin-right: 0.5em"
+                                >{{ translatedDescription || worldDialog.ref.description }}</span
                             >
+                            <Button
+                                v-if="
+                                    translationApi &&
+                                    worldDialog.ref.description &&
+                                    worldDialog.ref.name !== worldDialog.ref.description
+                                "
+                                class="w-3 h-6 text-xs"
+                                size="icon-sm"
+                                variant="ghost"
+                                @click="translateDescription">
+                                <Spinner v-if="isTranslating" class="size-1" />
+                                <Languages v-else class="h-3 w-3" />
+                            </Button>
                         </div>
                     </div>
-                    <div style="flex: none; margin-left: 10px">
+                    <div class="ml-2 mt-12">
                         <TooltipWrapper
                             v-if="worldDialog.inCache"
                             side="top"
@@ -199,11 +210,11 @@
                             </DropdownMenuTrigger>
                             <DropdownMenuContent>
                                 <DropdownMenuItem @click="worldDialogCommand('Refresh')">
-                                    <Refresh class="size-4" />
+                                    <RefreshCw class="size-4" />
                                     {{ t('dialog.world.actions.refresh') }}
                                 </DropdownMenuItem>
                                 <DropdownMenuItem @click="worldDialogCommand('Share')">
-                                    <Share class="size-4" />
+                                    <Share2 class="size-4" />
                                     {{ t('dialog.world.actions.share') }}
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
@@ -212,7 +223,7 @@
                                     {{ t('dialog.world.actions.new_instance') }}
                                 </DropdownMenuItem>
                                 <DropdownMenuItem @click="worldDialogCommand('New Instance and Self Invite')">
-                                    <Message class="size-4" />
+                                    <MessageSquare class="size-4" />
                                     {{
                                         canOpenInstanceInGame
                                             ? t('dialog.world.actions.new_instance_and_open_ingame')
@@ -226,15 +237,15 @@
                                         currentUser.$homeLocation.worldId === worldDialog.id
                                     "
                                     @click="worldDialogCommand('Reset Home')">
-                                    <MagicStick class="size-4" />
+                                    <Wand2 class="size-4" />
                                     {{ t('dialog.world.actions.reset_home') }}
                                 </DropdownMenuItem>
                                 <DropdownMenuItem v-else @click="worldDialogCommand('Make Home')">
-                                    <HomeFilled class="size-4" />
+                                    <Home class="size-4" />
                                     {{ t('dialog.world.actions.make_home') }}
                                 </DropdownMenuItem>
                                 <DropdownMenuItem @click="worldDialogCommand('Previous Instances')">
-                                    <DataLine class="size-4" />
+                                    <LineChart class="size-4" />
                                     {{ t('dialog.world.actions.show_previous_instances') }}
                                 </DropdownMenuItem>
                                 <template v-if="currentUser.id !== worldDialog.ref.authorId">
@@ -247,35 +258,35 @@
                                 </template>
                                 <template v-else>
                                     <DropdownMenuItem @click="worldDialogCommand('Rename')">
-                                        <Edit class="size-4" />
+                                        <Pencil class="size-4" />
                                         {{ t('dialog.world.actions.rename') }}
                                     </DropdownMenuItem>
                                     <DropdownMenuItem @click="worldDialogCommand('Change Description')">
-                                        <Edit class="size-4" />
+                                        <Pencil class="size-4" />
                                         {{ t('dialog.world.actions.change_description') }}
                                     </DropdownMenuItem>
                                     <DropdownMenuItem @click="worldDialogCommand('Change Capacity')">
-                                        <Edit class="size-4" />
+                                        <Pencil class="size-4" />
                                         {{ t('dialog.world.actions.change_capacity') }}
                                     </DropdownMenuItem>
                                     <DropdownMenuItem @click="worldDialogCommand('Change Recommended Capacity')">
-                                        <Edit class="size-4" />
+                                        <Pencil class="size-4" />
                                         {{ t('dialog.world.actions.change_recommended_capacity') }}
                                     </DropdownMenuItem>
                                     <DropdownMenuItem @click="worldDialogCommand('Change YouTube Preview')">
-                                        <Edit class="size-4" />
+                                        <Pencil class="size-4" />
                                         {{ t('dialog.world.actions.change_preview') }}
                                     </DropdownMenuItem>
                                     <DropdownMenuItem @click="worldDialogCommand('Change Tags')">
-                                        <Edit class="size-4" />
+                                        <Pencil class="size-4" />
                                         {{ t('dialog.world.actions.change_warnings_settings_tags') }}
                                     </DropdownMenuItem>
                                     <DropdownMenuItem @click="worldDialogCommand('Change Allowed Domains')">
-                                        <Edit class="size-4" />
+                                        <Pencil class="size-4" />
                                         {{ t('dialog.world.actions.change_allowed_video_player_domains') }}
                                     </DropdownMenuItem>
                                     <DropdownMenuItem v-if="isWindows" @click="worldDialogCommand('Change Image')">
-                                        <Picture class="size-4" />
+                                        <Image class="size-4" />
                                         {{ t('dialog.world.actions.change_image') }}
                                     </DropdownMenuItem>
                                     <DropdownMenuItem
@@ -291,11 +302,11 @@
                                             worldDialog.ref?.tags?.includes('system_labs')
                                         "
                                         @click="worldDialogCommand('Unpublish')">
-                                        <View class="size-4" />
+                                        <Eye class="size-4" />
                                         {{ t('dialog.world.actions.unpublish') }}
                                     </DropdownMenuItem>
                                     <DropdownMenuItem v-else @click="worldDialogCommand('Publish')">
-                                        <View class="size-4" />
+                                        <Eye class="size-4" />
                                         {{ t('dialog.world.actions.publish_to_labs') }}
                                     </DropdownMenuItem>
                                     <DropdownMenuItem
@@ -305,7 +316,7 @@
                                         {{ t('dialog.world.actions.delete_persistent_data') }}
                                     </DropdownMenuItem>
                                     <DropdownMenuItem variant="destructive" @click="worldDialogCommand('Delete')">
-                                        <Delete class="size-4" />
+                                        <Trash2 class="size-4" />
                                         {{ t('dialog.world.actions.delete') }}
                                     </DropdownMenuItem>
                                 </template>
@@ -314,18 +325,22 @@
                     </div>
                 </div>
             </div>
-            <el-tabs v-model="worldDialogLastActiveTab" @tab-click="worldDialogTabClick">
-                <el-tab-pane name="Instances" :label="t('dialog.world.instances.header')">
-                    <div class="">
-                        <el-icon><User /></el-icon>
+            <TabsUnderline
+                v-model="worldDialog.activeTab"
+                :items="worldDialogTabs"
+                :unmount-on-hide="false"
+                @update:modelValue="worldDialogTabClick">
+                <template #Instances>
+                    <div class="flex items-center text-sm">
+                        <User />
                         {{ t('dialog.world.instances.public_count', { count: worldDialog.ref.publicOccupants }) }}
-                        <el-icon style="margin-left: 10px"><UserFilled /></el-icon>
+                        <User style="margin-left: 10px" />
                         {{
                             t('dialog.world.instances.private_count', {
                                 count: worldDialog.ref.privateOccupants
                             })
                         }}
-                        <el-icon style="margin-left: 10px"><Check /></el-icon>
+                        <Check style="margin-left: 10px" />
                         {{
                             t('dialog.world.instances.capacity_count', {
                                 count: worldDialog.ref.recommendedCapacity,
@@ -337,45 +352,26 @@
                         <template
                             v-if="isAgeGatedInstancesVisible || !(room.ageGate || room.location?.includes('~ageGate'))">
                             <div style="margin: 5px 0">
-                                <div class="flex-align-center">
+                                <div class="flex items-center">
                                     <LocationWorld
+                                        class="text-sm"
                                         :locationobject="room.$location"
                                         :currentuserid="currentUser.id"
                                         :worlddialogshortname="worldDialog.$location.shortName" />
-                                    <Launch :location="room.tag" style="margin-left: 5px" />
-                                    <InviteYourself
+                                    <InstanceActionBar
+                                        class="ml-1 text-sm"
                                         :location="room.$location.tag"
+                                        :launch-location="room.tag"
+                                        :instance-location="room.tag"
                                         :shortname="room.$location.shortName"
-                                        style="margin-left: 5px" />
-                                    <TooltipWrapper
-                                        side="top"
-                                        :content="t('dialog.world.instances.refresh_instance_info')">
-                                        <Button
-                                            class="rounded-full ml-1 w-6 h-6 text-xs text-muted-foreground hover:text-foreground"
-                                            size="icon"
-                                            variant="outline"
-                                            @click="refreshInstancePlayerCount(room.tag)"
-                                            ><i class="ri-refresh-line"></i
-                                        ></Button>
-                                    </TooltipWrapper>
-                                    <TooltipWrapper
-                                        v-if="instanceJoinHistory.get(room.$location.tag)"
-                                        side="top"
-                                        :content="t('dialog.previous_instances.info')">
-                                        <Button
-                                            class="rounded-full w-6 h-6 text-xs text-muted-foreground hover:text-foreground"
-                                            size="icon-sm"
-                                            variant="outline"
-                                            style="margin-left: 5px"
-                                            @click="showPreviousInstancesInfoDialog(room.location)"
-                                            ><i class="ri-history-line"></i
-                                        ></Button>
-                                    </TooltipWrapper>
-                                    <LastJoin :location="room.$location.tag" :currentlocation="lastLocation.location" />
-                                    <InstanceInfo
-                                        :location="room.tag"
+                                        :currentlocation="lastLocation.location"
                                         :instance="room.ref"
-                                        :friendcount="room.friendCount" />
+                                        :friendcount="room.friendCount"
+                                        :refresh-tooltip="t('dialog.world.instances.refresh_instance_info')"
+                                        :show-history="!!instanceJoinHistory.get(room.$location.tag)"
+                                        :history-tooltip="t('dialog.previous_instances.info')"
+                                        :on-refresh="() => refreshInstancePlayerCount(room.tag)"
+                                        :on-history="() => showPreviousInstancesInfoDialog(room.location)" />
                                 </div>
                                 <div
                                     v-if="room.$location.userId || room.users.length"
@@ -415,9 +411,7 @@
                                                 :style="{ color: user.$userColour }"
                                                 v-text="user.displayName" />
                                             <span v-if="user.location === 'traveling'" class="extra">
-                                                <el-icon class="is-loading" style="margin-right: 3px"
-                                                    ><Loading
-                                                /></el-icon>
+                                                <Spinner class="inline-block mr-1" />
                                                 <Timer :epoch="user.$travelingToTime" />
                                             </span>
                                             <span v-else class="extra">
@@ -429,8 +423,8 @@
                             </div>
                         </template>
                     </div>
-                </el-tab-pane>
-                <el-tab-pane name="Info" :label="t('dialog.world.info.header')" lazy>
+                </template>
+                <template #Info>
                     <div class="x-friend-list" style="max-height: none">
                         <div class="x-friend-item" style="width: 100%; cursor: default">
                             <div class="detail">
@@ -461,10 +455,10 @@
                                                 <Button
                                                     class="rounded-full text-xs"
                                                     size="icon-sm"
-                                                    variant="outline"
+                                                    variant="ghost"
                                                     @click.stop
-                                                    ><i class="ri-file-copy-line"></i
-                                                ></Button>
+                                                    ><Copy class="h-4 w-4" />
+                                                </Button>
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent>
                                                 <DropdownMenuItem @click="copyWorldId()">
@@ -572,13 +566,26 @@
                         </div>
                         <div class="x-friend-item" style="cursor: default">
                             <div class="detail">
-                                <span class="name">
+                                <span class="name" style="display: inline">
                                     {{ t('dialog.world.info.last_updated') }}
                                 </span>
-                                <span v-if="worldDialog.lastUpdated" class="extra">
-                                    {{ formatDateFilter(worldDialog.lastUpdated, 'long') }}
-                                </span>
-                                <span v-else class="extra">
+                                <TooltipWrapper
+                                    v-if="Object.keys(worldDialog.fileAnalysis).length"
+                                    side="top"
+                                    style="margin-left: 5px">
+                                    <template #content>
+                                        <template
+                                            v-for="(created_at, platform) in worldDialogPlatformCreatedAt"
+                                            :key="platform">
+                                            <div class="flex justify-between w-full">
+                                                <span class="mr-1">{{ platform }}:</span>
+                                                <span>{{ formatDateFilter(created_at, 'long') }}</span>
+                                            </div>
+                                        </template>
+                                    </template>
+                                    <ChevronDown class="inline-block" />
+                                </TooltipWrapper>
+                                <span class="extra">
                                     {{ formatDateFilter(worldDialog.ref.updated_at, 'long') }}
                                 </span>
                             </div>
@@ -611,7 +618,7 @@
                                             {{ timeInLab }}
                                         </span>
                                     </template>
-                                    <el-icon><ArrowDown /></el-icon>
+                                    <ChevronDown class="inline-block" />
                                 </TooltipWrapper>
                                 <span class="extra">
                                     {{ formatDateFilter(worldDialog.ref.publicationDate, 'long') }}
@@ -655,39 +662,38 @@
                                 <span class="extra" style="white-space: normal">{{ worldDialogPlatform }}</span>
                             </div>
                         </div>
+
                         <div class="x-friend-item" style="cursor: default">
                             <div class="detail">
                                 <span class="name">
                                     {{ t('dialog.world.info.last_visited') }}
-                                    <TooltipWrapper side="top" :content="t('dialog.world.info.accuracy_notice')"
-                                        ><el-icon style="margin-left: 3px"><Warning /></el-icon
-                                    ></TooltipWrapper>
                                 </span>
                                 <span class="extra">{{ formatDateFilter(worldDialog.lastVisit, 'long') }}</span>
                             </div>
                         </div>
-                        <TooltipWrapper side="top" :content="t('dialog.user.info.open_previous_instance')">
-                            <div class="x-friend-item" @click="showPreviousInstancesWorldDialog(worldDialog.ref)">
-                                <div class="detail">
-                                    <span class="name">
+
+                        <div class="x-friend-item" @click="showPreviousInstancesListDialog(worldDialog.ref)">
+                            <div class="detail">
+                                <div
+                                    class="name"
+                                    style="display: flex; justify-content: space-between; align-items: center">
+                                    <div>
                                         {{ t('dialog.world.info.visit_count') }}
-                                        <TooltipWrapper side="top" :content="t('dialog.world.info.accuracy_notice')"
-                                            ><el-icon style="margin-left: 3px"><Warning /></el-icon
-                                        ></TooltipWrapper>
-                                    </span>
-                                    <span class="extra">
-                                        {{ worldDialog.visitCount }}
-                                    </span>
+                                    </div>
+
+                                    <TooltipWrapper side="top" :content="t('dialog.user.info.open_previous_instance')">
+                                        <MoreHorizontal style="margin-right: 16px" />
+                                    </TooltipWrapper>
                                 </div>
+                                <span v-if="worldDialog.visitCount === 0" class="extra">-</span>
+                                <span v-else class="extra" v-text="worldDialog.visitCount"></span>
                             </div>
-                        </TooltipWrapper>
+                        </div>
+
                         <div class="x-friend-item" style="cursor: default">
                             <div class="detail">
-                                <span class="name"
-                                    >{{ t('dialog.world.info.time_spent') }}
-                                    <TooltipWrapper side="top" :content="t('dialog.world.info.accuracy_notice')">
-                                        <el-icon style="margin-left: 3px"><Warning /></el-icon>
-                                    </TooltipWrapper>
+                                <span class="name">
+                                    {{ t('dialog.world.info.time_spent') }}
                                 </span>
                                 <span class="extra">
                                     {{ worldDialog.timeSpent === 0 ? ' - ' : timeSpent }}
@@ -695,32 +701,37 @@
                             </div>
                         </div>
                     </div>
-                </el-tab-pane>
-                <el-tab-pane name="JSON" :label="t('dialog.world.json.header')" style="max-height: 50vh" lazy>
+                </template>
+                <template #JSON>
                     <Button
-                        class="rounded-full h-6 w-6 mr-2"
+                        class="rounded-full mr-2"
                         size="icon-sm"
-                        variant="outline"
+                        variant="ghost"
                         @click="refreshWorldDialogTreeData()">
-                        <RefreshCcw />
+                        <RefreshCw />
                     </Button>
                     <Button
-                        class="rounded-full h-6 w-6"
+                        class="rounded-full"
                         size="icon-sm"
-                        variant="outline"
+                        variant="ghost"
                         @click="downloadAndSaveJson(worldDialog.id, worldDialog.ref)">
                         <Download />
                     </Button>
-                    <vue-json-pretty :data="treeData" :deep="2" :theme="isDarkMode ? 'dark' : 'light'" show-icon />
+                    <vue-json-pretty
+                        :key="treeData?.id"
+                        :data="treeData"
+                        :deep="2"
+                        :theme="isDarkMode ? 'dark' : 'light'"
+                        show-icon />
                     <br />
                     <vue-json-pretty
-                        v-if="worldDialog.fileAnalysis.length > 0"
+                        v-if="Object.keys(worldDialog.fileAnalysis).length"
                         :data="worldDialog.fileAnalysis"
                         :deep="2"
                         :theme="isDarkMode ? 'dark' : 'light'"
                         show-icon />
-                </el-tab-pane>
-            </el-tabs>
+                </template>
+            </TabsUnderline>
         </div>
 
         <template v-if="isDialogVisible">
@@ -730,7 +741,6 @@
                 :old-tags="worldDialog.ref?.tags"
                 :world-id="worldDialog.id"
                 :is-world-dialog-visible="worldDialog.visible" />
-            <PreviousInstancesWorldDialog v-model:previous-instances-world-dialog="previousInstancesWorldDialog" />
             <NewInstanceDialog
                 :new-instance-dialog-location-tag="newInstanceDialogLocationTag"
                 :last-location="lastLocation" />
@@ -738,36 +748,42 @@
                 v-model:change-world-image-dialog-visible="changeWorldImageDialogVisible"
                 v-model:previousImageUrl="previousImageUrl" />
         </template>
-    </el-dialog>
+    </div>
 </template>
 
 <script setup>
     import {
-        ArrowDown,
+        Apple,
         Check,
-        DataLine,
-        Delete,
+        ChevronDown,
+        Copy,
         Download,
-        Edit,
+        Ellipsis,
+        Eye,
         Flag,
-        HomeFilled,
-        Loading,
-        MagicStick,
-        Message,
-        Picture,
-        Refresh,
-        Share,
+        Home,
+        Image,
+        Languages,
+        LineChart,
+        MessageSquare,
+        Monitor,
+        MoreHorizontal,
+        Pencil,
+        RefreshCw,
+        Share2,
+        Smartphone,
+        Star,
+        Trash2,
         Upload,
         User,
-        UserFilled,
-        View,
-        Warning
-    } from '@element-plus/icons-vue';
+        Wand2
+    } from 'lucide-vue-next';
     import { computed, defineAsyncComponent, nextTick, ref, watch } from 'vue';
-    import { Ellipsis, RefreshCcw, Star, Trash2 } from 'lucide-vue-next';
+    import { DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
     import { Button } from '@/components/ui/button';
-    import { ElMessageBox } from 'element-plus';
     import { InputGroupTextareaField } from '@/components/ui/input-group';
+    import { Spinner } from '@/components/ui/spinner';
+    import { TabsUnderline } from '@/components/ui/tabs';
     import { storeToRefs } from 'pinia';
     import { toast } from 'vue-sonner';
     import { useI18n } from 'vue-i18n';
@@ -776,6 +792,7 @@
 
     import {
         commaNumber,
+        compareUnityVersion,
         deleteVRChatCache,
         downloadAndSaveJson,
         formatDateFilter,
@@ -788,6 +805,7 @@
         userStatusClass
     } from '../../../shared/utils';
     import {
+        useAdvancedSettingsStore,
         useAppearanceSettingsStore,
         useFavoriteStore,
         useGalleryStore,
@@ -807,16 +825,17 @@
         DropdownMenuTrigger
     } from '../../ui/dropdown-menu';
     import { favoriteRequest, miscRequest, userRequest, worldRequest } from '../../../api';
-    import { formatJsonVars, getNextDialogIndex } from '../../../shared/utils/base/ui';
     import { Badge } from '../../ui/badge';
     import { database } from '../../../service/database.js';
+    import { formatJsonVars } from '../../../shared/utils/base/ui';
+
+    import InstanceActionBar from '../../InstanceActionBar.vue';
 
     const modalStore = useModalStore();
+    const { translateText } = useAdvancedSettingsStore();
+    const { bioLanguage, translationApi } = storeToRefs(useAdvancedSettingsStore());
 
     const NewInstanceDialog = defineAsyncComponent(() => import('../NewInstanceDialog.vue'));
-    const PreviousInstancesWorldDialog = defineAsyncComponent(
-        () => import('../PreviousInstancesDialog/PreviousInstancesWorldDialog.vue')
-    );
     const ChangeWorldImageDialog = defineAsyncComponent(() => import('./ChangeWorldImageDialog.vue'));
     const SetWorldTagsDialog = defineAsyncComponent(() => import('./SetWorldTagsDialog.vue'));
     const WorldAllowedDomainsDialog = defineAsyncComponent(() => import('./WorldAllowedDomainsDialog.vue'));
@@ -829,11 +848,17 @@
     const { lastLocation } = storeToRefs(useLocationStore());
     const { newInstanceSelfInvite, canOpenInstanceInGame } = useInviteStore();
     const { showFavoriteDialog } = useFavoriteStore();
-    const { showPreviousInstancesInfoDialog } = useInstanceStore();
+    const { showPreviousInstancesInfoDialog, showPreviousInstancesListDialog: openPreviousInstancesListDialog } =
+        useInstanceStore();
     const { instanceJoinHistory } = storeToRefs(useInstanceStore());
     const { isGameRunning } = storeToRefs(useGameStore());
     const { showFullscreenImageDialog } = useGalleryStore();
     const { t } = useI18n();
+    const worldDialogTabs = computed(() => [
+        { value: 'Instances', label: t('dialog.world.instances.header') },
+        { value: 'Info', label: t('dialog.world.info.header') },
+        { value: 'JSON', label: t('dialog.world.json.header') }
+    ]);
 
     const treeData = ref({});
     const worldAllowedDomainsDialog = ref({
@@ -842,14 +867,11 @@
         urlList: []
     });
     const isSetWorldTagsDialogVisible = ref(false);
-    const previousInstancesWorldDialog = ref({
-        visible: false,
-        openFlg: false,
-        worldRef: {}
-    });
     const newInstanceDialogLocationTag = ref('');
     const changeWorldImageDialogVisible = ref(false);
     const previousImageUrl = ref('');
+    const translatedDescription = ref('');
+    const isTranslating = ref(false);
 
     const isDialogVisible = computed({
         get() {
@@ -914,13 +936,16 @@
         const platforms = [];
         if (ref.unityPackages) {
             for (const unityPackage of ref.unityPackages) {
+                if (!compareUnityVersion(unityPackage.unitySortNumber)) {
+                    continue;
+                }
                 let platform = 'PC';
                 if (unityPackage.platform === 'standalonewindows') {
                     platform = 'PC';
                 } else if (unityPackage.platform === 'android') {
                     platform = 'Android';
                 } else if (unityPackage.platform) {
-                    ({ platform } = unityPackage);
+                    platform = unityPackage.platform;
                 }
                 platforms.unshift(`${platform}/${unityPackage.unityVersion}`);
             }
@@ -928,16 +953,29 @@
         return platforms.join(', ');
     });
 
-    const worldDialogIndex = ref(2000);
-    const worldDialogLastActiveTab = ref('Instances');
+    const worldDialogPlatformCreatedAt = computed(() => {
+        const { ref } = worldDialog.value;
+        if (!ref.unityPackages) {
+            return null;
+        }
+        let newest = {};
+        for (const unityPackage of ref.unityPackages) {
+            if (unityPackage.variant && unityPackage.variant !== 'standard' && unityPackage.variant !== 'security') {
+                continue;
+            }
+            const platform = unityPackage.platform;
+            const createdAt = unityPackage.created_at;
+            if (!newest[platform] || new Date(createdAt) > new Date(newest[platform])) {
+                newest[platform] = createdAt;
+            }
+        }
+        return newest;
+    });
 
     watch(
         () => worldDialog.value.loading,
         () => {
             if (worldDialog.value.visible) {
-                nextTick(() => {
-                    worldDialogIndex.value = getNextDialogIndex();
-                });
                 handleDialogOpen();
                 !worldDialog.value.loading && loadLastActiveTab();
             }
@@ -945,21 +983,24 @@
     );
 
     function handleWorldDialogTab(tabName) {
+        worldDialog.value.lastActiveTab = tabName;
         if (tabName === 'JSON') {
             refreshWorldDialogTreeData();
         }
     }
 
     function loadLastActiveTab() {
-        handleWorldDialogTab(worldDialogLastActiveTab.value);
+        handleWorldDialogTab(worldDialog.value.lastActiveTab);
     }
 
-    function worldDialogTabClick(obj) {
-        if (obj.props.name === worldDialogLastActiveTab.value) {
+    function worldDialogTabClick(tabName) {
+        if (tabName === worldDialog.value.lastActiveTab) {
+            if (tabName === 'JSON') {
+                refreshWorldDialogTreeData();
+            }
             return;
         }
-        handleWorldDialogTab(obj.props.name);
-        worldDialogLastActiveTab.value = obj.props.name;
+        handleWorldDialogTab(tabName);
     }
 
     function handleDialogOpen() {
@@ -991,10 +1032,21 @@
             case 'Unpublish':
             case 'Delete Persistent Data':
             case 'Delete':
+                const commandLabelMap = {
+                    'Delete Favorite': t('dialog.world.actions.favorites_tooltip'),
+                    'Make Home': t('dialog.world.actions.make_home'),
+                    'Reset Home': t('dialog.world.actions.reset_home'),
+                    Publish: t('dialog.world.actions.publish_to_labs'),
+                    Unpublish: t('dialog.world.actions.unpublish'),
+                    'Delete Persistent Data': t('dialog.world.actions.delete_persistent_data'),
+                    Delete: t('dialog.world.actions.delete')
+                };
                 modalStore
                     .confirm({
-                        description: `Continue? ${command}`,
-                        title: 'Confirm'
+                        description: t('confirm.command_question', {
+                            command: commandLabelMap[command] ?? command
+                        }),
+                        title: t('confirm.title')
                     })
                     .then(({ ok }) => {
                         if (!ok) return;
@@ -1010,7 +1062,7 @@
                                         homeLocation: D.id
                                     })
                                     .then((args) => {
-                                        toast.success('Home world updated');
+                                        toast.success(t('message.world.home_updated'));
                                         return args;
                                     });
                                 break;
@@ -1020,7 +1072,7 @@
                                         homeLocation: ''
                                     })
                                     .then((args) => {
-                                        toast.success('Home world has been reset');
+                                        toast.success(t('message.world.home_reset'));
                                         return args;
                                     });
                                 break;
@@ -1030,7 +1082,7 @@
                                         worldId: D.id
                                     })
                                     .then((args) => {
-                                        toast.success('World has been published');
+                                        toast.success(t('message.world.published'));
                                         return args;
                                     });
                                 break;
@@ -1040,7 +1092,7 @@
                                         worldId: D.id
                                     })
                                     .then((args) => {
-                                        toast.success('World has been unpublished');
+                                        toast.success(t('message.world.unpublished'));
                                         return args;
                                     });
                                 break;
@@ -1053,7 +1105,7 @@
                                         if (args.params.worldId === worldDialog.value.id && worldDialog.value.visible) {
                                             worldDialog.value.hasPersistData = false;
                                         }
-                                        toast.success('Persistent data has been deleted');
+                                        toast.success(t('message.world.persistent_data_deleted'));
                                         return args;
                                     });
                                 break;
@@ -1075,7 +1127,7 @@
                                             const array = Array.from(map.values());
                                             userDialog.value.worlds = array;
                                         }
-                                        toast.success('World has been deleted');
+                                        toast.success(t('message.world.deleted'));
                                         D.visible = false;
                                         return args;
                                     });
@@ -1085,7 +1137,7 @@
                     .catch(() => {});
                 break;
             case 'Previous Instances':
-                showPreviousInstancesWorldDialog(D.ref);
+                showPreviousInstancesListDialog(D.ref);
                 break;
             case 'Share':
                 copyWorldUrl();
@@ -1103,7 +1155,9 @@
                 showChangeWorldImageDialog();
                 break;
             case 'Refresh':
-                showWorldDialog(D.id);
+                const { tag, shortName } = worldDialog.value.$location;
+                D.id = '';
+                showWorldDialog(tag, shortName);
                 break;
             case 'New Instance':
                 showNewInstanceDialog(D.$location.tag);
@@ -1135,14 +1189,17 @@
     }
 
     function promptRenameWorld(world) {
-        ElMessageBox.prompt(t('prompt.rename_world.description'), t('prompt.rename_world.header'), {
-            distinguishCancelAndClose: true,
-            confirmButtonText: t('prompt.rename_world.ok'),
-            cancelButtonText: t('prompt.rename_world.cancel'),
-            inputValue: world.ref.name,
-            inputErrorMessage: t('prompt.rename_world.input_error')
-        })
-            .then(({ value }) => {
+        modalStore
+            .prompt({
+                title: t('prompt.rename_world.header'),
+                description: t('prompt.rename_world.description'),
+                confirmText: t('prompt.rename_world.ok'),
+                cancelText: t('prompt.rename_world.cancel'),
+                inputValue: world.ref.name,
+                errorMessage: t('prompt.rename_world.input_error')
+            })
+            .then(({ ok, value }) => {
+                if (!ok) return;
                 if (value && value !== world.ref.name) {
                     worldRequest
                         .saveWorld({
@@ -1158,18 +1215,17 @@
             .catch(() => {});
     }
     function promptChangeWorldDescription(world) {
-        ElMessageBox.prompt(
-            t('prompt.change_world_description.description'),
-            t('prompt.change_world_description.header'),
-            {
-                distinguishCancelAndClose: true,
-                confirmButtonText: t('prompt.change_world_description.ok'),
-                cancelButtonText: t('prompt.change_world_description.cancel'),
+        modalStore
+            .prompt({
+                title: t('prompt.change_world_description.header'),
+                description: t('prompt.change_world_description.description'),
+                confirmText: t('prompt.change_world_description.ok'),
+                cancelText: t('prompt.change_world_description.cancel'),
                 inputValue: world.ref.description,
-                inputErrorMessage: t('prompt.change_world_description.input_error')
-            }
-        )
-            .then(({ value }) => {
+                errorMessage: t('prompt.change_world_description.input_error')
+            })
+            .then(({ ok, value }) => {
+                if (!ok) return;
                 if (value && value !== world.ref.description) {
                     worldRequest
                         .saveWorld({
@@ -1186,15 +1242,18 @@
     }
 
     function promptChangeWorldCapacity(world) {
-        ElMessageBox.prompt(t('prompt.change_world_capacity.description'), t('prompt.change_world_capacity.header'), {
-            distinguishCancelAndClose: true,
-            confirmButtonText: t('prompt.change_world_capacity.ok'),
-            cancelButtonText: t('prompt.change_world_capacity.cancel'),
-            inputValue: world.ref.capacity,
-            inputPattern: /\d+$/,
-            inputErrorMessage: t('prompt.change_world_capacity.input_error')
-        })
-            .then(({ value }) => {
+        modalStore
+            .prompt({
+                title: t('prompt.change_world_capacity.header'),
+                description: t('prompt.change_world_capacity.description'),
+                confirmText: t('prompt.change_world_capacity.ok'),
+                cancelText: t('prompt.change_world_capacity.cancel'),
+                inputValue: world.ref.capacity,
+                pattern: /\d+$/,
+                errorMessage: t('prompt.change_world_capacity.input_error')
+            })
+            .then(({ ok, value }) => {
+                if (!ok) return;
                 if (value && value !== world.ref.capacity) {
                     worldRequest
                         .saveWorld({
@@ -1211,19 +1270,18 @@
     }
 
     function promptChangeWorldRecommendedCapacity(world) {
-        ElMessageBox.prompt(
-            t('prompt.change_world_recommended_capacity.description'),
-            t('prompt.change_world_recommended_capacity.header'),
-            {
-                distinguishCancelAndClose: true,
-                confirmButtonText: t('prompt.change_world_capacity.ok'),
-                cancelButtonText: t('prompt.change_world_capacity.cancel'),
+        modalStore
+            .prompt({
+                title: t('prompt.change_world_recommended_capacity.header'),
+                description: t('prompt.change_world_recommended_capacity.description'),
+                confirmText: t('prompt.change_world_capacity.ok'),
+                cancelText: t('prompt.change_world_capacity.cancel'),
                 inputValue: world.ref.recommendedCapacity,
-                inputPattern: /\d+$/,
-                inputErrorMessage: t('prompt.change_world_recommended_capacity.input_error')
-            }
-        )
-            .then(({ value }) => {
+                pattern: /\d+$/,
+                errorMessage: t('prompt.change_world_recommended_capacity.input_error')
+            })
+            .then(({ ok, value }) => {
+                if (!ok) return;
                 if (value && value !== world.ref.recommendedCapacity) {
                     worldRequest
                         .saveWorld({
@@ -1240,14 +1298,17 @@
     }
 
     function promptChangeWorldYouTubePreview(world) {
-        ElMessageBox.prompt(t('prompt.change_world_preview.description'), t('prompt.change_world_preview.header'), {
-            distinguishCancelAndClose: true,
-            confirmButtonText: t('prompt.change_world_preview.ok'),
-            cancelButtonText: t('prompt.change_world_preview.cancel'),
-            inputValue: world.ref.previewYoutubeId,
-            inputErrorMessage: t('prompt.change_world_preview.input_error')
-        })
-            .then(({ value }) => {
+        modalStore
+            .prompt({
+                title: t('prompt.change_world_preview.header'),
+                description: t('prompt.change_world_preview.description'),
+                confirmText: t('prompt.change_world_preview.ok'),
+                cancelText: t('prompt.change_world_preview.cancel'),
+                inputValue: world.ref.previewYoutubeId,
+                errorMessage: t('prompt.change_world_preview.input_error')
+            })
+            .then(({ ok, value }) => {
+                if (!ok) return;
                 if (value && value !== world.ref.previewYoutubeId) {
                     let processedValue = value;
                     if (value.length > 11) {
@@ -1294,13 +1355,8 @@
             database.deleteWorldMemo(worldId);
         }
     }
-    function showPreviousInstancesWorldDialog(worldRef) {
-        const D = previousInstancesWorldDialog.value;
-        D.worldRef = worldRef;
-        D.visible = true;
-        // trigger watcher
-        D.openFlg = true;
-        nextTick(() => (D.openFlg = false));
+    function showPreviousInstancesListDialog(worldRef) {
+        openPreviousInstancesListDialog('world', worldRef);
     }
     function refreshWorldDialogTreeData() {
         treeData.value = formatJsonVars(worldDialog.value.ref);
@@ -1309,33 +1365,33 @@
         navigator.clipboard
             .writeText(worldDialog.value.id)
             .then(() => {
-                toast.success('World ID copied to clipboard');
+                toast.success(t('message.world.id_copied'));
             })
             .catch((err) => {
                 console.error('copy failed:', err);
-                toast.error('Copy failed');
+                toast.error(t('message.copy_failed'));
             });
     }
     function copyWorldUrl() {
         navigator.clipboard
             .writeText(`https://vrchat.com/home/world/${worldDialog.value.id}`)
             .then(() => {
-                toast.success('World URL copied to clipboard');
+                toast.success(t('message.world.url_copied'));
             })
             .catch((err) => {
                 console.error('copy failed:', err);
-                toast.error('Copy failed');
+                toast.error(t('message.copy_failed'));
             });
     }
     function copyWorldName() {
         navigator.clipboard
             .writeText(worldDialog.value.ref.name)
             .then(() => {
-                toast.success('World name copied to clipboard');
+                toast.success(t('message.world.name_copied'));
             })
             .catch((err) => {
                 console.error('copy failed:', err);
-                toast.error('Copy failed');
+                toast.error(t('message.copy_failed'));
             });
     }
     function showWorldAllowedDomainsDialog() {
@@ -1344,11 +1400,38 @@
         D.urlList = worldDialog.value.ref?.urlList ?? [];
         D.visible = true;
     }
-</script>
 
-<style scoped>
-    .flex-align-center {
-        display: flex;
-        align-items: center;
+    async function translateDescription() {
+        if (isTranslating.value) return;
+
+        const description = worldDialog.value.ref.description;
+        if (!description) return;
+
+        // Toggle: if already translated, clear to show original
+        if (translatedDescription.value) {
+            translatedDescription.value = '';
+            return;
+        }
+
+        isTranslating.value = true;
+        try {
+            const translated = await translateText(description, bioLanguage.value);
+            if (!translated) {
+                throw new Error('No translation returned');
+            }
+
+            translatedDescription.value = translated;
+        } catch (error) {
+            console.error('Translation failed:', error);
+        } finally {
+            isTranslating.value = false;
+        }
     }
-</style>
+
+    watch(
+        () => [worldDialog.value.id, worldDialog.value.ref?.description],
+        () => {
+            translatedDescription.value = '';
+        }
+    );
+</script>

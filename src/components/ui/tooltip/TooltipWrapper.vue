@@ -16,6 +16,7 @@
         sideOffset: { type: Number, required: false },
         delayDuration: { type: Number, required: false },
         disableHoverableContent: { type: Boolean, required: false },
+        ignoreNonKeyboardFocus: { type: Boolean, required: false, default: true },
         disabled: { type: Boolean, required: false },
         triggerAsChild: { type: Boolean, required: false, default: true },
         contentClass: { type: null, required: false }
@@ -27,13 +28,23 @@
 </script>
 
 <template>
-    <Tooltip :delay-duration="delayDuration" :disable-hoverable-content="disableHoverableContent" :disabled="disabled">
+    <Tooltip
+        :delay-duration="delayDuration"
+        :disable-hoverable-content="disableHoverableContent"
+        :ignore-non-keyboard-focus="ignoreNonKeyboardFocus"
+        :disabled="disabled">
         <TooltipTrigger :as-child="triggerAsChild" v-bind="attrs">
             <slot />
         </TooltipTrigger>
-        <TooltipContent v-if="hasContent" :side="side" :align="align" :side-offset="sideOffset" :class="contentClass">
+        <TooltipContent
+            v-if="hasContent"
+            :side="side"
+            :align="align"
+            :side-offset="sideOffset"
+            :class="contentClass"
+            class="max-w-screen">
             <slot name="content">
-                <span v-if="content !== undefined">{{ content }}</span>
+                <span v-if="content !== undefined" class="whitespace-pre-wrap">{{ content }}</span>
             </slot>
         </TooltipContent>
     </Tooltip>

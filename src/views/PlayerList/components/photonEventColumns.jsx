@@ -1,4 +1,4 @@
-import { ArrowRight, Download } from '@element-plus/icons-vue';
+import { ArrowRight, Download } from 'lucide-vue-next';
 
 import Location from '@/components/Location.vue';
 import { TooltipWrapper } from '@/components/ui/tooltip';
@@ -35,7 +35,7 @@ function DetailCell({ row, isPrevious, onShowAvatar, onShowGroup, onShowWorld, o
         return (
             <>
                 <span
-                    class="x-link"
+                    class="cursor-pointer"
                     onClick={(e) => {
                         e.stopPropagation();
                         onShowAvatar?.(r.avatar?.id);
@@ -46,9 +46,7 @@ function DetailCell({ row, isPrevious, onShowAvatar, onShowGroup, onShowWorld, o
                 &nbsp;
                 {!r.inCache ? (
                     <span style="color: #aaa">
-                        <el-icon>
-                            <Download />
-                        </el-icon>
+                        <Download />
                         &nbsp;
                     </span>
                 ) : null}
@@ -90,9 +88,7 @@ function DetailCell({ row, isPrevious, onShowAvatar, onShowGroup, onShowWorld, o
                             ></i>
                         </TooltipWrapper>
                         <span>
-                            <el-icon>
-                                <ArrowRight />
-                            </el-icon>
+                            <ArrowRight />
                         </span>
                         <TooltipWrapper
                             side="top"
@@ -120,7 +116,7 @@ function DetailCell({ row, isPrevious, onShowAvatar, onShowGroup, onShowWorld, o
         return (
             <>
                 <span
-                    class="x-link"
+                    class="cursor-pointer"
                     style="margin-right: 5px"
                     onClick={(e) => {
                         e.stopPropagation();
@@ -130,12 +126,10 @@ function DetailCell({ row, isPrevious, onShowAvatar, onShowGroup, onShowWorld, o
                     {r.previousGroupName || r.previousGroupId}
                 </span>
                 <span>
-                    <el-icon>
-                        <ArrowRight />
-                    </el-icon>
+                    <ArrowRight />
                 </span>
                 <span
-                    class="x-link"
+                    class="cursor-pointer"
                     style="margin-left: 5px"
                     onClick={(e) => {
                         e.stopPropagation();
@@ -151,7 +145,7 @@ function DetailCell({ row, isPrevious, onShowAvatar, onShowGroup, onShowWorld, o
     if (r.type === 'PortalSpawn') {
         return (
             <span
-                class="x-link"
+                class="cursor-pointer"
                 onClick={(e) => {
                     e.stopPropagation();
                     onShowWorld?.(r.location, r.shortName);
@@ -175,19 +169,14 @@ function DetailCell({ row, isPrevious, onShowAvatar, onShowGroup, onShowWorld, o
         return (
             <>
                 {r.platform === 'Desktop' ? (
-                    <span style="color: var(--el-color-primary)">
-                        Desktop&nbsp;
-                    </span>
+                    <span>Desktop&nbsp;</span>
                 ) : r.platform === 'VR' ? (
-                    <span style="color: var(--el-color-primary)">VR&nbsp;</span>
+                    <span>VR&nbsp;</span>
                 ) : r.platform === 'Quest' ? (
-                    <span style="color: var(--el-color-success)">
-                        Android&nbsp;
-                    </span>
+                    <span>Android&nbsp;</span>
                 ) : null}
-
                 <span
-                    class="x-link"
+                    class="cursor-pointer"
                     onClick={(e) => {
                         e.stopPropagation();
                         onShowAvatar?.(r.avatar?.id);
@@ -198,9 +187,7 @@ function DetailCell({ row, isPrevious, onShowAvatar, onShowGroup, onShowWorld, o
                 &nbsp;
                 {!r.inCache ? (
                     <span style="color: #aaa">
-                        <el-icon>
-                            <Download />
-                        </el-icon>
+                        <Download />
                         &nbsp;
                     </span>
                 ) : null}
@@ -246,7 +233,14 @@ function DetailCell({ row, isPrevious, onShowAvatar, onShowGroup, onShowWorld, o
     return <span>{r.text}</span>;
 }
 
-export const createColumns = ({ isPrevious, onShowUser, onShowAvatar, onShowGroup, onShowWorld, onShowImage }) => [
+export const createColumns = ({
+    isPrevious,
+    onShowUser,
+    onShowAvatar,
+    onShowGroup,
+    onShowWorld,
+    onShowImage
+}) => [
     {
         id: 'created_at',
         accessorFn: (row) => (row?.created_at ? Date.parse(row.created_at) : 0),
@@ -263,7 +257,9 @@ export const createColumns = ({ isPrevious, onShowUser, onShowAvatar, onShowGrou
                     )
                 }}
             >
-                <span>{formatDateFilter(row.original?.created_at, 'short')}</span>
+                <span>
+                    {formatDateFilter(row.original?.created_at, 'short')}
+                </span>
             </TooltipWrapper>
         )
     },
@@ -274,7 +270,7 @@ export const createColumns = ({ isPrevious, onShowUser, onShowAvatar, onShowGrou
         enableSorting: false,
         cell: ({ row }) => (
             <span
-                class="x-link"
+                class="cursor-pointer"
                 style="padding-right: 10px"
                 onClick={(e) => {
                     e.stopPropagation();

@@ -1,6 +1,6 @@
 <template>
     <div class="x-container" ref="moderationRef">
-        <div class="tool-slot">
+        <div class="mb-4 flex items-center">
             <Select
                 multiple
                 :model-value="
@@ -23,16 +23,16 @@
             <InputGroupField
                 v-model="playerModerationTable.filters[1].value"
                 :placeholder="t('view.moderation.search_placeholder')"
-                class="filter-input" />
+                class="filter-input flex-[0.4]" />
             <TooltipWrapper side="bottom" :content="t('view.moderation.refresh_tooltip')">
                 <Button
                     class="rounded-full"
-                    variant="outline"
+                    variant="ghost"
                     size="icon-sm"
                     :disabled="playerModerationTable.loading"
                     @click="refreshPlayerModerations()">
                     <Spinner v-if="playerModerationTable.loading" />
-                    <Refresh v-else />
+                    <RefreshCw v-else />
                 </Button>
             </TooltipWrapper>
         </div>
@@ -52,7 +52,7 @@
     import { computed, ref, watch } from 'vue';
     import { Button } from '@/components/ui/button';
     import { InputGroupField } from '@/components/ui/input-group';
-    import { Refresh } from '@element-plus/icons-vue';
+    import { RefreshCw } from 'lucide-vue-next';
     import { Spinner } from '@/components/ui/spinner';
     import { storeToRefs } from 'pinia';
     import { useI18n } from 'vue-i18n';
@@ -112,7 +112,7 @@
     function deletePlayerModerationPrompt(row) {
         modalStore
             .confirm({
-                description: `Continue? Delete Moderation ${row.type}`,
+                description: `Continue? Moderation ${row.type}`,
                 title: 'Confirm'
             })
             .then(({ ok }) => ok && deletePlayerModeration(row))
@@ -160,7 +160,9 @@
 
     const { table, pagination } = useVrcxVueTable({
         persistKey: 'moderation',
-        data: moderationDisplayData,
+        get data() {
+            return moderationDisplayData.value;
+        },
         columns,
         getRowId: (row) => row.id ?? `${row.type}:${row.sourceUserId}:${row.targetUserId}:${row.created ?? ''}`,
         initialSorting: [{ id: 'created', desc: true }],
@@ -198,11 +200,6 @@
 </script>
 
 <style scoped>
-    .tool-slot {
-        margin: 0 0 10px;
-        display: flex;
-        align-items: center;
-    }
     .filter-input {
         width: 150px;
         margin: 0 10px;

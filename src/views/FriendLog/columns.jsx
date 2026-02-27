@@ -3,10 +3,9 @@ import { Button } from '../../components/ui/button';
 import {
     Tooltip,
     TooltipContent,
-    TooltipProvider,
     TooltipTrigger
 } from '../../components/ui/tooltip';
-import { ArrowRight, ArrowUpDown } from 'lucide-vue-next';
+import { ArrowRight, ArrowUpDown, Trash2, X } from 'lucide-vue-next';
 import { storeToRefs } from 'pinia';
 
 import { formatDateFilter } from '../../shared/utils';
@@ -31,7 +30,7 @@ export const createColumns = ({ onDelete, onDeletePrompt }) => {
         },
         {
             accessorKey: 'created_at',
-            size: 90,
+            size: 120,
             header: ({ column }) => (
                 <Button
                     variant="ghost"
@@ -49,23 +48,21 @@ export const createColumns = ({ onDelete, onDeletePrompt }) => {
                 const longText = formatDateFilter(createdAt, 'long');
 
                 return (
-                    <TooltipProvider>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <span>{shortText}</span>
-                            </TooltipTrigger>
-                            <TooltipContent side="right">
-                                <span>{longText}</span>
-                            </TooltipContent>
-                        </Tooltip>
-                    </TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <span>{shortText}</span>
+                        </TooltipTrigger>
+                        <TooltipContent side="right">
+                            <span>{longText}</span>
+                        </TooltipContent>
+                    </Tooltip>
                 );
             }
         },
         {
             accessorKey: 'type',
 
-            size: 110,
+            size: 160,
             header: () => t('table.friendLog.type'),
             cell: ({ row }) => {
                 const type = row.getValue('type');
@@ -89,7 +86,7 @@ export const createColumns = ({ onDelete, onDeletePrompt }) => {
                 const displayName =
                     original.displayName || original.userId || '';
                 return (
-                    <span class="block w-full whitespace-normal break-words">
+                    <span class="block w-full whitespace-normal wrap-break-word cursor-pointer">
                         {original.type === 'DisplayName' ? (
                             <span class="mr-1">
                                 {original.previousDisplayName}
@@ -97,7 +94,7 @@ export const createColumns = ({ onDelete, onDeletePrompt }) => {
                             </span>
                         ) : null}
                         <span
-                            class="x-link pr-2.5"
+                            class="cursor-pointer pr-2.5"
                             onClick={() => showUserDialog(original.userId)}
                         >
                             {displayName}
@@ -118,7 +115,6 @@ export const createColumns = ({ onDelete, onDeletePrompt }) => {
             meta: {
                 class: 'w-[80px] max-w-[80px] text-right'
             },
-            enableResizing: false,
             size: 80,
             maxSize: 80,
             header: () => t('table.friendLog.action'),
@@ -136,13 +132,11 @@ export const createColumns = ({ onDelete, onDeletePrompt }) => {
                                     : onDeletePrompt(original)
                             }
                         >
-                            <i
-                                class={
-                                    shiftHeld.value
-                                        ? 'ri-close-line text-red-600'
-                                        : 'ri-delete-bin-line'
-                                }
-                            />
+                            {shiftHeld.value ? (
+                                <X class="h-4 w-4 text-red-600" />
+                            ) : (
+                                <Trash2 class="h-4 w-4" />
+                            )}
                         </button>
                     </div>
                 );

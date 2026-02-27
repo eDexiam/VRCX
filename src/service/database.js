@@ -1,5 +1,6 @@
 import { avatarFavorites } from './database/avatarFavorites.js';
 import { feed } from './database/feed.js';
+import { friendFavorites } from './database/friendFavorites.js';
 import { friendLogCurrent } from './database/friendLogCurrent.js';
 import { friendLogHistory } from './database/friendLogHistory.js';
 import { gameLog } from './database/gameLog.js';
@@ -17,7 +18,8 @@ import sqliteService from './sqlite.js';
 const dbVars = {
     userId: '',
     userPrefix: '',
-    maxTableSize: 1000
+    maxTableSize: 500,
+    searchTableSize: 5000
 };
 
 const database = {
@@ -29,6 +31,7 @@ const database = {
     ...friendLogCurrent,
     ...memos,
     ...avatarFavorites,
+    ...friendFavorites,
     ...worldFavorites,
     ...tableAlter,
     ...tableFixes,
@@ -37,6 +40,10 @@ const database = {
 
     setMaxTableSize(limit) {
         dbVars.maxTableSize = limit;
+    },
+
+    setSearchTableSize(limit) {
+        dbVars.searchTableSize = limit;
     },
 
     async initUserTables(userId) {
@@ -69,6 +76,9 @@ const database = {
         );
         await sqliteService.executeNonQuery(
             `CREATE TABLE IF NOT EXISTS ${dbVars.userPrefix}_notifications (id TEXT PRIMARY KEY, created_at TEXT, type TEXT, sender_user_id TEXT, sender_username TEXT, receiver_user_id TEXT, message TEXT, world_id TEXT, world_name TEXT, image_url TEXT, invite_message TEXT, request_message TEXT, response_message TEXT, expired INTEGER)`
+        );
+        await sqliteService.executeNonQuery(
+            `CREATE TABLE IF NOT EXISTS ${dbVars.userPrefix}_notifications_v2 (id TEXT PRIMARY KEY, created_at TEXT, updated_at TEXT, expires_at TEXT, type TEXT, link TEXT, link_text TEXT, message TEXT, title TEXT, image_url TEXT, seen INTEGER, sender_user_id TEXT, sender_username TEXT, data TEXT, responses TEXT, details TEXT)`
         );
         await sqliteService.executeNonQuery(
             `CREATE TABLE IF NOT EXISTS ${dbVars.userPrefix}_moderation (user_id TEXT PRIMARY KEY, updated_at TEXT, display_name TEXT, block INTEGER, mute INTEGER)`
@@ -120,6 +130,9 @@ const database = {
         );
         await sqliteService.executeNonQuery(
             `CREATE TABLE IF NOT EXISTS favorite_avatar (id INTEGER PRIMARY KEY, created_at TEXT, avatar_id TEXT, group_name TEXT)`
+        );
+        await sqliteService.executeNonQuery(
+            `CREATE TABLE IF NOT EXISTS favorite_friend (id INTEGER PRIMARY KEY, created_at TEXT, user_id TEXT, group_name TEXT)`
         );
         await sqliteService.executeNonQuery(
             `CREATE TABLE IF NOT EXISTS memos (user_id TEXT PRIMARY KEY, edited_at TEXT, memo TEXT)`

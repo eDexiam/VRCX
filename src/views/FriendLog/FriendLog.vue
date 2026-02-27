@@ -2,6 +2,7 @@
     <div class="x-container" ref="friendLogRef">
         <DataTableLayout
             :table="table"
+            :loading="friendLogTable.loading"
             :table-style="tableHeightStyle"
             :page-sizes="pageSizes"
             :total-items="totalItems"
@@ -151,7 +152,7 @@
     function deleteFriendLogPrompt(row) {
         modalStore
             .confirm({
-                description: 'Continue? Delete Log',
+                description: t('confirm.delete_log'),
                 title: 'Confirm'
             })
             .then(({ ok }) => ok && deleteFriendLog(row))
@@ -174,20 +175,24 @@
 
     const { table, pagination } = useVrcxVueTable({
         persistKey: 'friendLog',
-        data: friendLogDisplayData,
+        get data() {
+            return friendLogDisplayData.value;
+        },
         columns,
         getRowId: (row) => `${row.type}:${row.rowId ?? row.userId ?? row.created_at ?? ''}`,
         initialSorting: [],
         initialPagination: {
             pageIndex: 0,
             pageSize: pageSize.value
+        },
+        tableOptions: {
+            autoResetPageIndex: false
         }
     });
 
     const totalItems = computed(() => {
         const length = table.getFilteredRowModel().rows.length;
-        const max = vrcxStore.maxTableSize;
-        return length > max && length < max + 51 ? max : length;
+        return length;
     });
 
     const handlePageSizeChange = (size) => {
@@ -210,9 +215,3 @@
         table.setPageSize(size);
     });
 </script>
-
-<style scoped>
-    .table-user {
-        color: var(--x-table-user-text-color);
-    }
-</style>

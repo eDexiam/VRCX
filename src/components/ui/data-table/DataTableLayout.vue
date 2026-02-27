@@ -5,7 +5,7 @@
         </div>
 
         <div class="rounded-md border">
-            <div v-loading="loading" class="overflow-auto" :style="tableStyle">
+            <div ref="tableScrollRef" class="max-w-full overflow-auto relative" :style="tableStyle">
                 <Table :class="tableClassValue" :style="tableElementStyle">
                     <colgroup>
                         <col v-for="col in table.getVisibleLeafColumns()" :key="col.id" :style="getColStyle(col)" />
@@ -34,7 +34,9 @@
                     <TableBody>
                         <template v-if="table.getRowModel().rows?.length">
                             <template v-for="row in table.getRowModel().rows" :key="row.id">
-                                <TableRow @click="handleRowClick(row)">
+                                <TableRow
+                                    @click="handleRowClick(row)"
+                                    :class="isDataTableStriped ? 'even:bg-muted/20' : ''">
                                     <TableCell
                                         v-for="cell in row.getVisibleCells()"
                                         :key="cell.id"
@@ -57,14 +59,17 @@
                         </template>
 
                         <TableRow v-else>
-                            <TableCell class="h-24 text-center">
+                            <TableCell class="h-24 text-center" :colspan="table.getVisibleLeafColumns().length">
                                 <slot name="empty">
-                                    {{ emptyText }}
+                                    <DataTableEmpty v-if="!loading" :type="emptyType" />
                                 </slot>
                             </TableCell>
                         </TableRow>
                     </TableBody>
                 </Table>
+                <div v-if="loading" class="absolute inset-0 z-20 flex items-center justify-center bg-background/60">
+                    <Spinner class="text-2xl" />
+                </div>
             </div>
         </div>
 
@@ -111,8 +116,11 @@
 </template>
 
 <script setup>
+    import { computed, nextTick, ref, watch } from 'vue';
     import { FlexRender } from '@tanstack/vue-table';
-    import { computed } from 'vue';
+    import { Spinner } from '@/components/ui/spinner';
+    import { storeToRefs } from 'pinia';
+    import { useAppearanceSettingsStore } from '@/stores/';
     import { useI18n } from 'vue-i18n';
 
     import {
@@ -125,6 +133,11 @@
     } from '../pagination';
     import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../table';
     import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../select';
+
+    import DataTableEmpty from './DataTableEmpty.vue';
+
+    const appearanceSettingsStore = useAppearanceSettingsStore();
+    const { isDataTableStriped } = storeToRefs(appearanceSettingsStore);
 
     const props = defineProps({
         table: {
@@ -151,10 +164,6 @@
             type: Array,
             default: () => []
         },
-        emptyText: {
-            type: String,
-            default: 'No results.'
-        },
         showPagination: {
             type: Boolean,
             default: true
@@ -167,6 +176,10 @@
             type: Function,
             default: null
         },
+        onSortChange: {
+            type: Function,
+            default: null
+        },
         onRowClick: {
             type: Function,
             default: null
@@ -174,6 +187,12 @@
     });
 
     const { t } = useI18n();
+    const tableScrollRef = ref(null);
+
+    const emptyType = computed(() => {
+        const totalRows = props.table?.getCoreRowModel?.().rows?.length ?? 0;
+        return totalRows === 0 ? 'nodata' : 'nomatch';
+    });
 
     const expandedRenderer = computed(() => {
         const columns = props.table.getAllColumns?.() ?? [];
@@ -255,7 +274,7 @@
         const meta = columnDef?.meta ?? {};
         const pinned = getPinnedState(header?.column);
         return joinClasses(
-            'sticky top-0 bg-background relative group',
+            'sticky top-0 bg-background dark:bg-sidebar border-b border-border group',
             pinned ? 'z-30' : 'z-10',
             isSpacer(header.column) && 'p-0',
             resolveClassValue(meta.class, header?.getContext?.()),
@@ -305,6 +324,21 @@
             if (props.onPageChange) {
                 props.onPageChange(page);
             }
+        }
+    });
+
+    const sortBy = computed(() => props.table.getState?.().sorting ?? []);
+
+    watch(sortBy, (newSorting) => {
+        if (props.onSortChange) {
+            props.onSortChange(newSorting);
+        }
+    });
+
+    watch([currentPage, pageSizeProxy], async () => {
+        await nextTick();
+        if (tableScrollRef.value) {
+            tableScrollRef.value.scrollTop = 0;
         }
     });
 

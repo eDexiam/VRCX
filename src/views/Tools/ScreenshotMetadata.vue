@@ -1,15 +1,14 @@
 <template>
     <div class="screenshot-metadata-page x-container">
-        <div class="screenshot-metadata-page__header">
-            <Button variant="ghost" class="screenshot-metadata-page__back" @click="goBack">
+        <div class="flex items-center gap-2 ml-2">
+            <Button variant="ghost" size="sm" class="mr-3" @click="goBack">
+                <ArrowLeft />
                 {{ t('nav_tooltip.tools') }}
             </Button>
             <span class="header">{{ t('dialog.screenshot_metadata.header') }}</span>
         </div>
-        <div v-loading="screenshotMetadataDialog.loading" @dragover.prevent @dragenter.prevent @drop="handleDrop">
-            <span style="margin-left: 5px; color: var(--el-text-color-secondary); font-family: monospace">{{
-                t('dialog.screenshot_metadata.drag')
-            }}</span>
+        <div @dragover.prevent @dragenter.prevent @drop="handleDrop">
+            <span>{{ t('dialog.screenshot_metadata.drag') }}</span>
             <br />
             <br />
             <Button size="sm" variant="outline" class="mr-2" @click="getAndDisplayScreenshotFromFile">{{
@@ -53,17 +52,17 @@
             <div class="flex items-center">
                 <InputGroupSearch
                     v-model="screenshotMetadataDialog.search"
-                    placeholder="Search"
+                    :placeholder="t('dialog.screenshot_metadata.search_placeholder')"
                     style="width: 200px"
                     @input="screenshotMetadataSearch" />
                 <Select :model-value="screenshotMetadataDialog.searchType" @update:modelValue="handleSearchTypeChange">
                     <SelectTrigger size="sm" style="width: 150px; margin-left: 10px">
-                        <SelectValue placeholder="Search Type" />
+                        <SelectValue :placeholder="t('dialog.screenshot_metadata.search_type_placeholder')" />
                     </SelectTrigger>
                     <SelectContent>
                         <SelectGroup>
                             <SelectItem v-for="type in screenshotMetadataDialog.searchTypes" :key="type" :value="type">
-                                {{ type }}
+                                {{ t(screenshotMetadataSearchTypeLabels[type] ?? type) }}
                             </SelectItem>
                         </SelectGroup>
                     </SelectContent>
@@ -100,8 +99,7 @@
             <DisplayName
                 v-if="screenshotMetadataDialog.metadata.author"
                 :userid="screenshotMetadataDialog.metadata.author.id"
-                :hint="screenshotMetadataDialog.metadata.author.displayName"
-                style="color: var(--el-text-color-secondary); font-family: monospace" />
+                :hint="screenshotMetadataDialog.metadata.author.displayName" />
             <br />
             <div class="my-2 w-[90%] ml-17">
                 <Carousel :opts="{ loop: false }" @init-api="handleScreenshotMetadataCarouselInit">
@@ -109,7 +107,6 @@
                         <CarouselItem>
                             <div class="h-150 w-full">
                                 <img
-                                    class="x-link"
                                     :src="screenshotMetadataDialog.metadata.previousFilePath"
                                     style="width: 100%; height: 100%; object-fit: contain" />
                             </div>
@@ -117,7 +114,7 @@
                         <CarouselItem>
                             <div class="h-150 w-full">
                                 <img
-                                    class="x-link"
+                                    class="cursor-pointer"
                                     :src="screenshotMetadataDialog.metadata.filePath"
                                     style="width: 100%; height: 100%; object-fit: contain"
                                     @click="showFullscreenImageDialog(screenshotMetadataDialog.metadata.filePath)" />
@@ -126,7 +123,6 @@
                         <CarouselItem>
                             <div class="h-150 w-full">
                                 <img
-                                    class="x-link"
                                     :src="screenshotMetadataDialog.metadata.nextFilePath"
                                     style="width: 100%; height: 100%; object-fit: contain" />
                             </div>
@@ -143,11 +139,8 @@
                 <br />
             </template>
             <span v-for="user in screenshotMetadataDialog.metadata.players" :key="user.id" style="margin-top: 5px">
-                <span class="x-link" @click="lookupUser(user)" v-text="user.displayName"></span>
-                <span
-                    v-if="user.pos"
-                    style="margin-left: 5px; color: var(--el-text-color-secondary); font-family: monospace"
-                    v-text="'(' + user.pos.x + ', ' + user.pos.y + ', ' + user.pos.z + ')'"></span>
+                <span class="cursor-pointer" @click="lookupUser(user)" v-text="user.displayName"></span>
+                <span v-if="user.pos" v-text="'(' + user.pos.x + ', ' + user.pos.y + ', ' + user.pos.z + ')'"></span>
                 <br />
             </span>
         </div>
@@ -159,6 +152,7 @@
     import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
     import { onBeforeUnmount, onMounted, reactive, ref } from 'vue';
     import { useGalleryStore, useUserStore, useVrcxStore } from '@/stores';
+    import { ArrowLeft } from 'lucide-vue-next';
     import { Badge } from '@/components/ui/badge';
     import { Button } from '@/components/ui/button';
     import { InputGroupSearch } from '@/components/ui/input-group';
@@ -184,12 +178,19 @@
         loading: false,
         search: '',
         searchType: 'Player Name',
-        searchTypes: ['Player Name', 'Player ID', 'World  Name', 'World  ID'],
+        searchTypes: ['Player Name', 'Player ID', 'World Name', 'World ID'],
         searchIndex: null,
         searchResults: null,
         metadata: {},
         isUploading: false
     });
+
+    const screenshotMetadataSearchTypeLabels = {
+        'Player Name': 'dialog.screenshot_metadata.search_types.player_name',
+        'Player ID': 'dialog.screenshot_metadata.search_types.player_id',
+        'World Name': 'dialog.screenshot_metadata.search_types.world_name',
+        'World ID': 'dialog.screenshot_metadata.search_types.world_id'
+    };
 
     const screenshotMetadataSearchInputs = ref(0);
     const screenshotMetadataCarouselApi = ref(null);
@@ -351,7 +352,7 @@
 
                     if (results.length === 0) {
                         D.metadata = {};
-                        D.metadata.error = 'No results found';
+                        D.metadata.error = t('dialog.screenshot_metadata.no_results');
 
                         D.searchIndex = null;
                         D.searchResults = null;
@@ -503,7 +504,7 @@
         }
         if (!metadata?.sourceFile) {
             D.metadata = {};
-            D.metadata.error = 'Invalid file selected. Please select a valid VRChat screenshot.';
+            D.metadata.error = t('dialog.screenshot_metadata.invalid_file');
             return;
         }
 
@@ -541,12 +542,3 @@
         }
     }
 </script>
-
-<style scoped>
-    .screenshot-metadata-page__header {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        margin-bottom: 12px;
-    }
-</style>

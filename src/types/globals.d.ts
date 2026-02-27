@@ -191,6 +191,7 @@ declare global {
         // Common Functions
         GetColourFromUserID(userId: string): Promise<number>;
         OpenLink(url: string): Promise<void>;
+        OpenDiscordProfile(discordId: string): Promise<void>;
         GetLaunchCommand(): Promise<string>;
         IPCAnnounceStart(): Promise<void>;
         SendIpc(type: string, data: string): Promise<void>;
@@ -408,10 +409,11 @@ declare global {
             uploadFilePUT?: boolean;
             fileData?: string;
             fileMIME?: string;
+            fileMD5?: string;
             headers?: Record<string, string>;
             data?: any;
         }): Promise<{ status: number; data: string }>;
     };
 }
 
-export { };
+export {};

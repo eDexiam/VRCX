@@ -13,23 +13,23 @@
                         decoding="async"
                         fetchpriority="low" />
                 </div>
-                <div class="favorites-search-card__detail" v-once>
+                <div class="favorites-search-card__detail">
                     <div class="favorites-search-card__title">
-                        <span class="name">{{ props.favorite.ref.name }}</span>
+                        <span class="name text-sm">{{ props.favorite.ref.name }}</span>
                         <span
                             v-if="favorite.deleted || favorite.ref.releaseStatus === 'private'"
                             class="favorites-search-card__badges">
-                            <i
+                            <AlertTriangle
                                 v-if="favorite.deleted"
                                 :title="t('view.favorite.unavailable_tooltip')"
-                                class="ri-error-warning-line"></i>
-                            <i
+                                class="h-4 w-4" />
+                            <Lock
                                 v-if="favorite.ref.releaseStatus === 'private'"
                                 :title="t('view.favorite.private')"
-                                class="ri-lock-line"></i>
+                                class="h-4 w-4" />
                         </span>
                     </div>
-                    <span class="extra">
+                    <span class="text-xs text-muted-foreground">
                         {{ props.favorite.ref.authorName }}
                         <template v-if="props.favorite.ref.occupants"> ({{ props.favorite.ref.occupants }}) </template>
                     </span>
@@ -52,10 +52,10 @@
                         <div class="favorites-search-card__action">
                             <Button
                                 size="icon-sm"
-                                variant="outline"
-                                class="favorites-search-card__action-btn rounded-full text-xs h-6 w-6"
+                                variant="ghost"
+                                class="rounded-full text-xs h-6 w-6"
                                 @click.stop="handleDeleteFavorite">
-                                <i class="ri-delete-bin-line"></i>
+                                <Trash2 class="h-4 w-4" />
                             </Button>
                         </div>
                     </div>
@@ -66,11 +66,11 @@
                             <TooltipWrapper side="top" :content="inviteOrLaunchText">
                                 <Button
                                     size="icon-sm"
-                                    variant="outline"
-                                    class="favorites-search-card__action-btn rounded-full text-xs h-6 w-6"
+                                    variant="ghost"
+                                    class="rounded-full text-xs h-6 w-6"
                                     @click.stop="newInstanceSelfInvite(favorite.id)"
-                                    ><i class="ri-mail-line"></i
-                                ></Button>
+                                    ><Mail class="h-4 w-4"
+                                /></Button>
                             </TooltipWrapper>
                         </div>
                         <div class="favorites-search-card__action">
@@ -81,19 +81,19 @@
                                 <Button
                                     size="icon-sm"
                                     variant="destructive"
-                                    class="favorites-search-card__action-btn rounded-full text-xs h-6 w-6"
+                                    class="rounded-full text-xs h-6 w-6"
                                     @click.stop="handleDeleteFavorite"
-                                    ><i class="ri-delete-bin-line"></i
-                                ></Button>
+                                    ><Trash2 class="h-4 w-4"
+                                /></Button>
                             </TooltipWrapper>
                             <TooltipWrapper v-else side="top" :content="t('view.favorite.edit_favorite_tooltip')">
                                 <Button
                                     size="icon-sm"
-                                    variant="outline"
-                                    class="favorites-search-card__action-btn rounded-full text-xs h-6 w-6"
+                                    variant="ghost"
+                                    class="rounded-full text-xs h-6 w-6"
                                     @click.stop="showFavoriteDialog('world', favorite.id)"
-                                    ><i class="ri-star-line"></i
-                                ></Button>
+                                    ><Star class="h-4 w-4"
+                                /></Button>
                             </TooltipWrapper>
                         </div>
                     </div>
@@ -105,10 +105,10 @@
                 <div class="favorites-search-card__avatar is-empty"></div>
                 <div class="favorites-search-card__detail" v-once>
                     <span>{{ favorite.name || favorite.id }}</span>
-                    <i
+                    <AlertTriangle
                         v-if="favorite.deleted"
                         :title="t('view.favorite.unavailable_tooltip')"
-                        class="ri-error-warning-line"></i>
+                        class="h-4 w-4" />
                 </div>
             </div>
             <div class="favorites-search-card__actions">
@@ -116,9 +116,9 @@
                     <Button
                         class="rounded-full text-xs h-6 w-6"
                         size="icon-sm"
-                        variant="outline"
+                        variant="ghost"
                         @click.stop="handleDeleteFavorite">
-                        <i class="ri-delete-bin-line"></i>
+                        <Trash2 class="h-4 w-4" />
                     </Button>
                 </div>
             </div>
@@ -127,6 +127,7 @@
 </template>
 
 <script setup>
+    import { AlertTriangle, Lock, Mail, Star, Trash2 } from 'lucide-vue-next';
     import { Button } from '@/components/ui/button';
     import { Checkbox } from '@/components/ui/checkbox';
     import { computed } from 'vue';

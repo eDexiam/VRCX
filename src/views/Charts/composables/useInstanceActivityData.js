@@ -30,15 +30,7 @@ export function useInstanceActivityData() {
     async function getWorldNameData() {
         worldNameArray.value = await Promise.all(
             activityData.value.map(async (item) => {
-                try {
-                    return await getWorldName(item.location);
-                } catch {
-                    console.error(
-                        'getWorldName failed location',
-                        item.location
-                    );
-                    return 'Unknown world';
-                }
+                return await getWorldName(item.location);
             })
         );
     }
@@ -71,7 +63,8 @@ export function useInstanceActivityData() {
             isFriend:
                 item.user_id === currentUser.value.id
                     ? null
-                    : friends.value.has(item.user_id),
+                    : friends.value.has(item.user_id) ||
+                      localFavoriteFriends.value.has(item.user_id),
             isFavorite:
                 item.user_id === currentUser.value.id
                     ? null

@@ -1,107 +1,144 @@
 <template>
-    <el-dialog
-        class="x-dialog"
-        :model-value="isTranslationApiDialogVisible"
-        :title="t('dialog.translation_api.header')"
-        width="450px"
-        @close="closeDialog">
-        <div class="options-container-item">
-            <span class="name">{{ t('view.settings.appearance.appearance.bio_language') }}</span>
-            <Select :model-value="bioLanguage" @update:modelValue="setBioLanguage">
-                <SelectTrigger size="sm" style="float: right">
-                    <SelectValue :placeholder="String(getLanguageName(bioLanguage) || bioLanguage || '')" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectGroup>
-                        <SelectItem v-for="language in languageCodes" :key="language" :value="language">
-                            {{ getLanguageName(language) }}
-                        </SelectItem>
-                    </SelectGroup>
-                </SelectContent>
-            </Select>
-        </div>
-        <br />
-        <FieldGroup class="mb-3">
-            <Field>
-                <FieldLabel>{{ t('dialog.translation_api.mode') }}</FieldLabel>
-                <FieldContent>
-                    <Select :model-value="form.translationApiType" @update:modelValue="handleTranslationApiTypeChange">
-                        <SelectTrigger size="sm" style="width: 100%">
-                            <SelectValue :placeholder="t('dialog.translation_api.mode')" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectGroup>
-                                <SelectItem value="google" :text-value="t('dialog.translation_api.mode_google')">
-                                    {{ t('dialog.translation_api.mode_google') }}
-                                </SelectItem>
-                                <SelectItem value="openai" :text-value="t('dialog.translation_api.mode_openai')">
-                                    {{ t('dialog.translation_api.mode_openai') }}
-                                </SelectItem>
-                            </SelectGroup>
-                        </SelectContent>
-                    </Select>
-                </FieldContent>
-            </Field>
-        </FieldGroup>
-
-        <template v-if="form.translationApiType === 'google'">
-            <FieldGroup>
+    <Dialog :open="isTranslationApiDialogVisible" @update:open="(open) => (open ? null : closeDialog())">
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>{{ t('dialog.translation_api.header') }}</DialogTitle>
+            </DialogHeader>
+            <div class="options-container-item">
+                <span class="name">{{ t('view.settings.appearance.appearance.bio_language') }}</span>
+                <Select :model-value="bioLanguage" @update:modelValue="setBioLanguage">
+                    <SelectTrigger size="sm" style="float: right">
+                        <SelectValue :placeholder="String(getLanguageName(bioLanguage) || bioLanguage || '')" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectGroup>
+                            <SelectItem v-for="language in languageCodes" :key="language" :value="language">
+                                {{ getLanguageName(language) }}
+                            </SelectItem>
+                        </SelectGroup>
+                    </SelectContent>
+                </Select>
+            </div>
+            <br />
+            <FieldGroup class="mb-3">
                 <Field>
-                    <FieldLabel>{{ t('dialog.translation_api.description') }}</FieldLabel>
+                    <FieldLabel>{{ t('dialog.translation_api.mode') }}</FieldLabel>
                     <FieldContent>
-                        <InputGroupField
-                            v-model="form.translationApiKey"
-                            type="password"
-                            show-password
-                            placeholder="AIzaSy..."
-                            clearable />
+                        <Select
+                            :model-value="form.translationApiType"
+                            @update:modelValue="handleTranslationApiTypeChange">
+                            <SelectTrigger size="sm" style="width: 100%">
+                                <SelectValue :placeholder="t('dialog.translation_api.mode')" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectGroup>
+                                    <SelectItem value="google" :text-value="t('dialog.translation_api.mode_google')">
+                                        {{ t('dialog.translation_api.mode_google') }}
+                                    </SelectItem>
+                                    <SelectItem value="openai" :text-value="t('dialog.translation_api.mode_openai')">
+                                        {{ t('dialog.translation_api.mode_openai') }}
+                                    </SelectItem>
+                                </SelectGroup>
+                            </SelectContent>
+                        </Select>
                     </FieldContent>
                 </Field>
             </FieldGroup>
-        </template>
 
-        <template v-if="form.translationApiType === 'openai'">
-            <FieldGroup>
-                <Field>
-                    <FieldLabel>{{ t('dialog.translation_api.openai.endpoint') }}</FieldLabel>
-                    <FieldContent>
-                        <InputGroupField
-                            v-model="form.translationApiEndpoint"
-                            placeholder="https://api.openai.com/v1/chat/completions"
-                            clearable />
-                    </FieldContent>
-                </Field>
+            <template v-if="form.translationApiType === 'google'">
+                <FieldGroup>
+                    <Field>
+                        <FieldLabel>{{ t('dialog.translation_api.description') }}</FieldLabel>
+                        <FieldContent>
+                            <InputGroupField
+                                v-model="form.translationApiKey"
+                                type="password"
+                                show-password
+                                placeholder="AIzaSy..."
+                                clearable />
+                        </FieldContent>
+                    </Field>
+                </FieldGroup>
+            </template>
 
-                <Field>
-                    <FieldLabel>{{ t('dialog.translation_api.openai.api_key') }}</FieldLabel>
-                    <FieldContent>
-                        <InputGroupField
-                            v-model="form.translationApiKey"
-                            type="password"
-                            show-password
-                            placeholder="sk-..."
-                            clearable />
-                    </FieldContent>
-                </Field>
+            <template v-if="form.translationApiType === 'openai'">
+                <FieldGroup>
+                    <Field>
+                        <FieldLabel>{{ t('dialog.translation_api.openai.endpoint') }}</FieldLabel>
+                        <FieldContent>
+                            <InputGroupField
+                                v-model="form.translationApiEndpoint"
+                                placeholder="https://api.openai.com/v1/chat/completions"
+                                clearable />
+                        </FieldContent>
+                    </Field>
 
-                <Field>
-                    <FieldLabel>{{ t('dialog.translation_api.openai.model') }}</FieldLabel>
-                    <FieldContent>
-                        <InputGroupField v-model="form.translationApiModel" clearable />
-                    </FieldContent>
-                </Field>
+                    <Field>
+                        <FieldLabel>{{ t('dialog.translation_api.openai.api_key') }}</FieldLabel>
+                        <FieldContent>
+                            <InputGroupField
+                                v-model="form.translationApiKey"
+                                type="password"
+                                show-password
+                                placeholder="sk-..."
+                                clearable />
+                        </FieldContent>
+                    </Field>
 
-                <Field>
-                    <FieldLabel>{{ t('dialog.translation_api.openai.prompt_optional') }}</FieldLabel>
-                    <FieldContent>
-                        <InputGroupTextareaField v-model="form.translationApiPrompt" :rows="3" clearable />
-                    </FieldContent>
-                </Field>
-            </FieldGroup>
-        </template>
+                    <Field>
+                        <FieldLabel>{{ t('dialog.translation_api.openai.model') }}</FieldLabel>
+                        <FieldContent>
+                            <div class="flex gap-2 items-start">
+                                <div class="flex-1">
+                                    <Select
+                                        v-if="availableModels.length > 0"
+                                        :model-value="form.translationApiModel"
+                                        @update:modelValue="(value) => (form.translationApiModel = value)">
+                                        <SelectTrigger size="sm" style="width: 100%">
+                                            <SelectValue :placeholder="t('dialog.translation_api.openai.model')" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectGroup>
+                                                <SelectItem
+                                                    v-for="model in availableModels"
+                                                    :key="model"
+                                                    :value="model">
+                                                    {{ model }}
+                                                </SelectItem>
+                                            </SelectGroup>
+                                        </SelectContent>
+                                    </Select>
+                                    <InputGroupField
+                                        v-else
+                                        v-model="form.translationApiModel"
+                                        clearable
+                                        class="w-full" />
+                                </div>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    @click="fetchModels"
+                                    :disabled="isFetchingModels || !form.translationApiEndpoint">
+                                    {{
+                                        isFetchingModels
+                                            ? t('dialog.translation_api.fetching_models')
+                                            : t('dialog.translation_api.fetch_models')
+                                    }}
+                                </Button>
+                            </div>
+                        </FieldContent>
+                    </Field>
 
-        <template #footer>
-            <div class="flex items-center justify-between">
+                    <Field>
+                        <FieldLabel>{{ t('dialog.translation_api.openai.prompt_optional') }}</FieldLabel>
+                        <FieldContent>
+                            <InputGroupTextareaField v-model="form.translationApiPrompt" :rows="3" clearable />
+                        </FieldContent>
+                    </Field>
+                </FieldGroup>
+            </template>
+
+            <DialogFooter>
                 <Button
                     variant="outline"
                     v-if="form.translationApiType === 'google'"
@@ -112,28 +149,23 @@
                     ">
                     {{ t('dialog.translation_api.guide') }}
                 </Button>
-                <Button
-                    variant="outline"
-                    class="mr-2"
-                    v-if="form.translationApiType === 'openai'"
-                    @click="testOpenAiTranslation">
+                <Button variant="outline" v-if="form.translationApiType === 'openai'" @click="testOpenAiTranslation">
                     {{ t('dialog.translation_api.test') }}
                 </Button>
-                <div>
-                    <Button style="margin-left: auto" @click="saveTranslationApiConfig">
-                        {{ t('dialog.translation_api.save') }}
-                    </Button>
-                </div>
-            </div>
-        </template>
-    </el-dialog>
+                <Button @click="saveTranslationApiConfig">
+                    {{ t('dialog.translation_api.save') }}
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
 </template>
 
 <script setup>
     import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+    import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
     import { Field, FieldContent, FieldGroup, FieldLabel } from '@/components/ui/field';
+    import { reactive, ref, watch } from 'vue';
     import { InputGroupField, InputGroupTextareaField } from '@/components/ui/input-group';
-    import { reactive, watch } from 'vue';
     import { Button } from '@/components/ui/button';
     import { storeToRefs } from 'pinia';
     import { toast } from 'vue-sonner';
@@ -157,6 +189,7 @@
     const {
         setBioLanguage,
         translateText,
+        fetchAvailableModels,
         setTranslationApiKey,
         setTranslationApiType,
         setTranslationApiEndpoint,
@@ -165,6 +198,9 @@
     } = advancedSettingsStore;
 
     const { t } = useI18n();
+
+    const isFetchingModels = ref(false);
+    const availableModels = ref([]);
 
     const props = defineProps({
         isTranslationApiDialogVisible: {
@@ -193,6 +229,7 @@
         form.translationApiModel = translationApiModel.value || '';
         form.translationApiPrompt = translationApiPrompt.value || '';
         form.translationApiKey = translationApiKey.value || '';
+        availableModels.value = [];
     };
 
     watch(
@@ -223,6 +260,33 @@
 
         toast.success(t('dialog.translation_api.msg_settings_saved'));
         closeDialog();
+    }
+
+    async function fetchModels() {
+        if (!form.translationApiEndpoint) {
+            toast.warning(t('dialog.translation_api.msg_endpoint_required'));
+            return;
+        }
+
+        isFetchingModels.value = true;
+        try {
+            const models = await fetchAvailableModels({
+                endpoint: form.translationApiEndpoint,
+                key: form.translationApiKey
+            });
+
+            if (models && models.length > 0) {
+                availableModels.value = models;
+                toast.success(t('dialog.translation_api.msg_models_fetched', { count: models.length }));
+            } else {
+                availableModels.value = [];
+                toast.warning(t('dialog.translation_api.msg_no_models_found'));
+            }
+        } catch (err) {
+            console.error('[TranslationAPI] Failed to fetch models', err);
+        } finally {
+            isFetchingModels.value = false;
+        }
     }
 
     async function testOpenAiTranslation() {

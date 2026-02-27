@@ -1,52 +1,7 @@
 <template>
     <div>
-        <div class="options-container" style="margin-top: 0">
-            <span class="header">{{ t('view.settings.advanced.advanced.header') }}</span>
-            <div class="options-container-item" style="margin-top: 15px">
-                <ButtonGroup>
-                    <Button variant="outline" size="sm" @click="showVRChatConfig()">
-                        <Operation />
-                        VRChat config.json
-                    </Button>
-                    <Button variant="outline" size="sm" @click="showLaunchOptions()">
-                        <Operation />
-                        {{ t('view.settings.advanced.advanced.launch_options') }}
-                    </Button>
-                    <Button variant="outline" size="sm" @click="showRegistryBackupDialog()">
-                        <Goods />
-                        {{ t('view.settings.advanced.advanced.vrc_registry_backup') }}
-                    </Button>
-                </ButtonGroup>
-            </div>
-        </div>
-        <div class="options-container">
-            <span class="header">{{ t('view.settings.advanced.advanced.common_folders') }}</span>
-            <div class="options-container-item" style="margin-top: 15px">
-                <ButtonGroup>
-                    <Button variant="outline" size="sm" @click="openVrcxAppDataFolder()">
-                        <Folder />
-                        VRCX Data
-                    </Button>
-                    <Button variant="outline" size="sm" @click="openVrcAppDataFolder()">
-                        <Folder />
-                        VRChat Data
-                    </Button>
-                    <Button variant="outline" size="sm" @click="openCrashVrcCrashDumps()">
-                        <Folder />
-                        Crash Dumps
-                    </Button>
-                </ButtonGroup>
-            </div>
-        </div>
-        <div class="options-container">
-            <span class="sub-header">{{ t('view.settings.advanced.advanced.primary_password.header') }}</span>
-            <simple-switch
-                :label="t('view.settings.advanced.advanced.primary_password.description')"
-                :value="enablePrimaryPassword"
-                :disabled="!enablePrimaryPassword"
-                :long-label="true"
-                @change="enablePrimaryPasswordChange" />
-
+        <div class="options-container mt-2!">
+            <div class="header">{{ t('view.settings.advanced.advanced.vrchat_settings.header') }}</div>
             <span class="sub-header">{{ t('view.settings.advanced.advanced.relaunch_vrchat.header') }}</span>
             <simple-switch
                 :label="t('view.settings.advanced.advanced.relaunch_vrchat.description')"
@@ -74,14 +29,49 @@
                 :value="selfInviteOverride"
                 :long-label="true"
                 @change="setSelfInviteOverride" />
+        </div>
+        <div class="options-container">
+            <div class="header">{{ t('view.settings.advanced.advanced.vrcx_settings.header') }}</div>
+            <span class="sub-header">{{ t('view.settings.advanced.advanced.primary_password.header') }}</span>
+            <simple-switch
+                :label="t('view.settings.advanced.advanced.primary_password.description')"
+                :value="enablePrimaryPassword"
+                :disabled="!enablePrimaryPassword"
+                :long-label="true"
+                @change="enablePrimaryPasswordChange" />
 
             <div v-if="branch === 'Nightly'">
-                <span class="sub-header">Anonymous Error Reporting (Nightly Only)</span>
+                <span class="sub-header">{{
+                    t('view.settings.advanced.advanced.anonymous_error_reporting.header')
+                }}</span>
                 <simple-switch
-                    label="Help improve VRCX by sending anonymous error reports. Only collects crash and error information, no personal data or VRChat information is collected."
+                    :label="t('view.settings.advanced.advanced.anonymous_error_reporting.description')"
                     :value="sentryErrorReporting"
                     :long-label="true"
                     @change="setSentryErrorReporting()" />
+            </div>
+
+            <span class="sub-header">{{ t('view.settings.general.logging.header') }}</span>
+            <simple-switch
+                :label="t('view.settings.advanced.advanced.cache_debug.udon_exception_logging')"
+                :value="udonExceptionLogging"
+                @change="setUdonExceptionLogging" />
+            <simple-switch
+                :label="t('view.settings.general.logging.resource_load')"
+                :value="logResourceLoad"
+                @change="setLogResourceLoad" />
+            <simple-switch
+                :label="t('view.settings.general.logging.empty_avatar')"
+                :value="logEmptyAvatars"
+                @change="setLogEmptyAvatars" />
+            <simple-switch
+                :label="t('view.settings.general.logging.auto_login_delay')"
+                :value="autoLoginDelayEnabled"
+                @change="setAutoLoginDelayEnabled" />
+            <div v-if="autoLoginDelayEnabled" class="options-container-item">
+                <Button size="sm" variant="outline" @click="promptAutoLoginDelaySeconds">
+                    {{ t('view.settings.general.logging.auto_login_delay_button') }}
+                </Button>
             </div>
         </div>
         <div class="options-container">
@@ -90,10 +80,10 @@
                 <div class="x-friend-item">
                     <div class="detail" @click="getVisits">
                         <span class="name">{{ t('view.profile.game_info.online_users') }}</span>
-                        <span v-if="visits" class="extra">{{
+                        <span v-if="visits" class="block truncate text-xs">{{
                             t('view.profile.game_info.user_online', { count: visits })
                         }}</span>
-                        <span v-else class="extra">{{ t('view.profile.game_info.refresh') }}</span>
+                        <span v-else class="block truncate text-xs">{{ t('view.profile.game_info.refresh') }}</span>
                     </div>
                 </div>
             </div>
@@ -159,10 +149,10 @@
                 :long-label="true"
                 @change="changeTranslationAPI('VRCX_translationAPI')" />
             <div class="options-container-item">
-                <Button size="sm" variant="outline" @click="showTranslationApiDialog"
-                    ><i class="ri-translate-2" style="margin-right: 5px"></i
-                    >{{ t('view.settings.advanced.advanced.translation_api.translation_api_key') }}</Button
-                >
+                <Button size="sm" variant="outline" @click="showTranslationApiDialog">
+                    <Languages class="h-4 w-4" style="margin-right: 5px" />
+                    {{ t('view.settings.advanced.advanced.translation_api.translation_api_key') }}
+                </Button>
             </div>
         </div>
         <div class="options-container">
@@ -384,13 +374,11 @@
 </template>
 
 <script setup>
-    import { Folder, Goods, Operation } from '@element-plus/icons-vue';
+    import { Languages, Package, RefreshCcw, Settings, Trash2 } from 'lucide-vue-next';
     import { computed, reactive, ref } from 'vue';
-    import { RefreshCcw, Trash2 } from 'lucide-vue-next';
     import { Button } from '@/components/ui/button';
     import { ButtonGroup } from '@/components/ui/button-group';
     import { storeToRefs } from 'pinia';
-    import { toast } from 'vue-sonner';
     import { useI18n } from 'vue-i18n';
 
     import VueJsonPretty from 'vue-json-pretty';
@@ -402,6 +390,7 @@
         useAvatarProviderStore,
         useAvatarStore,
         useGameLogStore,
+        useGeneralSettingsStore,
         useGroupStore,
         useInstanceStore,
         useLaunchStore,
@@ -419,7 +408,7 @@
 
     import AvatarProviderDialog from '../../dialogs/AvatarProviderDialog.vue';
     import PhotonSettings from '../PhotonSettings.vue';
-    import RegistryBackupDialog from '../../dialogs/RegistryBackupDialog.vue';
+    import RegistryBackupDialog from '../../../Tools/dialogs/RegistryBackupDialog.vue';
     import SimpleSwitch from '../SimpleSwitch.vue';
     import TranslationApiDialog from '../../dialogs/TranslationApiDialog.vue';
     import YouTubeApiDialog from '../../dialogs/YouTubeApiDialog.vue';
@@ -435,6 +424,17 @@
     const { clearVRCXCache, showRegistryBackupDialog } = useVrcxStore();
     const { showConsole } = useUiStore();
     const { disableGameLogDialog } = useGameLogStore();
+
+    const generalSettingsStore = useGeneralSettingsStore();
+    const { udonExceptionLogging, logResourceLoad, logEmptyAvatars, autoLoginDelayEnabled } =
+        storeToRefs(generalSettingsStore);
+    const {
+        setUdonExceptionLogging,
+        setLogResourceLoad,
+        setLogEmptyAvatars,
+        setAutoLoginDelayEnabled,
+        promptAutoLoginDelaySeconds
+    } = generalSettingsStore;
 
     const { cachedUsers } = useUserStore();
     const { cachedWorlds } = useWorldStore();
@@ -502,36 +502,6 @@
     });
 
     const isLinux = computed(() => LINUX);
-
-    function openVrcxAppDataFolder() {
-        AppApi.OpenVrcxAppDataFolder().then((result) => {
-            if (result) {
-                toast.success('Folder opened');
-            } else {
-                toast.error("Folder dosn't exist");
-            }
-        });
-    }
-
-    function openVrcAppDataFolder() {
-        AppApi.OpenVrcAppDataFolder().then((result) => {
-            if (result) {
-                toast.success('Folder opened');
-            } else {
-                toast.error("Folder dosn't exist");
-            }
-        });
-    }
-
-    function openCrashVrcCrashDumps() {
-        AppApi.OpenCrashVrcCrashDumps().then((result) => {
-            if (result) {
-                toast.success('Folder opened');
-            } else {
-                toast.error("Folder dosn't exist");
-            }
-        });
-    }
 
     function openShortcutFolder() {
         AppApi.OpenShortcutFolder();

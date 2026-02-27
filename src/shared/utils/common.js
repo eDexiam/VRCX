@@ -10,9 +10,10 @@ import {
     useSearchStore,
     useWorldStore
 } from '../../stores';
+import { escapeTag, replaceBioSymbols } from './base/string';
 import { AppDebug } from '../../service/appConfig.js';
 import { compareUnityVersion } from './avatar';
-import { escapeTag } from './base/string';
+import { i18n } from '../../plugin/i18n';
 import { miscRequest } from '../../api';
 
 /**
@@ -143,12 +144,18 @@ async function checkVRChatCache(ref) {
         return { Item1: -1, Item2: false, Item3: '' };
     }
 
-    return AssetBundleManager.CheckVRChatCache(
-        id,
-        version,
-        variant,
-        variantVersion
-    );
+    try {
+        return AssetBundleManager.CheckVRChatCache(
+            id,
+            version,
+            variant,
+            variantVersion
+        );
+    } catch (err) {
+        console.error('Failed reading VRChat cache size:', err);
+        toast.error(`Failed reading VRChat cache size: ${err}`);
+        return { Item1: -1, Item2: false, Item3: '' };
+    }
 }
 
 /**
@@ -164,7 +171,7 @@ function copyToClipboard(text, message = 'Copied successfully!') {
         })
         .catch((err) => {
             console.error('Copy failed:', err);
-            toast.error('Copy failed!');
+            toast.error(i18n.global.t('message.copy_failed'));
         });
 }
 
@@ -341,52 +348,6 @@ function buildTreeData(json) {
 
 /**
  *
- * @param {string} text
- * @returns {string}
- */
-function replaceBioSymbols(text) {
-    if (typeof text !== 'string') {
-        return '';
-    }
-    const symbolList = {
-        '@': '＠',
-        '#': '＃',
-        $: '＄',
-        '%': '％',
-        '&': '＆',
-        '=': '＝',
-        '+': '＋',
-        '/': '⁄',
-        '\\': '＼',
-        ';': ';',
-        ':': '˸',
-        ',': '‚',
-        '?': '？',
-        '!': 'ǃ',
-        '"': '＂',
-        '<': '≺',
-        '>': '≻',
-        '.': '․',
-        '^': '＾',
-        '{': '｛',
-        '}': '｝',
-        '[': '［',
-        ']': '］',
-        '(': '（',
-        ')': '）',
-        '|': '｜',
-        '*': '∗'
-    };
-    let newText = text;
-    for (const key in symbolList) {
-        const regex = new RegExp(symbolList[key], 'g');
-        newText = newText.replace(regex, key);
-    }
-    return newText.replace(/ {1,}/g, ' ').trimRight();
-}
-
-/**
- *
  * @param {string} link
  */
 function openExternalLink(link) {
@@ -403,14 +364,27 @@ function openExternalLink(link) {
             confirmText: 'Open',
             cancelText: 'Copy'
         })
-        // TODO: beforeClose alert dialog
-        .then(({ ok }) => {
-            if (!ok) {
+        .then(({ ok, reason }) => {
+            if (reason === 'cancel') {
                 copyToClipboard(link, 'Link copied to clipboard!');
                 return;
             }
-            AppApi.OpenLink(link);
+            if (ok) {
+                AppApi.OpenLink(link);
+                return;
+            }
         });
+}
+
+function openDiscordProfile(discordId) {
+    if (!discordId) {
+        toast.error('No Discord ID provided!');
+        return;
+    }
+    AppApi.OpenDiscordProfile(discordId).catch((err) => {
+        console.error('Failed to open Discord profile:', err);
+        toast.error('Failed to open Discord profile!');
+    });
 }
 
 /**
@@ -426,8 +400,7 @@ async function getBundleDateSize(ref) {
     const instanceStore = useInstanceStore();
     const { currentInstanceWorld, currentInstanceLocation } =
         storeToRefs(instanceStore);
-    const bundleSizes = [];
-    const bundleJson = [];
+    const bundleJson = {};
     for (let i = ref.unityPackages.length - 1; i > -1; i--) {
         const unityPackage = ref.unityPackages[i];
         if (!unityPackage) {
@@ -445,7 +418,7 @@ async function getBundleDateSize(ref) {
         }
 
         const platform = unityPackage.platform;
-        if (bundleSizes[platform]) {
+        if (bundleJson[platform]) {
             continue;
         }
         const assetUrl = unityPackage.assetUrl;
@@ -480,34 +453,22 @@ async function getBundleDateSize(ref) {
             json._totalTextureUsage = `${(json.avatarStats.totalTextureUsage / 1048576).toFixed(2)} MB`;
         }
         bundleJson[platform] = json;
-        const createdAt = json.created_at;
-        const fileSize = `${(json.fileSize / 1048576).toFixed(2)} MB`;
-        bundleSizes[platform] = {
-            createdAt,
-            fileSize
-        };
 
         if (avatarDialog.value.id === ref.id) {
             // update avatar dialog
-            avatarDialog.value.bundleSizes[platform] = bundleSizes[platform];
-            avatarDialog.value.lastUpdated = createdAt;
-            avatarDialog.value.fileAnalysis = bundleJson;
+            avatarDialog.value.fileAnalysis[platform] = json;
         }
         // update world dialog
         if (worldDialog.value.id === ref.id) {
-            worldDialog.value.bundleSizes[platform] = bundleSizes[platform];
-            worldDialog.value.lastUpdated = createdAt;
-            worldDialog.value.fileAnalysis = bundleJson;
+            worldDialog.value.fileAnalysis[platform] = json;
         }
         // update player list
         if (currentInstanceLocation.value.worldId === ref.id) {
-            currentInstanceWorld.value.bundleSizes[platform] =
-                bundleSizes[platform];
-            currentInstanceWorld.value.lastUpdated = createdAt;
+            currentInstanceWorld.value.fileAnalysis[platform] = json;
         }
     }
 
-    return bundleSizes;
+    return bundleJson;
 }
 
 // #region | App: Random unsorted app methods, data structs, API functions, and an API feedback/file analysis event
@@ -542,6 +503,7 @@ export {
     buildTreeData,
     replaceBioSymbols,
     openExternalLink,
+    openDiscordProfile,
     getBundleDateSize,
     openFolderGeneric,
     debounce

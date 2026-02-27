@@ -1,6 +1,7 @@
 import { computed, reactive, ref, shallowReactive, watch } from 'vue';
 import { defineStore } from 'pinia';
 import { toast } from 'vue-sonner';
+import { useI18n } from 'vue-i18n';
 
 import Noty from 'noty';
 
@@ -30,7 +31,6 @@ import {
 import { processBulk, request } from '../service/request';
 import { AppDebug } from '../service/appConfig';
 import { database } from '../service/database';
-import { formatJsonVars } from '../shared/utils/base/ui';
 import { useAppearanceSettingsStore } from './settings/appearance';
 import { useAuthStore } from './auth';
 import { useAvatarStore } from './avatar';
@@ -47,6 +47,7 @@ import { useNotificationStore } from './notification';
 import { usePhotonStore } from './photon';
 import { useSearchStore } from './search';
 import { useSharedFeedStore } from './sharedFeed';
+import { useUiStore } from './ui';
 import { useWorldStore } from './world';
 import { watchState } from '../service/watchState';
 
@@ -67,9 +68,11 @@ export const useUserStore = defineStore('User', () => {
     const groupStore = useGroupStore();
     const feedStore = useFeedStore();
     const worldStore = useWorldStore();
+    const uiStore = useUiStore();
     const moderationStore = useModerationStore();
     const photonStore = usePhotonStore();
     const sharedFeedStore = useSharedFeedStore();
+    const { t } = useI18n();
 
     const currentUser = ref({
         acceptedPrivacyVersion: 0,
@@ -89,6 +92,11 @@ export const useUserStore = defineStore('User', () => {
         currentAvatarThumbnailImageUrl: '',
         date_joined: '',
         developerType: '',
+        discordDetails: {
+            global_name: '',
+            id: ''
+        },
+        discordId: '',
         displayName: '',
         emailVerified: false,
         fallbackAvatar: '',
@@ -97,6 +105,7 @@ export const useUserStore = defineStore('User', () => {
         friends: [],
         googleId: '',
         hasBirthday: false,
+        hasDiscordFriendsOptOut: false,
         hasEmail: false,
         hasLoggedInFromClient: false,
         hasPendingEmail: false,
@@ -179,6 +188,8 @@ export const useUserStore = defineStore('User', () => {
     const userDialog = ref({
         visible: false,
         loading: false,
+        activeTab: 'Info',
+        lastActiveTab: 'Info',
         id: '',
         ref: {},
         friend: {},
@@ -211,6 +222,13 @@ export const useUserStore = defineStore('User', () => {
         isFavoriteWorldsLoading: false,
         isAvatarsLoading: false,
         isGroupsLoading: false,
+        userFavoriteWorlds: [],
+        userGroups: {
+            groups: [],
+            ownGroups: [],
+            mutualGroups: [],
+            remainingGroups: []
+        },
 
         worldSorting: {
             name: 'dialog.user.worlds.sorting.updated',
@@ -230,7 +248,6 @@ export const useUserStore = defineStore('User', () => {
         },
         avatarSorting: 'update',
         avatarReleaseStatus: 'all',
-        treeData: {},
         memo: '',
         $avatarInfo: {
             ownerId: '',
@@ -308,6 +325,7 @@ export const useUserStore = defineStore('User', () => {
                 customUserTags.clear();
                 state.notes.clear();
                 subsetOfLanguages.value = [];
+                uiStore.clearDialogCrumbs();
             }
         },
         { flush: 'sync' }
@@ -406,7 +424,7 @@ export const useUserStore = defineStore('User', () => {
      * @param {Map<string, any>} friendMap
      */
     function cleanupUserCache(userCache, friendMap) {
-        const bufferSize = 200;
+        const bufferSize = 300;
 
         const currentFriendCount = friendMap.size;
         const currentTotalSize = userCache.size;
@@ -478,6 +496,7 @@ export const useUserStore = defineStore('User', () => {
                 currentAvatarThumbnailImageUrl: '',
                 date_joined: '',
                 developerType: '',
+                discordId: '',
                 displayName: '',
                 friendKey: '',
                 friendRequestStatus: '',
@@ -630,17 +649,11 @@ export const useUserStore = defineStore('User', () => {
                     ...ref
                 });
                 currentTravelers.set(ref.id, travelRef);
-                sharedFeedStore.sharedFeed.pendingUpdate = true;
-                sharedFeedStore.updateSharedFeed(false);
                 onPlayerTraveling(travelRef);
             }
         } else {
             ref.$location = parseLocation(ref.location);
-            if (currentTravelers.has(ref.id)) {
-                currentTravelers.delete(ref.id);
-                sharedFeedStore.sharedFeed.pendingUpdate = true;
-                sharedFeedStore.updateSharedFeed(false);
-            }
+            currentTravelers.delete(ref.id);
         }
         if (
             !instanceStore.cachedInstances.has(ref.$location.tag) &&
@@ -731,8 +744,6 @@ export const useUserStore = defineStore('User', () => {
             } else if (D.ref.friendRequestStatus === 'outgoing') {
                 D.outgoingRequest = true;
             }
-            // refresh user dialog JSON tab
-            refreshUserDialogTreeData();
         }
         if (hasPropChanged) {
             if (
@@ -767,9 +778,22 @@ export const useUserStore = defineStore('User', () => {
         ) {
             return;
         }
+        const isMainDialogOpen = uiStore.openDialog({
+            type: 'user',
+            id: userId
+        });
         const D = userDialog.value;
+        D.visible = true;
+        if (isMainDialogOpen && D.id === userId) {
+            uiStore.setDialogCrumbLabel(
+                'user',
+                D.id,
+                D.ref?.displayName || D.id
+            );
+            applyUserDialogLocation(true);
+            return;
+        }
         D.id = userId;
-        D.treeData = {};
         D.memo = '';
         D.note = '';
         getUserMemo(userId).then((memo) => {
@@ -786,7 +810,7 @@ export const useUserStore = defineStore('User', () => {
                 }
             }
         });
-        D.visible = true;
+
         D.loading = true;
         D.avatars = [];
         D.worlds = [];
@@ -842,165 +866,171 @@ export const useUserStore = defineStore('User', () => {
             })
             .catch((err) => {
                 D.loading = false;
+                D.id = null;
                 D.visible = false;
-                toast.error('Failed to load user');
+                uiStore.jumpBackDialogCrumb();
+                toast.error(t('message.user.load_failed'));
                 throw err;
             })
             .then((args) => {
                 if (args.ref.id === D.id) {
-                    requestAnimationFrame(() => {
-                        D.ref = args.ref;
-                        D.friend = friendStore.friends.get(D.id);
-                        D.isFriend = Boolean(D.friend);
-                        D.note = String(D.ref.note || '');
-                        D.incomingRequest = false;
-                        D.outgoingRequest = false;
-                        D.isBlock = false;
-                        D.isMute = false;
-                        D.isInteractOff = false;
-                        D.isMuteChat = false;
-                        for (const ref of moderationStore.cachedPlayerModerations.values()) {
-                            if (
-                                ref.targetUserId === D.id &&
-                                ref.sourceUserId === currentUser.value.id
-                            ) {
-                                if (ref.type === 'block') {
-                                    D.isBlock = true;
-                                } else if (ref.type === 'mute') {
-                                    D.isMute = true;
-                                } else if (ref.type === 'interactOff') {
-                                    D.isInteractOff = true;
-                                } else if (ref.type === 'muteChat') {
-                                    D.isMuteChat = true;
-                                }
-                            }
-                        }
-                        D.isFavorite =
-                            favoriteStore.getCachedFavoritesByObjectId(D.id);
-                        if (D.ref.friendRequestStatus === 'incoming') {
-                            D.incomingRequest = true;
-                        } else if (D.ref.friendRequestStatus === 'outgoing') {
-                            D.outgoingRequest = true;
-                        }
-                        applyUserDialogLocation(true);
+                    D.loading = false;
 
-                        userRequest.getUser(args.params);
-                        let inCurrentWorld = false;
+                    D.ref = args.ref;
+                    uiStore.setDialogCrumbLabel(
+                        'user',
+                        D.id,
+                        D.ref?.displayName || D.id
+                    );
+                    D.friend = friendStore.friends.get(D.id);
+                    D.isFriend = Boolean(D.friend);
+                    D.note = String(D.ref.note || '');
+                    D.incomingRequest = false;
+                    D.outgoingRequest = false;
+                    D.isBlock = false;
+                    D.isMute = false;
+                    D.isInteractOff = false;
+                    D.isMuteChat = false;
+                    for (const ref of moderationStore.cachedPlayerModerations.values()) {
                         if (
-                            locationStore.lastLocation.playerList.has(D.ref.id)
+                            ref.targetUserId === D.id &&
+                            ref.sourceUserId === currentUser.value.id
                         ) {
-                            inCurrentWorld = true;
-                        }
-                        if (userId !== currentUser.value.id) {
-                            database
-                                .getUserStats(D.ref, inCurrentWorld)
-                                .then((ref1) => {
-                                    if (ref1.userId === D.id) {
-                                        D.lastSeen = ref1.lastSeen;
-                                        D.joinCount = ref1.joinCount;
-                                        D.timeSpent = ref1.timeSpent;
-                                    }
-                                    const displayNameMap =
-                                        ref1.previousDisplayNames;
-                                    friendStore.friendLogTable.data.forEach(
-                                        (ref2) => {
-                                            if (ref2.userId === D.id) {
-                                                if (
-                                                    ref2.type === 'DisplayName'
-                                                ) {
-                                                    displayNameMap.set(
-                                                        ref2.previousDisplayName,
-                                                        ref2.created_at
-                                                    );
-                                                }
-                                                if (!D.dateFriended) {
-                                                    if (
-                                                        ref2.type === 'Unfriend'
-                                                    ) {
-                                                        D.unFriended = true;
-                                                        if (
-                                                            !appearanceSettingsStore.hideUnfriends
-                                                        ) {
-                                                            D.dateFriended =
-                                                                ref2.created_at;
-                                                        }
-                                                    }
-                                                    if (
-                                                        ref2.type === 'Friend'
-                                                    ) {
-                                                        D.unFriended = false;
-                                                        D.dateFriended =
-                                                            ref2.created_at;
-                                                    }
-                                                }
-                                                if (
-                                                    ref2.type === 'Friend' ||
-                                                    (ref2.type === 'Unfriend' &&
-                                                        !appearanceSettingsStore.hideUnfriends)
-                                                ) {
-                                                    D.dateFriendedInfo.push(
-                                                        ref2
-                                                    );
-                                                }
-                                            }
-                                        }
-                                    );
-                                    displayNameMap.forEach(
-                                        (updated_at, displayName) => {
-                                            D.previousDisplayNames.push({
-                                                displayName,
-                                                updated_at
-                                            });
-                                        }
-                                    );
-                                });
-                            AppApi.GetVRChatUserModeration(
-                                currentUser.value.id,
-                                userId
-                            ).then((result) => {
-                                D.avatarModeration = result;
-                                if (result === 4) {
-                                    D.isHideAvatar = true;
-                                } else if (result === 5) {
-                                    D.isShowAvatar = true;
-                                }
-                            });
-                            if (!currentUser.value.hasSharedConnectionsOptOut) {
-                                try {
-                                    userRequest
-                                        .getMutualCounts({ userId })
-                                        .then((args) => {
-                                            if (args.params.userId === D.id) {
-                                                D.mutualFriendCount =
-                                                    args.json.friends;
-                                                D.mutualGroupCount =
-                                                    args.json.groups;
-                                            }
-                                        });
-                                } catch (error) {
-                                    console.error(error);
-                                }
+                            if (ref.type === 'block') {
+                                D.isBlock = true;
+                            } else if (ref.type === 'mute') {
+                                D.isMute = true;
+                            } else if (ref.type === 'interactOff') {
+                                D.isInteractOff = true;
+                            } else if (ref.type === 'muteChat') {
+                                D.isMuteChat = true;
                             }
-                        } else {
-                            D.previousDisplayNames =
-                                currentUser.value.pastDisplayNames;
-                            database
-                                .getUserStats(D.ref, inCurrentWorld)
-                                .then((ref1) => {
-                                    if (ref1.userId === D.id) {
-                                        D.lastSeen = ref1.lastSeen;
-                                        D.joinCount = ref1.joinCount;
-                                        D.timeSpent = ref1.timeSpent;
-                                    }
-                                });
                         }
-                        groupRequest
-                            .getRepresentedGroup({ userId })
-                            .then((args1) => {
-                                groupStore.handleGroupRepresented(args1);
+                    }
+                    D.isFavorite =
+                        favoriteStore.getCachedFavoritesByObjectId(D.id) ||
+                        favoriteStore.isInAnyLocalFriendGroup(D.id);
+                    if (D.ref.friendRequestStatus === 'incoming') {
+                        D.incomingRequest = true;
+                    } else if (D.ref.friendRequestStatus === 'outgoing') {
+                        D.outgoingRequest = true;
+                    }
+                    let inCurrentWorld = false;
+                    if (locationStore.lastLocation.playerList.has(D.ref.id)) {
+                        inCurrentWorld = true;
+                    }
+                    if (args.cache) {
+                        userRequest.getUser(args.params);
+                    }
+                    if (userId !== currentUser.value.id) {
+                        database
+                            .getUserStats(D.ref, inCurrentWorld)
+                            .then(async (ref1) => {
+                                if (ref1.userId === D.id) {
+                                    D.lastSeen = ref1.lastSeen;
+                                    D.joinCount = ref1.joinCount;
+                                    D.timeSpent = ref1.timeSpent;
+                                }
+                                const displayNameMap =
+                                    ref1.previousDisplayNames;
+                                const userNotifications =
+                                    await database.getFriendLogHistoryForUserId(
+                                        D.id,
+                                        ['DisplayName', 'Friend', 'Unfriend']
+                                    );
+                                const dateFriendedInfo = [];
+                                for (const notification of userNotifications) {
+                                    if (notification.userId !== D.id) {
+                                        continue;
+                                    }
+                                    if (notification.type === 'DisplayName') {
+                                        displayNameMap.set(
+                                            notification.previousDisplayName,
+                                            notification.created_at
+                                        );
+                                    }
+                                    if (
+                                        !D.dateFriended &&
+                                        notification.type === 'Unfriend'
+                                    ) {
+                                        D.unFriended = true;
+                                        if (
+                                            !appearanceSettingsStore.hideUnfriends
+                                        ) {
+                                            D.dateFriended =
+                                                notification.created_at;
+                                        }
+                                    }
+                                    if (notification.type === 'Friend') {
+                                        D.unFriended = false;
+                                        D.dateFriended =
+                                            notification.created_at;
+                                    }
+                                    if (
+                                        notification.type === 'Friend' ||
+                                        (notification.type === 'Unfriend' &&
+                                            !appearanceSettingsStore.hideUnfriends)
+                                    ) {
+                                        dateFriendedInfo.unshift(notification);
+                                    }
+                                }
+                                D.dateFriendedInfo = dateFriendedInfo;
+                                displayNameMap.forEach(
+                                    (updated_at, displayName) => {
+                                        D.previousDisplayNames.push({
+                                            displayName,
+                                            updated_at
+                                        });
+                                    }
+                                );
                             });
-                        D.loading = false;
-                    });
+                        AppApi.GetVRChatUserModeration(
+                            currentUser.value.id,
+                            userId
+                        ).then((result) => {
+                            D.avatarModeration = result;
+                            if (result === 4) {
+                                D.isHideAvatar = true;
+                            } else if (result === 5) {
+                                D.isShowAvatar = true;
+                            }
+                        });
+                        if (!currentUser.value.hasSharedConnectionsOptOut) {
+                            try {
+                                userRequest
+                                    .getMutualCounts({ userId })
+                                    .then((args) => {
+                                        if (args.params.userId === D.id) {
+                                            D.mutualFriendCount =
+                                                args.json.friends;
+                                            D.mutualGroupCount =
+                                                args.json.groups;
+                                        }
+                                    });
+                            } catch (error) {
+                                console.error(error);
+                            }
+                        }
+                    } else {
+                        D.previousDisplayNames =
+                            currentUser.value.pastDisplayNames;
+                        database
+                            .getUserStats(D.ref, inCurrentWorld)
+                            .then((ref1) => {
+                                if (ref1.userId === D.id) {
+                                    D.lastSeen = ref1.lastSeen;
+                                    D.joinCount = ref1.joinCount;
+                                    D.timeSpent = ref1.timeSpent;
+                                }
+                            });
+                    }
+                    groupRequest
+                        .getRepresentedGroup({ userId })
+                        .then((args1) => {
+                            groupStore.handleGroupRepresented(args1);
+                        });
+                    D.visible = true;
+                    applyUserDialogLocation(true);
                 }
             });
         showUserDialogHistory.delete(userId);
@@ -1171,8 +1201,9 @@ export const useUserStore = defineStore('User', () => {
         D.avatars = array;
     }
 
-    function refreshUserDialogAvatars(fileId) {
+    async function refreshUserDialogAvatars(fileId) {
         const D = userDialog.value;
+        const userId = D.id;
         if (D.isAvatarsLoading) {
             return;
         }
@@ -1196,7 +1227,7 @@ export const useUserStore = defineStore('User', () => {
             }
         }
         const map = new Map();
-        processBulk({
+        await processBulk({
             fn: avatarRequest.getAvatars,
             N: -1,
             params,
@@ -1208,7 +1239,9 @@ export const useUserStore = defineStore('User', () => {
             },
             done: () => {
                 const array = Array.from(map.values());
-                sortUserDialogAvatars(array);
+                if (userId === D.id) {
+                    sortUserDialogAvatars(array);
+                }
                 D.isAvatarsLoading = false;
                 if (fileId) {
                     D.loading = false;
@@ -1222,18 +1255,6 @@ export const useUserStore = defineStore('User', () => {
                 }
             }
         });
-    }
-
-    function refreshUserDialogTreeData() {
-        const D = userDialog.value;
-        if (D.id === currentUser.value.id) {
-            D.treeData = formatJsonVars({
-                ...currentUser.value,
-                ...D.ref
-            });
-            return;
-        }
-        D.treeData = formatJsonVars(D.ref);
     }
 
     async function lookupUser(ref) {
@@ -1599,7 +1620,39 @@ export const useUserStore = defineStore('User', () => {
 
         let withCompany = locationStore.lastLocation.playerList.size > 1;
         if (generalSettingsStore.autoStateChangeNoFriends) {
-            withCompany = locationStore.lastLocation.friendList.size >= 1;
+            const selectedGroups = generalSettingsStore.autoStateChangeGroups;
+            if (selectedGroups.length > 0) {
+                const groupFriendIds = new Set();
+                for (const ref of favoriteStore.cachedFavorites.values()) {
+                    if (
+                        ref.type === 'friend' &&
+                        selectedGroups.includes(ref.$groupKey)
+                    ) {
+                        groupFriendIds.add(ref.favoriteId);
+                    }
+                }
+                for (const selectedKey of selectedGroups) {
+                    if (selectedKey.startsWith('local:')) {
+                        const groupName = selectedKey.slice(6);
+                        const userIds =
+                            favoriteStore.localFriendFavorites[groupName];
+                        if (userIds) {
+                            for (let i = 0; i < userIds.length; ++i) {
+                                groupFriendIds.add(userIds[i]);
+                            }
+                        }
+                    }
+                }
+                withCompany = false;
+                for (const friendId of locationStore.lastLocation.friendList.keys()) {
+                    if (groupFriendIds.has(friendId)) {
+                        withCompany = true;
+                        break;
+                    }
+                }
+            } else {
+                withCompany = locationStore.lastLocation.friendList.size >= 1;
+            }
         }
 
         const currentStatus = currentUser.value.status;
@@ -1611,22 +1664,33 @@ export const useUserStore = defineStore('User', () => {
             return;
         }
 
-        userRequest
-            .saveCurrentUser({
-                status: newStatus
-            })
-            .then(() => {
-                const text = `Status automatically changed to ${newStatus}`;
-                if (AppDebug.errorNoty) {
-                    AppDebug.errorNoty.close();
-                }
-                AppDebug.errorNoty = new Noty({
-                    type: 'info',
-                    text
-                });
-                AppDebug.errorNoty.show();
-                console.log(text);
+        const params = { status: newStatus };
+        if (
+            withCompany &&
+            generalSettingsStore.autoStateChangeCompanyDescEnabled
+        ) {
+            params.statusDescription =
+                generalSettingsStore.autoStateChangeCompanyDesc;
+        } else if (
+            !withCompany &&
+            generalSettingsStore.autoStateChangeAloneDescEnabled
+        ) {
+            params.statusDescription =
+                generalSettingsStore.autoStateChangeAloneDesc;
+        }
+
+        userRequest.saveCurrentUser(params).then(() => {
+            const text = `Status automatically changed to ${newStatus}`;
+            if (AppDebug.errorNoty) {
+                AppDebug.errorNoty.close();
+            }
+            AppDebug.errorNoty = new Noty({
+                type: 'info',
+                text
             });
+            AppDebug.errorNoty.show();
+            console.log(text);
+        });
     }
 
     function addCustomTag(data) {
@@ -1651,7 +1715,7 @@ export const useUserStore = defineStore('User', () => {
             ref.$customTag = data.Tag;
             ref.$customTagColour = data.TagColour;
         }
-        sharedFeedStore.updateSharedFeed(true);
+        sharedFeedStore.addTag(data.UserId, data.TagColour);
     }
 
     async function initUserNotes() {
@@ -1811,6 +1875,11 @@ export const useUserStore = defineStore('User', () => {
                 currentAvatarThumbnailImageUrl: '',
                 date_joined: '',
                 developerType: '',
+                discordDetails: {
+                    global_name: '',
+                    id: ''
+                },
+                discordId: '',
                 displayName: '',
                 emailVerified: false,
                 fallbackAvatar: '',
@@ -1819,6 +1888,7 @@ export const useUserStore = defineStore('User', () => {
                 friends: [],
                 googleId: '',
                 hasBirthday: false,
+                hasDiscordFriendsOptOut: false,
                 hasEmail: false,
                 hasLoggedInFromClient: false,
                 hasPendingEmail: false,
@@ -1966,6 +2036,7 @@ export const useUserStore = defineStore('User', () => {
             currentAvatarThumbnailImageUrl: json.currentAvatarThumbnailImageUrl,
             date_joined: json.date_joined,
             developerType: json.developerType,
+            discordId: json.discordId,
             displayName: json.displayName,
             friendKey: json.friendKey,
             // json.friendRequestStatus - missing from currentUser
@@ -2030,6 +2101,12 @@ export const useUserStore = defineStore('User', () => {
         });
     }
 
+    function toggleDiscordFriendsOptOut() {
+        userRequest.saveCurrentUser({
+            hasDiscordFriendsOptOut: !currentUser.value.hasDiscordFriendsOptOut
+        });
+    }
+
     return {
         state,
 
@@ -2049,7 +2126,6 @@ export const useUserStore = defineStore('User', () => {
         applyUserDialogLocation,
         sortUserDialogAvatars,
         refreshUserDialogAvatars,
-        refreshUserDialogTreeData,
         lookupUser,
         updateAutoStateChange,
         addCustomTag,
@@ -2058,6 +2134,7 @@ export const useUserStore = defineStore('User', () => {
         handleConfig,
         showSendBoopDialog,
         checkNote,
-        toggleSharedConnectionsOptOut
+        toggleSharedConnectionsOptOut,
+        toggleDiscordFriendsOptOut
     };
 });

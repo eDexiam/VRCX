@@ -1,6 +1,7 @@
 import { nextTick, reactive, ref, watch } from 'vue';
 import { defineStore } from 'pinia';
 import { toast } from 'vue-sonner';
+import { useI18n } from 'vue-i18n';
 
 import {
     groupRequest,
@@ -19,6 +20,7 @@ import { useGameStore } from './game';
 import { useInstanceStore } from './instance';
 import { useModalStore } from './modal';
 import { useNotificationStore } from './notification';
+import { useUiStore } from './ui';
 import { useUserStore } from './user';
 import { watchState } from '../service/watchState';
 
@@ -32,14 +34,17 @@ export const useGroupStore = defineStore('Group', () => {
     const userStore = useUserStore();
     const notificationStore = useNotificationStore();
     const modalStore = useModalStore();
+    const uiStore = useUiStore();
+    const { t } = useI18n();
 
     let cachedGroups = new Map();
 
     const groupDialog = ref({
         visible: false,
         loading: false,
+        activeTab: 'Info',
+        lastActiveTab: 'Info',
         isGetGroupDialogGroupLoading: false,
-        treeData: {},
         id: '',
         inGroup: false,
         ownerDisplayName: '',
@@ -126,13 +131,22 @@ export const useGroupStore = defineStore('Group', () => {
         if (!groupId) {
             return;
         }
+        const isMainDialogOpen = uiStore.openDialog({
+            type: 'group',
+            id: groupId
+        });
         const D = groupDialog.value;
         D.visible = true;
+        if (isMainDialogOpen && D.id === groupId) {
+            uiStore.setDialogCrumbLabel('group', D.id, D.ref?.name || D.id);
+            instanceStore.applyGroupDialogInstances();
+            D.loading = false;
+            return;
+        }
         D.loading = true;
         D.id = groupId;
         D.inGroup = false;
         D.ownerDisplayName = '';
-        D.treeData = {};
         D.announcement = {};
         D.posts = [];
         D.postsFiltered = [];
@@ -151,23 +165,33 @@ export const useGroupStore = defineStore('Group', () => {
             })
             .catch((err) => {
                 D.loading = false;
+                D.id = null;
                 D.visible = false;
-                toast.error('Failed to load group');
+                uiStore.jumpBackDialogCrumb();
+                toast.error(t('message.group.load_failed'));
                 throw err;
             })
             .then((args) => {
                 if (groupId === args.ref.id) {
-                    D.loading = false;
                     D.ref = args.ref;
+                    uiStore.setDialogCrumbLabel(
+                        'group',
+                        D.id,
+                        D.ref?.name || D.id
+                    );
                     D.inGroup = args.ref.membershipStatus === 'member';
                     D.ownerDisplayName = args.ref.ownerId;
+                    D.visible = true;
+                    D.loading = false;
+                    if (args.cache) {
+                        groupRequest.getGroup(args.params);
+                    }
                     userRequest
                         .getCachedUser({
                             userId: args.ref.ownerId
                         })
                         .then((args1) => {
                             D.ownerDisplayName = args1.ref.displayName;
-                            return args1;
                         });
                     database.getLastGroupVisit(D.ref.name).then((r) => {
                         if (D.id === args.ref.id) {
@@ -420,6 +444,7 @@ export const useGroupStore = defineStore('Group', () => {
             .then((args) => {
                 const ref = applyGroup(args.json);
                 if (D.id === ref.id) {
+                    D.loading = false;
                     D.ref = ref;
                     D.inGroup = ref.membershipStatus === 'member';
                     for (const role of ref.roles) {
@@ -558,8 +583,8 @@ export const useGroupStore = defineStore('Group', () => {
     function leaveGroupPrompt(groupId) {
         modalStore
             .confirm({
-                description: 'Are you sure you want to leave this group?',
-                title: 'Confirm'
+                description: t('confirm.leave_group'),
+                title: t('confirm.title')
             })
             .then(({ ok }) => {
                 if (!ok) return;
@@ -592,7 +617,7 @@ export const useGroupStore = defineStore('Group', () => {
             })
             .then((args) => {
                 handleGroupMemberProps(args);
-                toast.success('Group visibility updated');
+                toast.success(t('message.group.visibility_updated'));
                 return args;
             });
     }
@@ -604,7 +629,7 @@ export const useGroupStore = defineStore('Group', () => {
             })
             .then((args) => {
                 handleGroupMemberProps(args);
-                toast.success('Group subscription updated');
+                toast.success(t('message.group.subscription_updated'));
                 return args;
             });
     }

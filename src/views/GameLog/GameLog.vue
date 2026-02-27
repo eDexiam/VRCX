@@ -11,7 +11,9 @@
                 <div style="margin: 0 0 10px; display: flex; align-items: center">
                     <div style="flex: none; margin-right: 10px; display: flex; align-items: center">
                         <TooltipWrapper side="bottom" :content="t('view.feed.favorites_only_tooltip')">
-                            <Switch v-model="gameLogTable.vip" @update:modelValue="gameLogTableLookup" />
+                            <span class="inline-flex">
+                                <Switch v-model="gameLogTable.vip" @update:modelValue="gameLogTableLookup" />
+                            </span>
                         </TooltipWrapper>
                     </div>
                     <Select
@@ -61,8 +63,6 @@
     import { storeToRefs } from 'pinia';
     import { useI18n } from 'vue-i18n';
 
-    import dayjs from 'dayjs';
-
     import { useAppearanceSettingsStore, useGameLogStore, useModalStore, useVrcxStore } from '../../stores';
     import { DataTableLayout } from '../../components/ui/data-table';
     import { InputGroupField } from '../../components/ui/input-group';
@@ -73,7 +73,7 @@
     import { useVrcxVueTable } from '../../lib/table/useVrcxVueTable';
 
     const { gameLogTableLookup } = useGameLogStore();
-    const { gameLogTable } = storeToRefs(useGameLogStore());
+    const { gameLogTable, gameLogTableData } = storeToRefs(useGameLogStore());
     const appearanceSettingsStore = useAppearanceSettingsStore();
     const vrcxStore = useVrcxStore();
     const modalStore = useModalStore();
@@ -91,39 +91,6 @@
         return '';
     }
 
-    function getGameLogCreatedAtTs(row) {
-        const createdAtRaw = row?.created_at ?? row?.createdAt ?? row?.dt;
-        if (typeof createdAtRaw === 'number') {
-            const ts = createdAtRaw > 1_000_000_000_000 ? createdAtRaw : createdAtRaw * 1000;
-            return Number.isFinite(ts) ? ts : 0;
-        }
-
-        const createdAt = getGameLogCreatedAt(row);
-        const ts = dayjs(createdAt).valueOf();
-        return Number.isFinite(ts) ? ts : 0;
-    }
-
-    const gameLogDisplayData = computed(() => {
-        const data = gameLogTable.value.data;
-        return data.slice().sort((a, b) => {
-            const aTs = getGameLogCreatedAtTs(a);
-            const bTs = getGameLogCreatedAtTs(b);
-            if (aTs !== bTs) {
-                return bTs - aTs;
-            }
-
-            const aRowId = typeof a?.rowId === 'number' ? a.rowId : 0;
-            const bRowId = typeof b?.rowId === 'number' ? b.rowId : 0;
-            if (aRowId !== bRowId) {
-                return bRowId - aRowId;
-            }
-
-            const aUid = typeof a?.uid === 'string' ? a.uid : '';
-            const bUid = typeof b?.uid === 'string' ? b.uid : '';
-            return aUid < bUid ? 1 : aUid > bUid ? -1 : 0;
-        });
-    });
-
     const { t } = useI18n();
 
     const gameLogRef = ref(null);
@@ -136,7 +103,7 @@
     function deleteGameLogEntryPrompt(row) {
         modalStore
             .confirm({
-                description: 'Continue? Delete Log',
+                description: t('confirm.delete_log'),
                 title: 'Confirm'
             })
             .then(({ ok }) => ok && deleteGameLogEntry(row))
@@ -144,7 +111,7 @@
     }
 
     function deleteGameLogEntry(row) {
-        removeFromArray(gameLogTable.value.data, row);
+        removeFromArray(gameLogTableData.value, row);
         database.deleteGameLogEntry(row);
     }
 
@@ -164,15 +131,32 @@
         gameLogTable.value.pageSizeLinked ? appearanceSettingsStore.tablePageSize : gameLogTable.value.pageSize
     );
 
+    function getGameLogRowId(row) {
+        if (row?.rowId != null) return `row:${row.rowId}`;
+
+        const type = row?.type ?? '';
+        const createdAt = row?.created_at ?? row?.createdAt ?? row?.dt ?? '';
+        const userId = row?.userId ?? '';
+        const displayName = row?.displayName ?? '';
+        const location = row?.location ?? '';
+
+        return `${type}:${createdAt}:${userId}:${displayName}:${location}`;
+    }
+
     const { table, pagination } = useVrcxVueTable({
         persistKey: 'gameLog',
-        data: gameLogDisplayData,
+        get data() {
+            return gameLogTableData.value;
+        },
         columns,
-        getRowId: (row) => `${row.type}:${row.rowId ?? row.displayName + row.location + row.time}`,
+        getRowId: getGameLogRowId,
         initialSorting: [],
         initialPagination: {
             pageIndex: 0,
             pageSize: pageSize.value
+        },
+        tableOptions: {
+            autoResetPageIndex: false
         }
     });
 
@@ -202,9 +186,3 @@
         table.setPageSize(size);
     });
 </script>
-
-<style scoped>
-    .table-user {
-        color: var(--x-table-user-text-color) !important;
-    }
-</style>

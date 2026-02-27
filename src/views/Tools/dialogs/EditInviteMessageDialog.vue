@@ -1,30 +1,31 @@
 <template>
-    <el-dialog
-        class="x-dialog"
-        :model-value="isEditInviteMessageDialogVisible"
-        :title="t('dialog.edit_invite_message.header')"
-        width="400px"
-        @close="closeDialog">
-        <div style="font-size: 12px">
-            <span>{{ t('dialog.edit_invite_message.description') }}</span>
-            <InputGroupTextareaField
-                v-model="message"
-                :maxlength="64"
-                :rows="2"
-                class="mt-2.5"
-                placeholder=""
-                show-count />
-        </div>
-        <template #footer>
-            <Button variant="secondary" class="mr-2" @click="closeDialog">{{
-                t('dialog.edit_invite_message.cancel')
-            }}</Button>
-            <Button @click="saveEditInviteMessage">{{ t('dialog.edit_invite_message.save') }}</Button>
-        </template>
-    </el-dialog>
+    <Dialog :open="isEditInviteMessageDialogVisible" @update:open="(open) => !open && closeDialog()">
+        <DialogContent class="sm:max-w-sm">
+            <DialogHeader>
+                <DialogTitle>{{ t('dialog.edit_invite_message.header') }}</DialogTitle>
+            </DialogHeader>
+            <div style="font-size: 12px">
+                <span>{{ t('dialog.edit_invite_message.description') }}</span>
+                <InputGroupTextareaField
+                    v-model="message"
+                    :maxlength="64"
+                    :rows="2"
+                    class="mt-2.5"
+                    placeholder=""
+                    show-count />
+            </div>
+            <DialogFooter>
+                <Button variant="secondary" class="mr-2" @click="closeDialog">{{
+                    t('dialog.edit_invite_message.cancel')
+                }}</Button>
+                <Button @click="saveEditInviteMessage">{{ t('dialog.edit_invite_message.save') }}</Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
 </template>
 
 <script setup>
+    import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
     import { ref, watch } from 'vue';
     import { Button } from '@/components/ui/button';
     import { InputGroupTextareaField } from '@/components/ui/input-group';
@@ -69,8 +70,9 @@
                 })
                 .then((args) => {
                     if (args.json[slot].message === props.inviteMessage.message) {
-                        toast.error("VRChat API didn't update message, try again");
-                        throw new Error("VRChat API didn't update message, try again");
+                        const errorMessage = t('message.invite.message_update_failed');
+                        toast.error(errorMessage);
+                        throw new Error(errorMessage);
                     } else {
                         toast.success('Invite message updated');
                         emit('updateInviteMessages', messageType);

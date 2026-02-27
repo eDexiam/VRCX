@@ -1,12 +1,9 @@
 <template>
-    <el-dialog
-        :z-index="previousInstancesInfoDialogIndex"
-        :model-value="previousInstancesInfoDialogVisible"
-        :title="t('dialog.previous_instances.info')"
-        width="800px"
-        :fullscreen="fullscreen"
-        destroy-on-close
-        @close="closeDialog">
+    <div>
+        <DialogHeader>
+            <DialogTitle>{{ t('dialog.previous_instances.info') }}</DialogTitle>
+        </DialogHeader>
+
         <DataTableLayout
             class="min-w-0 w-full"
             :table="table"
@@ -14,7 +11,9 @@
             :table-style="tableStyle"
             :page-sizes="pageSizes"
             :total-items="totalItems"
-            :on-page-size-change="handlePageSizeChange">
+            :on-page-size-change="handlePageSizeChange"
+            :on-page-change="handlePageChange"
+            :on-sort-change="handleSortChange">
             <template #toolbar>
                 <div style="display: flex; align-items: center; justify-content: space-between">
                     <Location :location="location.tag" style="font-size: 14px" />
@@ -26,11 +25,14 @@
                 </div>
             </template>
         </DataTableLayout>
-    </el-dialog>
+    </div>
 </template>
 
 <script setup>
+    defineOptions({ name: 'PreviousInstancesInfoDialog' });
+
     import { computed, nextTick, ref, watch } from 'vue';
+    import { DialogHeader, DialogTitle } from '@/components/ui/dialog';
     import { storeToRefs } from 'pinia';
     import { useI18n } from 'vue-i18n';
 
@@ -40,23 +42,45 @@
     import { InputGroupField } from '../../../components/ui/input-group';
     import { createColumns } from './previousInstancesInfoColumns.jsx';
     import { database } from '../../../service/database';
-    import { getNextDialogIndex } from '../../../shared/utils/base/ui';
     import { useVrcxVueTable } from '../../../lib/table/useVrcxVueTable';
 
     const { lookupUser } = useUserStore();
-    const { previousInstancesInfoDialogVisible, previousInstancesInfoDialogInstanceId } =
-        storeToRefs(useInstanceStore());
+    const { previousInstancesInfoDialog, previousInstancesInfoState } = storeToRefs(useInstanceStore());
     const { gameLogIsFriend, gameLogIsFavorite } = useGameLogStore();
     const { t } = useI18n();
 
-    const previousInstancesInfoDialogIndex = ref(2000);
+    const dialogState = computed(() => {
+        return previousInstancesInfoState.value;
+    });
 
     const loading = ref(false);
     const rawRows = ref([]);
-    const search = ref('');
     const pageSizes = [10, 25, 50, 100];
-    const pageSize = ref(10);
-    const tableStyle = { maxHeight: '400px' };
+    const pageSize = computed({
+        get: () => dialogState.value.pageSize,
+        set: (value) => {
+            dialogState.value.pageSize = value;
+        }
+    });
+    const pageIndex = computed({
+        get: () => dialogState.value.pageIndex,
+        set: (value) => {
+            dialogState.value.pageIndex = value;
+        }
+    });
+    const tableStyle = { maxHeight: '100%' };
+    const search = computed({
+        get: () => dialogState.value.search,
+        set: (value) => {
+            dialogState.value.search = value;
+        }
+    });
+    const sortBy = computed({
+        get: () => dialogState.value.sortBy,
+        set: (value) => {
+            dialogState.value.sortBy = value;
+        }
+    });
 
     const location = ref({
         tag: '',
@@ -81,7 +105,6 @@
         strict: false,
         ageGate: false
     });
-    const fullscreen = ref(false);
 
     const { stringComparer } = storeToRefs(useSearchStore());
     const vrcxStore = useVrcxStore();
@@ -103,13 +126,18 @@
 
     const { table } = useVrcxVueTable({
         persistKey: 'previousInstancesInfoDialog',
-        data: displayRows,
+        get data() {
+            return displayRows.value;
+        },
         columns: columns.value,
         getRowId: (row) => row?.id ?? row?.userId ?? row?.displayName ?? JSON.stringify(row ?? {}),
-        initialSorting: [{ id: 'created_at', desc: true }],
+        initialSorting: sortBy.value,
         initialPagination: {
-            pageIndex: 0,
+            pageIndex: pageIndex.value,
             pageSize: pageSize.value
+        },
+        tableOptions: {
+            autoResetPageIndex: false
         }
     });
 
@@ -127,15 +155,23 @@
     const totalItems = computed(() => {
         const length = table.getFilteredRowModel().rows.length;
         const max = vrcxStore.maxTableSize;
-        return length > max && length < max + 51 ? max : length;
+        return length > max ? max : length;
     });
 
     const handlePageSizeChange = (size) => {
         pageSize.value = size;
     };
 
+    const handlePageChange = (page) => {
+        pageIndex.value = Math.max(0, page - 1);
+    };
+
+    const handleSortChange = (sorting) => {
+        sortBy.value = sorting;
+    };
+
     watch(
-        () => previousInstancesInfoDialogVisible.value,
+        () => previousInstancesInfoDialog.value.visible,
         (value) => {
             if (value) {
                 nextTick(() => {
@@ -143,13 +179,17 @@
                     refreshPreviousInstancesInfoTable();
                 });
             }
-        }
+        },
+        { immediate: true }
     );
 
     function init() {
-        previousInstancesInfoDialogIndex.value = getNextDialogIndex();
         loading.value = true;
-        location.value = parseLocation(previousInstancesInfoDialogInstanceId.value);
+        location.value = parseLocation(previousInstancesInfoDialog.value.instanceId);
+        if (previousInstancesInfoDialog.value.lastId !== previousInstancesInfoDialog.value.instanceId) {
+            table.setPageIndex(0);
+            previousInstancesInfoDialog.value.lastId = previousInstancesInfoDialog.value.instanceId;
+        }
     }
 
     function refreshPreviousInstancesInfoTable() {
@@ -165,9 +205,5 @@
             rawRows.value = array;
             loading.value = false;
         });
-    }
-
-    function closeDialog() {
-        previousInstancesInfoDialogVisible.value = false;
     }
 </script>

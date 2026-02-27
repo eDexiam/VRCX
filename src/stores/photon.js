@@ -1,5 +1,4 @@
 import { computed, reactive, ref } from 'vue';
-import { ElMessageBox } from 'element-plus';
 import { defineStore } from 'pinia';
 import { toast } from 'vue-sonner';
 import { useI18n } from 'vue-i18n';
@@ -24,6 +23,7 @@ import { useFriendStore } from './friend';
 import { useGameLogStore } from './gameLog';
 import { useInstanceStore } from './instance';
 import { useLocationStore } from './location';
+import { useModalStore } from './modal';
 import { useNotificationStore } from './notification';
 import { useSharedFeedStore } from './sharedFeed';
 import { useUserStore } from './user';
@@ -39,6 +39,7 @@ export const usePhotonStore = defineStore('Photon', () => {
     const friendStore = useFriendStore();
     const instanceStore = useInstanceStore();
     const gameLogStore = useGameLogStore();
+    const modalStore = useModalStore();
     const notificationStore = useNotificationStore();
     const locationStore = useLocationStore();
     const sharedFeedStore = useSharedFeedStore();
@@ -102,10 +103,6 @@ export const usePhotonStore = defineStore('Photon', () => {
                 value: []
             }
         ],
-        tableProps: {
-            stripe: true,
-            size: 'small'
-        },
         pageSize: 10,
         paginationProps: {
             layout: 'sizes,prev,pager,next,total'
@@ -123,10 +120,6 @@ export const usePhotonStore = defineStore('Photon', () => {
                 value: []
             }
         ],
-        tableProps: {
-            stripe: true,
-            size: 'small'
-        },
         pageSize: 10,
         paginationProps: {
             layout: 'sizes,prev,pager,next,total'
@@ -440,24 +433,21 @@ export const usePhotonStore = defineStore('Photon', () => {
     }
 
     function promptPhotonOverlayMessageTimeout() {
-        ElMessageBox.prompt(
-            t('prompt.overlay_message_timeout.description'),
-            t('prompt.overlay_message_timeout.header'),
-            {
-                distinguishCancelAndClose: true,
-                confirmButtonText: t('prompt.overlay_message_timeout.ok'),
-                cancelButtonText: t('prompt.overlay_message_timeout.cancel'),
+        modalStore
+            .prompt({
+                title: t('prompt.overlay_message_timeout.header'),
+                description: t('prompt.overlay_message_timeout.description'),
+                confirmText: t('prompt.overlay_message_timeout.ok'),
+                cancelText: t('prompt.overlay_message_timeout.cancel'),
                 inputValue: (
                     state.photonOverlayMessageTimeout / 1000
                 ).toString(),
-                inputPattern: /\d+$/,
-                inputErrorMessage: t(
-                    'prompt.overlay_message_timeout.input_error'
-                )
-            }
-        )
-            .then(({ value, action }) => {
-                if (action === 'confirm' && value && !isNaN(Number(value))) {
+                pattern: /\d+$/,
+                errorMessage: t('prompt.overlay_message_timeout.input_error')
+            })
+            .then(({ ok, value }) => {
+                if (!ok) return;
+                if (value && !isNaN(Number(value))) {
                     state.photonOverlayMessageTimeout = Math.trunc(
                         Number(value) * 1000
                     );
@@ -468,22 +458,21 @@ export const usePhotonStore = defineStore('Photon', () => {
     }
 
     function promptPhotonLobbyTimeoutThreshold() {
-        ElMessageBox.prompt(
-            t('prompt.photon_lobby_timeout.description'),
-            t('prompt.photon_lobby_timeout.header'),
-            {
-                distinguishCancelAndClose: true,
-                confirmButtonText: t('prompt.photon_lobby_timeout.ok'),
-                cancelButtonText: t('prompt.photon_lobby_timeout.cancel'),
+        modalStore
+            .prompt({
+                title: t('prompt.photon_lobby_timeout.header'),
+                description: t('prompt.photon_lobby_timeout.description'),
+                confirmText: t('prompt.photon_lobby_timeout.ok'),
+                cancelText: t('prompt.photon_lobby_timeout.cancel'),
                 inputValue: (
                     state.photonLobbyTimeoutThreshold / 1000
                 ).toString(),
-                inputPattern: /\d+$/,
-                inputErrorMessage: t('prompt.photon_lobby_timeout.input_error')
-            }
-        )
-            .then(({ value, action }) => {
-                if (action === 'confirm' && value && !isNaN(Number(value))) {
+                pattern: /\d+$/,
+                errorMessage: t('prompt.photon_lobby_timeout.input_error')
+            })
+            .then(({ ok, value }) => {
+                if (!ok) return;
+                if (value && !isNaN(Number(value))) {
                     state.photonLobbyTimeoutThreshold = Math.trunc(
                         Number(value) * 1000
                     );
@@ -1648,6 +1637,7 @@ export const usePhotonStore = defineStore('Photon', () => {
                     type
                 };
                 notificationStore.queueModerationNoty(noty);
+                sharedFeedStore.addEntry(noty);
                 const entry = {
                     created_at: gameLogDate,
                     userId: ref.id,
@@ -1655,9 +1645,6 @@ export const usePhotonStore = defineStore('Photon', () => {
                     type
                 };
                 moderationAgainstTable.value.push(entry);
-            }
-            if (block || mute || block !== row.block || mute !== row.mute) {
-                sharedFeedStore.updateSharedFeed(true);
             }
             if (block || mute) {
                 database.setModeration({

@@ -1,23 +1,25 @@
 <template>
     <div style="display: flex">
-        <img
-            v-if="
-                !userDialog.loading && (userDialog.ref.profilePicOverrideThumbnail || userDialog.ref.profilePicOverride)
-            "
-            class="x-link"
-            :src="userDialog.ref.profilePicOverrideThumbnail || userDialog.ref.profilePicOverride"
-            style="flex: none; height: 120px; width: 213.33px; border-radius: 12px; object-fit: cover"
-            @click="showFullscreenImageDialog(userDialog.ref.profilePicOverride)"
-            loading="lazy" />
-        <img
-            v-else-if="!userDialog.loading"
-            class="x-link"
-            :src="userDialog.ref.currentAvatarThumbnailImageUrl"
-            style="flex: none; height: 120px; width: 160px; border-radius: 12px; object-fit: cover"
-            @click="showFullscreenImageDialog(userDialog.ref.currentAvatarImageUrl)"
-            loading="lazy" />
-
-        <div style="flex: 1; display: flex; align-items: center; margin-left: 15px">
+        <div style="flex: none; height: 120px; width: 160px">
+            <img
+                v-if="
+                    !userDialog.loading &&
+                    (userDialog.ref.profilePicOverrideThumbnail || userDialog.ref.profilePicOverride)
+                "
+                class="cursor-pointer"
+                :src="userDialog.ref.profilePicOverrideThumbnail || userDialog.ref.profilePicOverride"
+                style="height: 120px; width: 213.33px; border-radius: 12px; object-fit: cover"
+                @click="showFullscreenImageDialog(userDialog.ref.profilePicOverride)"
+                loading="lazy" />
+            <img
+                v-else-if="!userDialog.loading"
+                class="cursor-pointer"
+                :src="userDialog.ref.currentAvatarThumbnailImageUrl"
+                style="height: 120px; width: 160px; border-radius: 12px; object-fit: cover"
+                @click="showFullscreenImageDialog(userDialog.ref.currentAvatarImageUrl)"
+                loading="lazy" />
+        </div>
+        <div style="flex: 1; display: flex; align-items: flex-start; margin-left: 15px">
             <div style="flex: 1">
                 <div>
                     <TooltipWrapper v-if="userDialog.ref.status" side="top">
@@ -40,11 +42,11 @@
                                     >
                                 </div>
                             </template>
-                            <el-icon><CaretBottom /></el-icon>
+                            <ChevronDown class="inline-block" />
                         </TooltipWrapper>
                     </template>
                     <span
-                        class="dialog-title"
+                        class="font-bold"
                         style="margin-left: 5px; margin-right: 5px; cursor: pointer"
                         v-text="userDialog.ref.displayName"
                         @click="copyUserDisplayName(userDialog.ref.displayName)"></span>
@@ -72,29 +74,22 @@
                             @click="copyUserDisplayName(currentUser.username)"></span>
                     </template>
                 </div>
-                <div style="margin-top: 5px" v-show="!userDialog.loading">
+                <div class="mt-2 flex items-center gap-1" v-show="!userDialog.loading">
                     <TooltipWrapper side="top" :content="t('dialog.user.tags.trust_level')">
-                        <Badge
-                            variant="outline"
-                            class="name"
-                            :class="userDialog.ref.$trustClass"
-                            style="margin-right: 5px; margin-top: 5px">
-                            <i class="ri-shield-line"></i> {{ userDialog.ref.$trustLevel }}
+                        <Badge variant="outline" class="name" :class="userDialog.ref.$trustClass">
+                            <Shield class="h-4 w-4" /> {{ userDialog.ref.$trustLevel }}
                         </Badge>
                     </TooltipWrapper>
                     <TooltipWrapper
                         v-if="userDialog.ref.ageVerified && userDialog.ref.ageVerificationStatus"
                         side="top"
                         :content="t('dialog.user.tags.age_verified')">
-                        <Badge
-                            variant="outline"
-                            class="x-tag-age-verification"
-                            style="margin-right: 5px; margin-top: 5px">
+                        <Badge variant="outline" class="x-tag-age-verification">
                             <template v-if="userDialog.ref.ageVerificationStatus === '18+'">
-                                <i class="ri-info-card-line"></i> 18+
+                                <IdCard class="h-4 w-4" /> 18+
                             </template>
                             <template v-else>
-                                <i class="ri-info-card-line"></i>
+                                <IdCard class="h-4 w-4" />
                             </template>
                         </Badge>
                     </TooltipWrapper>
@@ -102,8 +97,8 @@
                         v-if="userDialog.isFriend && userDialog.friend"
                         side="top"
                         :content="t('dialog.user.tags.friend_number')">
-                        <Badge variant="outline" class="x-tag-friend" style="margin-right: 5px; margin-top: 5px">
-                            <i class="ri-user-add-line"></i>
+                        <Badge variant="outline" class="x-tag-friend">
+                            <UserPlus class="h-4 w-4" />
                             {{ userDialog.ref.$friendNumber ? userDialog.ref.$friendNumber : '' }}
                         </Badge>
                     </TooltipWrapper>
@@ -111,56 +106,49 @@
                         v-if="userDialog.mutualFriendCount"
                         side="top"
                         :content="t('dialog.user.tags.mutual_friends')">
-                        <Badge variant="outline" class="x-tag-mutual-friend" style="margin-right: 5px; margin-top: 5px">
-                            <i class="ri-group-line"></i>
+                        <Badge variant="outline" class="x-tag-mutual-friend border-zinc-500/50! dark:border-zinc-400!">
+                            <Users class="h-4 w-4" />
                             {{ userDialog.mutualFriendCount }}
                         </Badge>
                     </TooltipWrapper>
-                    <Badge
-                        v-if="userDialog.ref.$isTroll"
-                        variant="outline"
-                        class="x-tag-troll"
-                        style="margin-right: 5px; margin-top: 5px">
-                        Nuisance
+                    <TooltipWrapper
+                        v-if="userDialog.ref.discordId"
+                        side="top"
+                        :content="t('dialog.user.tags.open_in_discord')">
+                        <Badge
+                            variant="outline"
+                            class="x-tag-discord cursor-pointer"
+                            @click="openDiscordProfile(userDialog.ref.discordId)">
+                            <i class="ri-discord-line text-xs"></i>
+                            {{ t('dialog.user.tags.discord') }}
+                        </Badge>
+                    </TooltipWrapper>
+                    <Badge v-if="userDialog.ref.$isTroll" variant="outline" class="x-tag-troll">
+                        {{ t('view.settings.appearance.user_colors.trust_levels.nuisance') }}
                     </Badge>
-                    <Badge
-                        v-if="userDialog.ref.$isProbableTroll"
-                        variant="outline"
-                        class="x-tag-troll"
-                        style="margin-right: 5px; margin-top: 5px">
-                        Almost Nuisance
+                    <Badge v-if="userDialog.ref.$isProbableTroll" variant="outline" class="x-tag-troll">
+                        {{ t('view.favorite.avatars.almost_nuisance') }}
                     </Badge>
-                    <Badge
-                        v-if="userDialog.ref.$isModerator"
-                        variant="outline"
-                        class="x-tag-vip"
-                        style="margin-right: 5px; margin-top: 5px">
+                    <Badge v-if="userDialog.ref.$isModerator" variant="outline" class="x-tag-vip">
                         {{ t('dialog.user.tags.vrchat_team') }}
                     </Badge>
 
                     <TooltipWrapper v-if="userDialog.ref.$platform === 'standalonewindows'" side="top" content="PC">
-                        <Badge variant="outline" class="x-tag-platform-pc" style="margin-right: 5px; margin-top: 5px">
-                            <i class="ri-computer-line"></i>
+                        <Badge variant="outline" class="x-tag-platform-pc">
+                            <Monitor class="m-0.5 x-tag-platform-pc" />
                         </Badge>
                     </TooltipWrapper>
                     <TooltipWrapper v-else-if="userDialog.ref.$platform === 'android'" side="top" content="Android">
-                        <Badge
-                            variant="outline"
-                            class="x-tag-platform-quest"
-                            style="margin-right: 5px; margin-top: 5px">
-                            <i class="ri-android-line"></i>
+                        <Badge variant="outline" class="x-tag-platform-quest">
+                            <Smartphone class="m-0.5 x-tag-platform-quest" />
                         </Badge>
                     </TooltipWrapper>
                     <TooltipWrapper v-else-if="userDialog.ref.$platform === 'ios'" side="top" content="iOS">
-                        <Badge variant="outline" class="x-tag-platform-ios" style="margin-right: 5px; margin-top: 5px"
-                            ><i class="ri-apple-line"></i
-                        ></Badge>
+                        <Badge variant="outline" class="text-[#8e8e93] border-[#8e8e93]">
+                            <Apple class="m-0.5 text-[#8e8e93]" />
+                        </Badge>
                     </TooltipWrapper>
-                    <Badge
-                        v-else-if="userDialog.ref.$platform"
-                        variant="outline"
-                        class="x-tag-platform-other"
-                        style="margin-right: 5px; margin-top: 5px">
+                    <Badge v-else-if="userDialog.ref.$platform" variant="outline" class="x-tag-platform-other">
                         {{ userDialog.ref.$platform }}
                     </Badge>
 
@@ -172,10 +160,10 @@
                             color: userDialog.ref.$customTagColour,
                             'border-color': userDialog.ref.$customTagColour
                         }"
-                        style="margin-right: 5px; margin-top: 5px"
                         >{{ userDialog.ref.$customTag }}</Badge
                     >
-                    <br />
+                </div>
+                <div class="mt-1">
                     <TooltipWrapper v-for="badge in userDialog.ref.badges" :key="badge.badgeId" side="top">
                         <template #content>
                             <span>{{ badge.badgeName }}</span>
@@ -185,7 +173,7 @@
                             <Popover>
                                 <PopoverTrigger asChild>
                                     <img
-                                        class="x-link x-user-badge"
+                                        class="cursor-pointer hover:grayscale-0"
                                         :src="badge.badgeImageUrl"
                                         style="
                                             flex: none;
@@ -196,13 +184,13 @@
                                             margin-top: 5px;
                                             margin-right: 5px;
                                         "
-                                        :class="{ 'x-user-badge-hidden': badge.hidden }"
+                                        :class="{ grayscale: badge.hidden }"
                                         loading="lazy" />
                                 </PopoverTrigger>
                                 <PopoverContent side="bottom" class="w-75">
                                     <img
                                         :src="badge.badgeImageUrl"
-                                        :class="['x-link', 'x-popover-image']"
+                                        :class="['cursor-pointer', 'max-w-full', 'max-h-full']"
                                         @click="showFullscreenImageDialog(badge.badgeImageUrl)"
                                         loading="lazy" />
                                     <br />
@@ -240,31 +228,37 @@
                         </div>
                     </TooltipWrapper>
                 </div>
-                <div style="margin-top: 5px">
+                <div>
                     <span style="font-size: 12px" v-text="userDialog.ref.statusDescription"></span>
                 </div>
             </div>
 
             <div v-if="userDialog.ref.userIcon" style="flex: none; margin-right: 10px">
                 <img
-                    class="x-link"
+                    class="cursor-pointer"
                     :src="userImage(userDialog.ref, true, '256', true)"
                     style="flex: none; width: 120px; height: 120px; border-radius: 12px; object-fit: cover"
                     @click="showFullscreenImageDialog(userDialog.ref.userIcon)"
                     loading="lazy" />
             </div>
 
-            <UserActionDropdown :user-dialog-command="userDialogCommand" />
+            <UserActionDropdown class="ml-2 mt-12" :user-dialog-command="userDialogCommand" />
         </div>
     </div>
 </template>
 
 <script setup>
-    import { CaretBottom } from '@element-plus/icons-vue';
+    import { Apple, ChevronDown, IdCard, Monitor, Shield, Smartphone, UserPlus, Users } from 'lucide-vue-next';
     import { storeToRefs } from 'pinia';
     import { useI18n } from 'vue-i18n';
 
-    import { formatDateFilter, languageClass, userImage, userStatusClass } from '../../../shared/utils';
+    import {
+        formatDateFilter,
+        languageClass,
+        openDiscordProfile,
+        userImage,
+        userStatusClass
+    } from '../../../shared/utils';
     import { Popover, PopoverContent, PopoverTrigger } from '../../ui/popover';
     import { useGalleryStore, useUserStore } from '../../../stores';
     import { Badge } from '../../ui/badge';

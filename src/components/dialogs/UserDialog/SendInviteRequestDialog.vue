@@ -1,30 +1,37 @@
 <template>
-    <el-dialog
-        class="x-dialog"
-        :model-value="sendInviteRequestDialogVisible"
-        :title="t('dialog.invite_request_message.header')"
-        width="800px"
-        append-to-body
-        @close="cancelSendInviteRequest">
-        <template v-if="isLocalUserVrcPlusSupporter">
-            <input class="inviteImageUploadButton" type="file" accept="image/*" @change="inviteImageUpload" />
-        </template>
+    <Dialog
+        :open="sendInviteRequestDialogVisible"
+        @update:open="
+            (open) => {
+                if (!open) cancelSendInviteRequest();
+            }
+        ">
+        <DialogContent class="x-dialog sm:max-w-200">
+            <DialogHeader>
+                <DialogTitle>{{ t('dialog.invite_request_message.header') }}</DialogTitle>
+            </DialogHeader>
 
-        <DataTableLayout
-            style="margin-top: 10px"
-            :table="inviteRequestMessageTanstackTable"
-            :loading="false"
-            :show-pagination="false"
-            :on-row-click="handleInviteRequestMessageRowClick" />
+            <template v-if="isLocalUserVrcPlusSupporter">
+                <input class="inviteImageUploadButton" type="file" accept="image/*" @change="inviteImageUpload" />
+            </template>
 
-        <template #footer>
-            <Button variant="secondary" class="mr-2" @click="cancelSendInviteRequest">{{
-                t('dialog.invite_request_message.cancel')
-            }}</Button>
-            <Button @click="refreshInviteMessageTableData('request')">{{
-                t('dialog.invite_request_message.refresh')
-            }}</Button>
-        </template>
+            <DataTableLayout
+                style="margin-top: 10px"
+                :table="inviteRequestMessageTanstackTable"
+                :loading="false"
+                :show-pagination="false"
+                :on-row-click="handleInviteRequestMessageRowClick" />
+
+            <DialogFooter>
+                <Button variant="secondary" class="mr-2" @click="cancelSendInviteRequest">{{
+                    t('dialog.invite_request_message.cancel')
+                }}</Button>
+                <Button @click="refreshInviteMessageTableData('request')">{{
+                    t('dialog.invite_request_message.refresh')
+                }}</Button>
+            </DialogFooter>
+        </DialogContent>
+
         <SendInviteConfirmDialog
             v-model:isSendInviteConfirmDialogVisible="isSendInviteConfirmDialogVisible"
             :sendInviteDialog="sendInviteDialog"
@@ -32,15 +39,16 @@
             :invite-dialog="inviteDialog"
             @closeInviteDialog="closeInviteDialog" />
         <EditAndSendInviteDialog
-            :edit-and-send-invite-dialog="editAndSendInviteDialog"
+            v-model:edit-and-send-invite-dialog="editAndSendInviteDialog"
             :sendInviteDialog="sendInviteDialog"
             @update:sendInviteDialog="emit('update:sendInviteDialog', $event)"
             :invite-dialog="inviteDialog"
             @closeInviteDialog="closeInviteDialog" />
-    </el-dialog>
+    </Dialog>
 </template>
 
 <script setup>
+    import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
     import { computed, ref } from 'vue';
     import { Button } from '@/components/ui/button';
     import { DataTableLayout } from '@/components/ui/data-table';
@@ -97,7 +105,9 @@
 
     const { table: inviteRequestMessageTanstackTable } = useVrcxVueTable({
         persistKey: 'invite-request-message',
-        data: inviteRequestMessageRows,
+        get data() {
+            return inviteRequestMessageRows.value;
+        },
         columns: inviteRequestMessageColumns,
         getRowId: (row) => String(row?.slot ?? ''),
         enablePagination: false,

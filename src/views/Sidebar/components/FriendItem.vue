@@ -1,5 +1,5 @@
 <template>
-    <div class="x-friend-item" @click="showUserDialog(friend.id)">
+    <div class="x-friend-item hover:bg-muted/50" @click="showUserDialog(friend.id)">
         <template v-if="friend.ref">
             <div
                 class="avatar"
@@ -11,62 +11,66 @@
                     {{ friend.ref.displayName }} ({{ friend.$nickName }})
                 </span>
                 <span v-else class="name" :style="{ color: friend.ref.$userColour }"
-                    >{{ friend.ref.displayName }}{{ isGroupByInstance && friend.isVIP ? ' ⭐' : '' }}</span
+                    >{{ friend.ref.displayName
+                    }}{{ isGroupByInstance && allFavoriteFriendIds.has(friend.id) ? ' ⭐' : '' }}</span
                 >
 
-                <span v-if="isFriendActiveOrOffline" class="extra">{{ friend.ref.statusDescription }}</span>
+                <span v-if="isFriendActiveOrOffline" class="block truncate text-xs">{{
+                    friend.ref.statusDescription
+                }}</span>
                 <template v-else>
-                    <div v-if="friend.pendingOffline" class="extra">
-                        <el-icon><WarningFilled /></el-icon> {{ t('side_panel.pending_offline') }}
+                    <div v-if="friend.pendingOffline" class="extra block truncate text-xs">
+                        {{ t('side_panel.pending_offline') }}
                     </div>
                     <template v-else-if="isGroupByInstance">
                         <div class="flex items-center">
-                            <el-icon v-if="isFriendTraveling" class="is-loading" style="margin-right: 3px"
-                                ><Loading
-                            /></el-icon>
+                            <Spinner v-if="isFriendTraveling" class="mr-1" />
                             <Timer
-                                class="extra"
+                                class="text-xs"
                                 :epoch="epoch"
                                 :style="
                                     isFriendTraveling ? { display: 'inline-block', overflow: 'unset' } : undefined
                                 " />
                         </div>
                     </template>
-                    <Location v-else class="extra" :location="locationProp" :traveling="travelingProp" :link="false" />
+                    <Location
+                        v-else
+                        class="extra block truncate text-xs"
+                        :location="locationProp"
+                        :traveling="travelingProp"
+                        :link="false" />
                 </template>
             </div>
         </template>
         <template v-else-if="!friend.ref && !isRefreshFriendsLoading">
             <span>{{ friend.name || friend.id }}</span>
-            <Button
-                size="sm"
-                variant="ghost"
-                class="mr-1 w-6 h-6 text-xs"
-                @click.stop="$emit('confirm-delete-friend', friend.id)"
-                ><i class="ri-delete-bin-2-line"></i>
+            <Button size="sm" variant="ghost" class="mr-1 w-6 h-6 text-xs" @click.stop="confirmDeleteFriend(friend.id)"
+                ><Trash2 class="h-4 w-4" />
             </Button>
         </template>
 
-        <el-skeleton v-else animated class="skeleton" :throttle="100">
-            <template #template>
+        <!-- <div v-else class="skeleton" aria-busy="true" aria-label="Loading">
+            <div>
+                <Skeleton class="h-10 w-10 rounded-full" />
                 <div>
-                    <el-skeleton-item variant="circle" />
-                    <div>
-                        <el-skeleton-item variant="text" />
-                        <el-skeleton-item variant="text" />
-                    </div>
+                    <Skeleton class="h-3.5 w-1/2" />
+                    <Skeleton class="mt-1.5 h-3 w-full" />
                 </div>
-            </template>
-        </el-skeleton>
+            </div>
+        </div> -->
     </div>
 </template>
 
 <script setup>
-    import { Loading, WarningFilled } from '@element-plus/icons-vue';
     import { Button } from '@/components/ui/button';
+    import { Spinner } from '@/components/ui/spinner';
+    import { Trash2 } from 'lucide-vue-next';
     import { computed } from 'vue';
     import { storeToRefs } from 'pinia';
     import { useI18n } from 'vue-i18n';
+
+    import Location from '@/components/Location.vue';
+    import Timer from '@/components/Timer.vue';
 
     import { useAppearanceSettingsStore, useFriendStore, useUserStore } from '../../../stores';
     import { userImage, userStatusClass } from '../../../shared/utils';
@@ -76,10 +80,9 @@
         isGroupByInstance: Boolean
     });
 
-    defineEmits(['confirm-delete-friend']);
-
     const { hideNicknames } = storeToRefs(useAppearanceSettingsStore());
-    const { isRefreshFriendsLoading } = storeToRefs(useFriendStore());
+    const { isRefreshFriendsLoading, allFavoriteFriendIds } = storeToRefs(useFriendStore());
+    const { confirmDeleteFriend } = useFriendStore();
     const { showUserDialog } = useUserStore();
     const { t } = useI18n();
 
@@ -92,37 +95,3 @@
     const locationProp = computed(() => props.friend.ref?.location || '');
     const travelingProp = computed(() => props.friend.ref?.travelingToLocation || '');
 </script>
-
-<style>
-    .skeleton {
-        height: 40px;
-        width: 100%;
-        & > div {
-            height: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            & > div {
-                width: calc(100% - 48px);
-                height: 100%;
-                display: flex;
-                flex-direction: column;
-                justify-content: center;
-            }
-        }
-        .el-skeleton__circle {
-            height: 40px;
-            width: 40px;
-        }
-        .el-skeleton__text {
-            &:first-child {
-                height: 14px;
-                margin-bottom: 6px;
-                width: 50%;
-            }
-            &:last-child {
-                height: 12px;
-            }
-        }
-    }
-</style>

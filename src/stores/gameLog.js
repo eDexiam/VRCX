@@ -1,6 +1,8 @@
-import { reactive, ref, shallowReactive, watch } from 'vue';
+import { reactive, ref, shallowRef, watch } from 'vue';
 import { defineStore } from 'pinia';
 import { toast } from 'vue-sonner';
+import { useI18n } from 'vue-i18n';
+import { useRouter } from 'vue-router';
 
 import dayjs from 'dayjs';
 
@@ -15,7 +17,6 @@ import {
 import { AppDebug } from '../service/appConfig';
 import { database } from '../service/database';
 import { useAdvancedSettingsStore } from './settings/advanced';
-import { useAppearanceSettingsStore } from './settings/appearance';
 import { useFriendStore } from './friend';
 import { useGalleryStore } from './gallery';
 import { useGameStore } from './game';
@@ -49,19 +50,21 @@ export const useGameLogStore = defineStore('GameLog', () => {
     const vrcxStore = useVrcxStore();
     const advancedSettingsStore = useAdvancedSettingsStore();
     const gameStore = useGameStore();
-    const appearanceSettingsStore = useAppearanceSettingsStore();
     const generalSettingsStore = useGeneralSettingsStore();
     const galleryStore = useGalleryStore();
     const photonStore = usePhotonStore();
     const sharedFeedStore = useSharedFeedStore();
     const modalStore = useModalStore();
 
+    const router = useRouter();
+    const { t } = useI18n();
+
     const state = reactive({
         lastLocationAvatarList: new Map()
     });
 
+    const gameLogTableData = shallowRef([]);
     const gameLogTable = ref({
-        data: shallowReactive([]),
         loading: false,
         search: '',
         filter: [],
@@ -69,8 +72,6 @@ export const useGameLogStore = defineStore('GameLog', () => {
         pageSizeLinked: true,
         vip: false
     });
-
-    const gameLogSessionTable = ref([]);
 
     const nowPlaying = ref({
         url: '',
@@ -91,17 +92,22 @@ export const useGameLogStore = defineStore('GameLog', () => {
 
     watch(
         () => watchState.isLoggedIn,
-        (isLoggedIn) => {
-            gameLogTable.value.data.length = 0;
-            gameLogSessionTable.value = [];
-            if (isLoggedIn) {
-                // wait for friends to load, silly but works
-                setTimeout(() => {
-                    initGameLogTable();
-                }, 800);
-            }
+        () => {
+            gameLogTableData.value = [];
         },
         { flush: 'sync' }
+    );
+
+    watch(
+        router.currentRoute,
+        (value) => {
+            if (value.name === 'game-log') {
+                initGameLogTable();
+            } else {
+                gameLogTableData.value = [];
+            }
+        },
+        { immediate: true }
     );
 
     watch(
@@ -135,6 +141,66 @@ export const useGameLogStore = defineStore('GameLog', () => {
 
     init();
 
+    function getGameLogCreatedAtTs(row) {
+        const createdAtRaw = row?.created_at ?? row?.createdAt ?? row?.dt;
+        if (typeof createdAtRaw === 'number') {
+            const ts =
+                createdAtRaw > 1_000_000_000_000
+                    ? createdAtRaw
+                    : createdAtRaw * 1000;
+            return Number.isFinite(ts) ? ts : 0;
+        }
+
+        const createdAt = typeof createdAtRaw === 'string' ? createdAtRaw : '';
+        const ts = dayjs(createdAt).valueOf();
+        return Number.isFinite(ts) ? ts : 0;
+    }
+
+    function compareGameLogRows(a, b) {
+        const aTs = getGameLogCreatedAtTs(a);
+        const bTs = getGameLogCreatedAtTs(b);
+        if (aTs !== bTs) {
+            return bTs - aTs;
+        }
+
+        const aRowId = typeof a?.rowId === 'number' ? a.rowId : 0;
+        const bRowId = typeof b?.rowId === 'number' ? b.rowId : 0;
+        if (aRowId !== bRowId) {
+            return bRowId - aRowId;
+        }
+
+        const aUid = typeof a?.uid === 'string' ? a.uid : '';
+        const bUid = typeof b?.uid === 'string' ? b.uid : '';
+        return aUid < bUid ? 1 : aUid > bUid ? -1 : 0;
+    }
+
+    function insertGameLogSorted(entry) {
+        const arr = gameLogTableData.value;
+        if (arr.length === 0) {
+            gameLogTableData.value = [entry];
+            return;
+        }
+        if (compareGameLogRows(entry, arr[0]) < 0) {
+            gameLogTableData.value = [entry, ...arr];
+            return;
+        }
+        if (compareGameLogRows(entry, arr[arr.length - 1]) > 0) {
+            gameLogTableData.value = [...arr, entry];
+            return;
+        }
+        for (let i = 1; i < arr.length; i++) {
+            if (compareGameLogRows(entry, arr[i]) < 0) {
+                gameLogTableData.value = [
+                    ...arr.slice(0, i),
+                    entry,
+                    ...arr.slice(i)
+                ];
+                return;
+            }
+        }
+        gameLogTableData.value = [...arr, entry];
+    }
+
     function clearNowPlaying() {
         nowPlaying.value = {
             url: '',
@@ -151,7 +217,8 @@ export const useGameLogStore = defineStore('GameLog', () => {
         vrStore.updateVrNowPlaying();
     }
 
-    function setNowPlaying(ctx) {
+    function setNowPlaying(data) {
+        const ctx = structuredClone(data);
         if (nowPlaying.value.url !== ctx.videoUrl) {
             if (!ctx.userId && ctx.displayName) {
                 for (const ref of userStore.cachedUsers.values()) {
@@ -225,14 +292,15 @@ export const useGameLogStore = defineStore('GameLog', () => {
         workerTimers.setTimeout(() => updateNowPlaying(), 1000);
     }
 
-    function tryLoadPlayerList() {
+    async function tryLoadPlayerList() {
+        // TODO: make this work again
         if (!gameStore.isGameRunning) {
             return;
         }
         console.log('Loading player list from game log...');
         let ctx;
         let i;
-        const data = gameLogSessionTable.value;
+        const data = await database.getGamelogDatabase();
         if (data.length === 0) {
             return;
         }
@@ -312,8 +380,7 @@ export const useGameLogStore = defineStore('GameLog', () => {
         if (!row.userId) {
             return false;
         }
-        row.isFriend = friendStore.friends.has(row.userId);
-        return row.isFriend;
+        return friendStore.friends.has(row.userId);
     }
 
     function gameLogIsFavorite(row) {
@@ -323,8 +390,7 @@ export const useGameLogStore = defineStore('GameLog', () => {
         if (!row.userId) {
             return false;
         }
-        row.isFavorite = friendStore.localFavoriteFriends.has(row.userId);
-        return row.isFavorite;
+        return friendStore.localFavoriteFriends.has(row.userId);
     }
 
     async function gameLogTableLookup() {
@@ -337,34 +403,40 @@ export const useGameLogStore = defineStore('GameLog', () => {
             gameLogTable.value.vip
         );
         gameLogTable.value.loading = true;
-        let vipList = [];
-        if (gameLogTable.value.vip) {
-            vipList = Array.from(friendStore.localFavoriteFriends.values());
-        }
-        const rows = await database.lookupGameLogDatabase(
-            gameLogTable.value.search,
-            gameLogTable.value.filter,
-            vipList
-        );
+        try {
+            let vipList = [];
+            if (gameLogTable.value.vip) {
+                vipList = Array.from(friendStore.localFavoriteFriends.values());
+            }
+            const search = gameLogTable.value.search.trim();
+            let rows = [];
+            if (search) {
+                rows = await database.searchGameLogDatabase(
+                    search,
+                    gameLogTable.value.filter,
+                    vipList,
+                    vrcxStore.searchLimit
+                );
+            } else {
+                rows = await database.lookupGameLogDatabase(
+                    gameLogTable.value.filter,
+                    vipList
+                );
+            }
 
-        for (const row of rows) {
-            row.isFriend = gameLogIsFriend(row);
-            row.isFavorite = gameLogIsFavorite(row);
+            for (const row of rows) {
+                row.isFriend = gameLogIsFriend(row);
+                row.isFavorite = gameLogIsFavorite(row);
+            }
+            gameLogTableData.value = rows;
+        } finally {
+            gameLogTable.value.loading = false;
         }
-        gameLogTable.value.data = shallowReactive(rows);
-        gameLogTable.value.loading = false;
     }
 
     function addGameLog(entry) {
         entry.isFriend = gameLogIsFriend(entry);
         entry.isFavorite = gameLogIsFavorite(entry);
-        gameLogSessionTable.value.push(entry);
-        sweepGameLogSessionTable();
-        sharedFeedStore.updateSharedFeed(false);
-        if (entry.type === 'VideoPlay') {
-            // event time can be before last gameLog entry
-            sharedFeedStore.updateSharedFeed(true);
-        }
 
         // If the VIP friend filter is enabled, logs from other friends will be ignored.
         if (
@@ -397,41 +469,9 @@ export const useGameLogStore = defineStore('GameLog', () => {
         if (!gameLogSearch(entry)) {
             return;
         }
-        gameLogTable.value.data.push(entry);
+        insertGameLogSorted(entry);
         sweepGameLog();
         uiStore.notifyMenu('game-log');
-    }
-
-    function sweepGameLogSessionTable() {
-        const data = gameLogSessionTable.value;
-        const k = data.length;
-        if (!k) {
-            return;
-        }
-
-        // 24 hour limit
-        const date = new Date();
-        date.setDate(date.getDate() - 1);
-        const limit = date.toJSON();
-
-        if (data[0].created_at < limit) {
-            let i = 0;
-            while (i < k && data[i].created_at < limit) {
-                ++i;
-            }
-            if (i === k) {
-                gameLogSessionTable.value = [];
-                return;
-            }
-            if (i) {
-                data.splice(0, i);
-            }
-        }
-
-        const maxLen = Math.floor(vrcxStore.maxTableSize * 1.5);
-        if (maxLen > 0 && data.length > maxLen + 100) {
-            data.splice(0, 100);
-        }
     }
 
     async function addGamelogLocationToDatabase(input) {
@@ -444,7 +484,7 @@ export const useGameLogStore = defineStore('GameLog', () => {
     }
 
     function gameLogSearch(row) {
-        const value = gameLogTable.value.search.toUpperCase();
+        const value = gameLogTable.value.search.trim().toUpperCase();
         if (!value) {
             return true;
         }
@@ -513,13 +553,10 @@ export const useGameLogStore = defineStore('GameLog', () => {
     }
 
     function sweepGameLog() {
-        const { data } = gameLogTable.value;
-        const j = data.length;
+        const j = gameLogTableData.value.length;
         if (j > vrcxStore.maxTableSize + 50) {
-            data.splice(0, 50);
+            gameLogTableData.value = gameLogTableData.value.slice(0, -50);
         }
-
-        sweepGameLogSessionTable();
     }
 
     function addGameLogEntry(gameLog, location) {
@@ -656,22 +693,6 @@ export const useGameLogStore = defineStore('GameLog', () => {
                 const ref1 = locationStore.lastLocation.playerList.get(userId);
                 if (typeof ref1 === 'undefined') {
                     break;
-                }
-                const friendRef = friendStore.friends.get(userId);
-                if (typeof friendRef?.ref !== 'undefined') {
-                    friendRef.ref.$joinCount++;
-                    friendRef.ref.$lastSeen = new Date().toJSON();
-                    friendRef.ref.$timeSpent +=
-                        dayjs(gameLog.dt) - ref1.joinTime;
-                    if (
-                        appearanceSettingsStore.sidebarSortMethods.includes(
-                            'Sort by Last Seen'
-                        )
-                    ) {
-                        // TODO: remove
-                        friendStore.sortVIPFriends = true;
-                        friendStore.sortOnlineFriends = true;
-                    }
                 }
                 const time = dayjs(gameLog.dt) - ref1.joinTime;
                 locationStore.lastLocation.playerList.delete(userId);
@@ -958,13 +979,7 @@ export const useGameLogStore = defineStore('GameLog', () => {
                 break;
         }
         if (typeof entry !== 'undefined') {
-            // add tag colour
-            if (entry.userId) {
-                const tagRef = userStore.customUserTags.get(entry.userId);
-                if (typeof tagRef !== 'undefined') {
-                    entry.tagColour = tagRef.colour;
-                }
-            }
+            sharedFeedStore.addEntry(entry);
             notificationStore.queueGameLogNoty(entry);
             addGameLog(entry);
         }
@@ -1368,8 +1383,6 @@ export const useGameLogStore = defineStore('GameLog', () => {
 
     async function getGameLogTable() {
         await database.initTables();
-        gameLogSessionTable.value = await database.getGamelogDatabase();
-        sweepGameLogSessionTable();
         const dateTill = await database.getLastDateGameLogDatabase();
         updateGameLog(dateTill);
     }
@@ -1409,16 +1422,14 @@ export const useGameLogStore = defineStore('GameLog', () => {
 
     async function disableGameLogDialog() {
         if (gameStore.isGameRunning) {
-            toast.error(
-                'VRChat needs to be closed before this option can be changed'
-            );
+            toast.error(t('message.gamelog.vrchat_must_be_closed'));
             return;
         }
         if (!advancedSettingsStore.gameLogDisabled) {
             modalStore
                 .confirm({
-                    description: 'Continue? Disable GameLog',
-                    title: 'Confirm'
+                    description: t('confirm.disable_gamelog'),
+                    title: t('confirm.title')
                 })
                 .then(({ ok }) => {
                     if (!ok) return;
@@ -1431,15 +1442,17 @@ export const useGameLogStore = defineStore('GameLog', () => {
     }
 
     async function initGameLogTable() {
+        gameLogTable.value.loading = true;
         const rows = await database.lookupGameLogDatabase(
-            gameLogTable.value.search,
-            gameLogTable.value.filter
+            gameLogTable.value.filter,
+            []
         );
         for (const row of rows) {
             row.isFriend = gameLogIsFriend(row);
             row.isFavorite = gameLogIsFavorite(row);
         }
-        gameLogTable.value.data = shallowReactive(rows);
+        gameLogTableData.value = rows;
+        gameLogTable.value.loading = false;
     }
 
     return {
@@ -1447,11 +1460,10 @@ export const useGameLogStore = defineStore('GameLog', () => {
 
         nowPlaying,
         gameLogTable,
-        gameLogSessionTable,
+        gameLogTableData,
         lastVideoUrl,
         lastResourceloadUrl,
 
-        initGameLogTable,
         clearNowPlaying,
         tryLoadPlayerList,
         gameLogIsFriend,

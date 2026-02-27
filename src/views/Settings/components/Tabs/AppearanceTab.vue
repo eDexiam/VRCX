@@ -17,17 +17,31 @@
                     </SelectContent>
                 </Select>
             </div>
+
             <div class="options-container-item">
-                <span class="name">{{ t('view.settings.appearance.appearance.theme_mode') }}</span>
-                <Select :model-value="themeMode" @update:modelValue="setThemeMode">
+                <span class="name flex! items-center!">
+                    {{ t('view.settings.appearance.appearance.font_family') }}
+
+                    <TooltipWrapper
+                        side="top"
+                        style="margin-left: 5px"
+                        :content="t('view.settings.appearance.appearance.font_family_tooltip')">
+                        <Info />
+                    </TooltipWrapper>
+                </span>
+                <Select :model-value="appFontFamily" @update:modelValue="setAppFontFamily">
                     <SelectTrigger size="sm">
-                        <SelectValue :placeholder="t(`view.settings.appearance.appearance.theme_mode_${themeMode}`)" />
+                        <SelectValue
+                            :placeholder="t(`view.settings.appearance.appearance.font_family_${appFontFamily}`)" />
                     </SelectTrigger>
                     <SelectContent>
                         <SelectGroup>
-                            <SelectItem v-for="(config, themeKey) in THEME_CONFIG" :key="themeKey" :value="themeKey">
-                                {{ t(`view.settings.appearance.appearance.theme_mode_${themeKey}`) }}
-                            </SelectItem>
+                            <template v-for="option in appFontFamilyOptions" :key="option.key">
+                                <SelectSeparator v-if="option.type === 'separator'" />
+                                <SelectItem v-else :value="option.key">
+                                    {{ t(`view.settings.appearance.appearance.font_family_${option.key}`) }}
+                                </SelectItem>
+                            </template>
                         </SelectGroup>
                     </SelectContent>
                 </Select>
@@ -61,6 +75,9 @@
                     setDisplayVRCPlusIconsAsAvatar();
                     saveOpenVROption();
                 " />
+        </div>
+        <div class="options-container">
+            <span class="header">{{ t('view.settings.appearance.display.header') }}</span>
             <simple-switch
                 :label="t('view.settings.appearance.appearance.show_instance_id')"
                 :value="showInstanceIdInLocation"
@@ -76,6 +93,17 @@
                 :label="t('view.settings.appearance.appearance.age_gated_instances')"
                 :value="isAgeGatedInstancesVisible"
                 @change="setIsAgeGatedInstancesVisible" />
+            <simple-switch
+                :label="t('view.settings.appearance.appearance.striped_data_table_mode')"
+                :value="isDataTableStriped"
+                @change="toggleStripedDataTable" />
+            <simple-switch
+                :label="t('view.settings.appearance.appearance.toggle_pointer_on_hover')"
+                :value="showPointerOnHover"
+                @change="togglePointerOnHover" />
+        </div>
+        <div class="options-container">
+            <span class="header">{{ t('view.settings.appearance.sorting_tables.header') }}</span>
             <div class="options-container-item">
                 <span class="name">{{ t('view.settings.appearance.appearance.sort_favorite_by') }}</span>
                 <RadioGroup
@@ -166,16 +194,14 @@
                     </ListboxRoot>
                 </Popover>
             </div>
-            <simple-switch
-                :label="t('view.settings.appearance.appearance.compact_table_mode')"
-                :value="compactTableMode"
-                @change="setCompactTableMode" />
+
             <div class="options-container-item">
-                <Button size="sm" variant="outline" @click="promptMaxTableSizeDialog">{{
+                <Button size="sm" variant="outline" @click="showTableLimitsDialog">{{
                     t('view.settings.appearance.appearance.table_max_size')
                 }}</Button>
             </div>
         </div>
+        <TableLimitsDialog />
         <div class="options-container">
             <span class="header">{{ t('view.settings.appearance.timedate.header') }}</span>
             <div class="options-container-item">
@@ -204,123 +230,7 @@
                 :value="dtIsoFormat"
                 @change="setDtIsoFormat" />
         </div>
-        <div class="options-container">
-            <span class="header">{{ t('view.settings.appearance.side_panel.header') }}</span>
-            <br />
-            <div class="options-container-item">
-                <span class="name">{{ t('view.settings.appearance.side_panel.sorting.header') }}</span>
-                <Select :model-value="sidebarSortMethod1" @update:modelValue="setSidebarSortMethod1">
-                    <SelectTrigger style="width: 170px" size="sm">
-                        <SelectValue :placeholder="t('view.settings.appearance.side_panel.sorting.placeholder')" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="Sort Alphabetically">{{
-                            t('view.settings.appearance.side_panel.sorting.alphabetical')
-                        }}</SelectItem>
-                        <SelectItem value="Sort by Status">{{
-                            t('view.settings.appearance.side_panel.sorting.status')
-                        }}</SelectItem>
-                        <SelectItem value="Sort Private to Bottom">{{
-                            t('view.settings.appearance.side_panel.sorting.private_to_bottom')
-                        }}</SelectItem>
-                        <SelectItem value="Sort by Last Active">{{
-                            t('view.settings.appearance.side_panel.sorting.last_active')
-                        }}</SelectItem>
-                        <SelectItem value="Sort by Last Seen">{{
-                            t('view.settings.appearance.side_panel.sorting.last_seen')
-                        }}</SelectItem>
-                        <SelectItem value="Sort by Time in Instance">{{
-                            t('view.settings.appearance.side_panel.sorting.time_in_instance')
-                        }}</SelectItem>
-                        <SelectItem value="Sort by Location">{{
-                            t('view.settings.appearance.side_panel.sorting.location')
-                        }}</SelectItem>
-                    </SelectContent>
-                </Select>
-                <el-icon style="margin: 5px"><ArrowRight /></el-icon>
-                <Select
-                    :model-value="sidebarSortMethod2"
-                    :disabled="!sidebarSortMethod1"
-                    @update:modelValue="(v) => setSidebarSortMethod2(v === SELECT_CLEAR_VALUE ? '' : v)">
-                    <SelectTrigger style="width: 170px" size="sm">
-                        <SelectValue :placeholder="t('view.settings.appearance.side_panel.sorting.placeholder')" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem :value="SELECT_CLEAR_VALUE">{{ t('dialog.gallery_select.none') }}</SelectItem>
-                        <SelectItem value="Sort Alphabetically">{{
-                            t('view.settings.appearance.side_panel.sorting.alphabetical')
-                        }}</SelectItem>
-                        <SelectItem value="Sort by Status">{{
-                            t('view.settings.appearance.side_panel.sorting.status')
-                        }}</SelectItem>
-                        <SelectItem value="Sort Private to Bottom">{{
-                            t('view.settings.appearance.side_panel.sorting.private_to_bottom')
-                        }}</SelectItem>
-                        <SelectItem value="Sort by Last Active">{{
-                            t('view.settings.appearance.side_panel.sorting.last_active')
-                        }}</SelectItem>
-                        <SelectItem value="Sort by Last Seen">{{
-                            t('view.settings.appearance.side_panel.sorting.last_seen')
-                        }}</SelectItem>
-                        <SelectItem value="Sort by Time in Instance">{{
-                            t('view.settings.appearance.side_panel.sorting.time_in_instance')
-                        }}</SelectItem>
-                        <SelectItem value="Sort by Location">{{
-                            t('view.settings.appearance.side_panel.sorting.location')
-                        }}</SelectItem>
-                    </SelectContent>
-                </Select>
-                <el-icon style="margin: 5px"><ArrowRight /></el-icon>
-                <Select
-                    :model-value="sidebarSortMethod3"
-                    :disabled="!sidebarSortMethod2"
-                    @update:modelValue="(v) => setSidebarSortMethod3(v === SELECT_CLEAR_VALUE ? '' : v)">
-                    <SelectTrigger style="width: 170px" size="sm">
-                        <SelectValue :placeholder="t('view.settings.appearance.side_panel.sorting.placeholder')" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem :value="SELECT_CLEAR_VALUE">{{ t('dialog.gallery_select.none') }}</SelectItem>
-                        <SelectItem value="Sort Alphabetically">{{
-                            t('view.settings.appearance.side_panel.sorting.alphabetical')
-                        }}</SelectItem>
-                        <SelectItem value="Sort by Status">{{
-                            t('view.settings.appearance.side_panel.sorting.status')
-                        }}</SelectItem>
-                        <SelectItem value="Sort Private to Bottom">{{
-                            t('view.settings.appearance.side_panel.sorting.private_to_bottom')
-                        }}</SelectItem>
-                        <SelectItem value="Sort by Last Active">{{
-                            t('view.settings.appearance.side_panel.sorting.last_active')
-                        }}</SelectItem>
-                        <SelectItem value="Sort by Last Seen">{{
-                            t('view.settings.appearance.side_panel.sorting.last_seen')
-                        }}</SelectItem>
-                        <SelectItem value="Sort by Time in Instance">{{
-                            t('view.settings.appearance.side_panel.sorting.time_in_instance')
-                        }}</SelectItem>
-                        <SelectItem value="Sort by Location">{{
-                            t('view.settings.appearance.side_panel.sorting.location')
-                        }}</SelectItem>
-                    </SelectContent>
-                </Select>
-            </div>
-            <simple-switch
-                :label="t('view.settings.appearance.side_panel.group_by_instance')"
-                :value="isSidebarGroupByInstance"
-                :tooltip="t('view.settings.appearance.side_panel.group_by_instance_tooltip')"
-                @change="setIsSidebarGroupByInstance"></simple-switch>
-            <simple-switch
-                v-if="isSidebarGroupByInstance"
-                :label="t('view.settings.appearance.side_panel.hide_friends_in_same_instance')"
-                :value="isHideFriendsInSameInstance"
-                :tooltip="t('view.settings.appearance.side_panel.hide_friends_in_same_instance_tooltip')"
-                @change="setIsHideFriendsInSameInstance"></simple-switch>
-            <simple-switch
-                :label="t('view.settings.appearance.side_panel.split_favorite_friends')"
-                :value="isSidebarDivideByFriendGroup"
-                :tooltip="t('view.settings.appearance.side_panel.split_favorite_friends_tooltip')"
-                @change="setIsSidebarDivideByFriendGroup"></simple-switch>
-        </div>
+
         <div class="options-container">
             <span class="header">{{ t('view.settings.appearance.user_dialog.header') }}</span>
             <simple-switch
@@ -331,11 +241,6 @@
                 :label="t('view.settings.appearance.user_dialog.vrcx_memos')"
                 :value="!hideUserMemos"
                 @change="setHideUserMemos" />
-            <div class="options-container-item">
-                <span class="name">{{
-                    t('view.settings.appearance.user_dialog.export_vrcx_memos_into_vrchat_notes')
-                }}</span>
-            </div>
         </div>
         <div class="options-container">
             <span class="header">{{ t('view.settings.appearance.friend_log.header') }}</span>
@@ -350,69 +255,67 @@
                 :label="t('view.settings.appearance.user_colors.random_colors_from_user_id')"
                 :value="randomUserColours"
                 @change="updateTrustColor('', '', true)"></simple-switch>
-            <div>
+            <div class="flex flex-col gap-1">
                 <div>
-                    <el-color-picker
+                    <span class="x-tag-untrusted">{{
+                        t('view.settings.appearance.user_colors.trust_levels.visitor')
+                    }}</span>
+                    <PresetColorPicker
                         :model-value="trustColor.untrusted"
-                        size="small"
-                        :predefine="['#CCCCCC']"
-                        @change="updateTrustColor('untrusted', $event)">
-                    </el-color-picker>
-                    <span class="color-picker x-tag-untrusted">Visitor</span>
+                        :presets="['#CCCCCC']"
+                        @change="updateTrustColor('untrusted', $event)" />
                 </div>
                 <div>
-                    <el-color-picker
+                    <span class="x-tag-basic">{{
+                        t('view.settings.appearance.user_colors.trust_levels.new_user')
+                    }}</span>
+                    <PresetColorPicker
                         :model-value="trustColor.basic"
-                        size="small"
-                        :predefine="['#1778ff']"
-                        @change="updateTrustColor('basic', $event)">
-                    </el-color-picker>
-                    <span class="color-picker x-tag-basic">New User</span>
+                        :presets="['#1778ff']"
+                        @change="updateTrustColor('basic', $event)" />
                 </div>
                 <div>
-                    <el-color-picker
+                    <span class="x-tag-known">{{ t('view.settings.appearance.user_colors.trust_levels.user') }}</span>
+                    <PresetColorPicker
                         :model-value="trustColor.known"
-                        size="small"
-                        :predefine="['#2bcf5c']"
-                        @change="updateTrustColor('known', $event)">
-                    </el-color-picker>
-                    <span class="color-picker x-tag-known">User</span>
+                        :presets="['#2bcf5c']"
+                        @change="updateTrustColor('known', $event)" />
                 </div>
                 <div>
-                    <el-color-picker
+                    <span class="x-tag-trusted">{{
+                        t('view.settings.appearance.user_colors.trust_levels.known_user')
+                    }}</span>
+                    <PresetColorPicker
                         :model-value="trustColor.trusted"
-                        size="small"
-                        :predefine="['#ff7b42']"
-                        @change="updateTrustColor('trusted', $event)">
-                    </el-color-picker>
-                    <span class="color-picker x-tag-trusted">Known User</span>
+                        :presets="['#ff7b42']"
+                        @change="updateTrustColor('trusted', $event)" />
                 </div>
                 <div>
-                    <el-color-picker
+                    <span class="x-tag-veteran">{{
+                        t('view.settings.appearance.user_colors.trust_levels.trusted_user')
+                    }}</span>
+                    <PresetColorPicker
                         :model-value="trustColor.veteran"
-                        size="small"
-                        :predefine="['#b18fff', '#8143e6', '#ff69b4', '#b52626', '#ffd000', '#abcdef']"
-                        @change="updateTrustColor('veteran', $event)">
-                    </el-color-picker>
-                    <span class="color-picker x-tag-veteran">Trusted User</span>
+                        :presets="['#b18fff', '#8143e6', '#ff69b4', '#b52626', '#ffd000', '#abcdef']"
+                        @change="updateTrustColor('veteran', $event)" />
                 </div>
                 <div>
-                    <el-color-picker
+                    <span class="x-tag-vip">{{
+                        t('view.settings.appearance.user_colors.trust_levels.vrchat_team')
+                    }}</span>
+                    <PresetColorPicker
                         :model-value="trustColor.vip"
-                        size="small"
-                        :predefine="['#ff2626']"
-                        @change="updateTrustColor('vip', $event)">
-                    </el-color-picker>
-                    <span class="color-picker x-tag-vip">VRChat Team</span>
+                        :presets="['#ff2626']"
+                        @change="updateTrustColor('vip', $event)" />
                 </div>
                 <div>
-                    <el-color-picker
+                    <span class="x-tag-troll">{{
+                        t('view.settings.appearance.user_colors.trust_levels.nuisance')
+                    }}</span>
+                    <PresetColorPicker
                         :model-value="trustColor.troll"
-                        size="small"
-                        :predefine="['#782f2f']"
-                        @change="updateTrustColor('troll', $event)">
-                    </el-color-picker>
-                    <span class="color-picker x-tag-troll">Nuisance</span>
+                        :presets="['#782f2f']"
+                        @change="updateTrustColor('troll', $event)" />
                 </div>
             </div>
         </div>
@@ -420,8 +323,16 @@
 </template>
 
 <script setup>
+    import {
+        Select,
+        SelectContent,
+        SelectGroup,
+        SelectItem,
+        SelectSeparator,
+        SelectTrigger,
+        SelectValue
+    } from '@/components/ui/select';
     import { ListboxContent, ListboxFilter, ListboxItem, ListboxItemIndicator, ListboxRoot, useFilter } from 'reka-ui';
-    import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
     import {
         NumberField,
         NumberFieldContent,
@@ -438,17 +349,18 @@
     } from '@/components/ui/tags-input';
     import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
     import { computed, onBeforeUnmount, ref, watch } from 'vue';
-    import { CheckIcon, ChevronDown } from 'lucide-vue-next';
+    import { CheckIcon, ChevronDown, Info } from 'lucide-vue-next';
+    import { useAppearanceSettingsStore, useFavoriteStore, useVrStore } from '@/stores';
     import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-    import { ArrowRight } from '@element-plus/icons-vue';
+    import { getLanguageName, languageCodes } from '@/localization';
+    import { APP_FONT_FAMILIES } from '@/shared/constants';
     import { Button } from '@/components/ui/button';
     import { storeToRefs } from 'pinia';
     import { toast } from 'vue-sonner';
     import { useI18n } from 'vue-i18n';
 
-    import { useAppearanceSettingsStore, useFavoriteStore, useVrStore } from '../../../../stores';
-    import { getLanguageName, languageCodes } from '../../../../localization';
-    import { THEME_CONFIG } from '../../../../shared/constants';
+    import PresetColorPicker from '@/components/PresetColorPicker.vue';
+    import TableLimitsDialog from '@/components/dialogs/TableLimitsDialog.vue';
 
     import SimpleSwitch from '../SimpleSwitch.vue';
 
@@ -459,8 +371,8 @@
 
     const {
         appLanguage,
-        themeMode,
         displayVRCPlusIconsAsAvatar,
+        appFontFamily,
         hideNicknames,
         showInstanceIdInLocation,
         isAgeGatedInstancesVisible,
@@ -468,12 +380,6 @@
         instanceUsersSortAlphabetical,
         dtHour12,
         dtIsoFormat,
-        sidebarSortMethod1,
-        sidebarSortMethod2,
-        sidebarSortMethod3,
-        isSidebarGroupByInstance,
-        isHideFriendsInSameInstance,
-        isSidebarDivideByFriendGroup,
         hideUserNotes,
         hideUserMemos,
         hideUnfriends,
@@ -481,7 +387,8 @@
         trustColor,
         notificationIconDot,
         tablePageSizes,
-        compactTableMode
+        isDataTableStriped,
+        showPointerOnHover
     } = storeToRefs(appearanceSettingsStore);
 
     const appLanguageDisplayName = computed(() => getLanguageName(String(appLanguage.value)));
@@ -496,23 +403,27 @@
         setInstanceUsersSortAlphabetical,
         setDtHour12,
         setDtIsoFormat,
-        setSidebarSortMethod1,
-        setSidebarSortMethod2,
-        setSidebarSortMethod3,
-        setIsSidebarGroupByInstance,
-        setIsHideFriendsInSameInstance,
-        setIsSidebarDivideByFriendGroup,
         setHideUserNotes,
         setHideUserMemos,
         setHideUnfriends,
         updateTrustColor,
-        setThemeMode,
         changeAppLanguage,
-        promptMaxTableSizeDialog,
+        showTableLimitsDialog,
         setNotificationIconDot,
         setTablePageSizes,
-        setCompactTableMode
+        toggleStripedDataTable,
+        togglePointerOnHover,
+        setAppFontFamily
     } = appearanceSettingsStore;
+
+    const appFontFamilyOptions = computed(() => {
+        const fontKeys = APP_FONT_FAMILIES.filter((key) => key !== 'system_ui');
+        return [
+            ...fontKeys.map((key) => ({ type: 'item', key })),
+            { type: 'separator', key: 'separator-system-ui' },
+            { type: 'item', key: 'system_ui' }
+        ];
+    });
 
     const zoomLevel = ref(100);
     const isLinux = computed(() => LINUX);
@@ -558,8 +469,6 @@
             }
         }
     });
-
-    const SELECT_CLEAR_VALUE = '__clear__';
 
     const TABLE_PAGE_SIZE_SUGGESTIONS = Object.freeze([5, 10, 15, 20, 25, 30, 50, 75, 100, 150, 200, 250, 500, 1000]);
 

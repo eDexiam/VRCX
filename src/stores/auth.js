@@ -1,5 +1,4 @@
 import { reactive, ref, watch } from 'vue';
-import { ElMessageBox } from 'element-plus';
 import { defineStore } from 'pinia';
 import { toast } from 'vue-sonner';
 import { useI18n } from 'vue-i18n';
@@ -13,6 +12,7 @@ import { database } from '../service/database';
 import { escapeTag } from '../shared/utils';
 import { request } from '../service/request';
 import { useAdvancedSettingsStore } from './settings/advanced';
+import { useGeneralSettingsStore } from './settings/general';
 import { useModalStore } from './modal';
 import { useNotificationStore } from './notification';
 import { useUpdateLoopStore } from './updateLoop';
@@ -23,8 +23,11 @@ import configRepository from '../service/config';
 import security from '../service/security';
 import webApiService from '../service/webapi';
 
+import * as workerTimers from 'worker-timers';
+
 export const useAuthStore = defineStore('Auth', () => {
     const advancedSettingsStore = useAdvancedSettingsStore();
+    const generalSettingsStore = useGeneralSettingsStore();
     const notificationStore = useNotificationStore();
     const userStore = useUserStore();
     const updateLoopStore = useUpdateLoopStore();
@@ -188,6 +191,7 @@ export const useAuthStore = defineStore('Auth', () => {
                 AppDebug.endpointDomain = user.loginParams.endpoint;
                 AppDebug.websocketDomain = user.loginParams.websocket;
             }
+            await applyAutoLoginDelay();
             // login at startup
             loginForm.value.loading = true;
             authRequest
@@ -255,15 +259,22 @@ export const useAuthStore = defineStore('Auth', () => {
         if (advancedSettingsStore.enablePrimaryPassword) {
             enablePrimaryPasswordDialog.value.visible = true;
         } else {
-            ElMessageBox.prompt(
-                t('prompt.primary_password.description'),
-                t('prompt.primary_password.header'),
-                {
+            modalStore
+                .prompt({
+                    title: t('prompt.primary_password.header'),
+                    description: t('prompt.primary_password.description'),
                     inputType: 'password',
-                    inputPattern: /[\s\S]{1,32}/
-                }
-            )
-                .then(async ({ value }) => {
+                    pattern: /[\s\S]{1,32}/
+                })
+                .then(async ({ ok, value }) => {
+                    if (!ok) {
+                        advancedSettingsStore.enablePrimaryPassword = true;
+                        advancedSettingsStore.setEnablePrimaryPasswordConfigRepository(
+                            true
+                        );
+                        return;
+                    }
+
                     const savedCredentials = JSON.parse(
                         await configRepository.getString(
                             'savedCredentials',
@@ -299,7 +310,8 @@ export const useAuthStore = defineStore('Auth', () => {
                             });
                     }
                 })
-                .catch(async () => {
+                .catch((err) => {
+                    console.error(err);
                     advancedSettingsStore.enablePrimaryPassword = true;
                     advancedSettingsStore.setEnablePrimaryPasswordConfigRepository(
                         true
@@ -378,16 +390,20 @@ export const useAuthStore = defineStore('Auth', () => {
         return new Promise((resolve, reject) => {
             if (!advancedSettingsStore.enablePrimaryPassword) {
                 resolve(args.password);
+                return;
             }
-            ElMessageBox.prompt(
-                t('prompt.primary_password.description'),
-                t('prompt.primary_password.header'),
-                {
+            modalStore
+                .prompt({
+                    title: t('prompt.primary_password.header'),
+                    description: t('prompt.primary_password.description'),
                     inputType: 'password',
-                    inputPattern: /[\s\S]{1,32}/
-                }
-            )
-                .then(({ value }) => {
+                    pattern: /[\s\S]{1,32}/
+                })
+                .then(({ ok, value }) => {
+                    if (!ok) {
+                        reject(new Error('primary password prompt cancelled'));
+                        return;
+                    }
                     security
                         .decrypt(args.password, value)
                         .then(resolve)
@@ -409,7 +425,7 @@ export const useAuthStore = defineStore('Auth', () => {
     function logout() {
         modalStore
             .confirm({
-                description: 'Continue? Logout',
+                description: t('confirm.logout'),
                 title: 'Confirm'
             })
             .then(({ ok }) => {
@@ -438,59 +454,40 @@ export const useAuthStore = defineStore('Auth', () => {
             AppDebug.endpointDomain = AppDebug.endpointDomainVrchat;
             AppDebug.websocketDomain = AppDebug.websocketDomainVrchat;
         }
-        return new Promise((resolve, reject) => {
-            loginForm.value.loading = true;
+
+        loginForm.value.loading = true;
+        try {
+            let password = loginParams.password;
             if (advancedSettingsStore.enablePrimaryPassword) {
-                checkPrimaryPassword(loginParams)
-                    .then((pwd) => {
-                        return authRequest
-                            .getConfig()
-                            .catch((err) => {
-                                reject(err);
-                            })
-                            .then(() => {
-                                authLogin({
-                                    username: loginParams.username,
-                                    password: pwd,
-                                    cipher: loginParams.password,
-                                    endpoint: loginParams.endpoint,
-                                    websocket: loginParams.websocket
-                                })
-                                    .catch((err2) => {
-                                        reject(err2);
-                                    })
-                                    .then(() => {
-                                        resolve();
-                                    });
-                            });
-                    })
-                    .catch((_) => {
-                        toast.error('Incorrect primary password');
-                        reject(_);
-                    });
-            } else {
-                authRequest
-                    .getConfig()
-                    .catch((err) => {
-                        reject(err);
-                    })
-                    .then(() => {
-                        authLogin({
-                            username: loginParams.username,
-                            password: loginParams.password,
-                            endpoint: loginParams.endpoint,
-                            websocket: loginParams.websocket
-                        })
-                            .catch((err2) => {
-                                handleLogoutEvent();
-                                reject(err2);
-                            })
-                            .then(() => {
-                                resolve();
-                            });
-                    });
+                try {
+                    password = await checkPrimaryPassword(loginParams);
+                } catch (err) {
+                    toast.error('Incorrect primary password');
+                    throw err;
+                }
             }
-        }).finally(() => (loginForm.value.loading = false));
+
+            await authRequest.getConfig();
+            try {
+                await authLogin({
+                    username: loginParams.username,
+                    password,
+                    endpoint: loginParams.endpoint,
+                    websocket: loginParams.websocket
+                });
+            } catch (err) {
+                await handleLogoutEvent();
+                throw err;
+            }
+        } catch (err) {
+            if (err.message.includes('Invalid Username/Email or Password')) {
+                toast.error('Saved credentials are no longer valid.');
+                await deleteSavedLogin(user.user.id);
+            }
+            throw err;
+        } finally {
+            loginForm.value.loading = false;
+        }
     }
 
     async function deleteSavedLogin(userId) {
@@ -536,15 +533,17 @@ export const useAuthStore = defineStore('Auth', () => {
                         loginForm.value.saveCredentials &&
                         advancedSettingsStore.enablePrimaryPassword
                     ) {
-                        ElMessageBox.prompt(
-                            t('prompt.primary_password.description'),
-                            t('prompt.primary_password.header'),
-                            {
+                        modalStore
+                            .prompt({
+                                title: t('prompt.primary_password.header'),
+                                description: t(
+                                    'prompt.primary_password.description'
+                                ),
                                 inputType: 'password',
-                                inputPattern: /[\s\S]{1,32}/
-                            }
-                        )
-                            .then(async ({ value }) => {
+                                pattern: /[\s\S]{1,32}/
+                            })
+                            .then(async ({ ok, value }) => {
+                                if (!ok) return;
                                 const savedCredentials = JSON.parse(
                                     await configRepository.getString(
                                         'savedCredentials'
@@ -613,41 +612,38 @@ export const useAuthStore = defineStore('Auth', () => {
         }
         AppApi.FlashWindow();
         twoFactorAuthDialogVisible.value = true;
-        ElMessageBox.prompt(
-            t('prompt.totp.description'),
-            t('prompt.totp.header'),
-            {
-                distinguishCancelAndClose: true,
-                cancelButtonText: t('prompt.totp.use_otp'),
-                confirmButtonText: t('prompt.totp.verify'),
-                inputPlaceholder: t('prompt.totp.input_placeholder'),
-                inputPattern: /^[0-9]{6}$/,
-                inputErrorMessage: t('prompt.totp.input_error'),
-                beforeClose: (action, instance, done) => {
-                    twoFactorAuthDialogVisible.value = false;
-                    if (action === 'cancel') {
-                        promptOTP();
-                    }
-                    done();
-                }
-            }
-        )
-            .then(({ value, action }) => {
-                if (action === 'confirm') {
-                    authRequest
-                        .verifyTOTP({
-                            code: value.trim()
-                        })
-                        .catch((err) => {
-                            console.error(err);
-                            clearCookiesTryLogin();
-                        })
-                        .then(() => {
-                            userStore.getCurrentUser();
-                        });
-                }
+        modalStore
+            .otpPrompt({
+                title: t('prompt.totp.header'),
+                description: t('prompt.totp.description'),
+                mode: 'totp',
+                cancelText: t('prompt.totp.use_otp'),
+                confirmText: t('prompt.totp.verify')
             })
-            .catch(() => {});
+            .then(({ ok, reason, value }) => {
+                twoFactorAuthDialogVisible.value = false;
+
+                if (reason === 'cancel') {
+                    promptOTP();
+                    return;
+                }
+                if (!ok) return;
+
+                authRequest
+                    .verifyTOTP({
+                        code: value.trim()
+                    })
+                    .catch((err) => {
+                        console.error(err);
+                        clearCookiesTryLogin();
+                    })
+                    .then(() => {
+                        userStore.getCurrentUser();
+                    });
+            })
+            .catch(() => {
+                twoFactorAuthDialogVisible.value = false;
+            });
     }
 
     function promptOTP() {
@@ -655,41 +651,38 @@ export const useAuthStore = defineStore('Auth', () => {
             return;
         }
         twoFactorAuthDialogVisible.value = true;
-        ElMessageBox.prompt(
-            t('prompt.otp.description'),
-            t('prompt.otp.header'),
-            {
-                distinguishCancelAndClose: true,
-                cancelButtonText: t('prompt.otp.use_totp'),
-                confirmButtonText: t('prompt.otp.verify'),
-                inputPlaceholder: t('prompt.otp.input_placeholder'),
-                inputPattern: /^[a-z0-9]{4}-[a-z0-9]{4}$/,
-                inputErrorMessage: t('prompt.otp.input_error'),
-                beforeClose: (action, instance, done) => {
-                    twoFactorAuthDialogVisible.value = false;
-                    if (action === 'cancel') {
-                        promptTOTP();
-                    }
-                    done();
-                }
-            }
-        )
-            .then(({ value, action }) => {
-                if (action === 'confirm') {
-                    authRequest
-                        .verifyOTP({
-                            code: value.trim()
-                        })
-                        .catch((err) => {
-                            console.error(err);
-                            clearCookiesTryLogin();
-                        })
-                        .then(() => {
-                            userStore.getCurrentUser();
-                        });
-                }
+        modalStore
+            .otpPrompt({
+                title: t('prompt.otp.header'),
+                description: t('prompt.otp.description'),
+                mode: 'otp',
+                cancelText: t('prompt.otp.use_totp'),
+                confirmText: t('prompt.otp.verify')
             })
-            .catch(() => {});
+            .then(({ ok, reason, value }) => {
+                twoFactorAuthDialogVisible.value = false;
+
+                if (reason === 'cancel') {
+                    promptTOTP();
+                    return;
+                }
+                if (!ok) return;
+
+                authRequest
+                    .verifyOTP({
+                        code: `${value.slice(0, 4)}-${value.slice(4)}`
+                    })
+                    .catch((err) => {
+                        console.error(err);
+                        clearCookiesTryLogin();
+                    })
+                    .then(() => {
+                        userStore.getCurrentUser();
+                    });
+            })
+            .catch(() => {
+                twoFactorAuthDialogVisible.value = false;
+            });
     }
 
     function promptEmailOTP() {
@@ -698,42 +691,38 @@ export const useAuthStore = defineStore('Auth', () => {
         }
         AppApi.FlashWindow();
         twoFactorAuthDialogVisible.value = true;
-        ElMessageBox.prompt(
-            t('prompt.email_otp.description'),
-            t('prompt.email_otp.header'),
-            {
-                distinguishCancelAndClose: true,
-                cancelButtonText: t('prompt.email_otp.resend'),
-                confirmButtonText: t('prompt.email_otp.verify'),
-                inputPlaceholder: t('prompt.email_otp.input_placeholder'),
-                inputPattern: /^[0-9]{6}$/,
-                inputErrorMessage: t('prompt.email_otp.input_error'),
-                beforeClose: (action, instance, done) => {
-                    twoFactorAuthDialogVisible.value = false;
-                    if (action === 'cancel') {
-                        resendEmail2fa();
-                        return;
-                    }
-                    done();
-                }
-            }
-        )
-            .then(({ value, action }) => {
-                if (action === 'confirm') {
-                    authRequest
-                        .verifyEmailOTP({
-                            code: value.trim()
-                        })
-                        .catch((err) => {
-                            console.error(err);
-                            promptEmailOTP();
-                        })
-                        .then(() => {
-                            userStore.getCurrentUser();
-                        });
-                }
+        modalStore
+            .otpPrompt({
+                title: t('prompt.email_otp.header'),
+                description: t('prompt.email_otp.description'),
+                mode: 'emailOtp',
+                cancelText: t('prompt.email_otp.resend'),
+                confirmText: t('prompt.email_otp.verify')
             })
-            .catch(() => {});
+            .then(({ ok, reason, value }) => {
+                twoFactorAuthDialogVisible.value = false;
+
+                if (reason === 'cancel') {
+                    resendEmail2fa();
+                    return;
+                }
+                if (!ok) return;
+
+                authRequest
+                    .verifyEmailOTP({
+                        code: value.trim()
+                    })
+                    .catch((err) => {
+                        console.error(err);
+                        promptEmailOTP();
+                    })
+                    .then(() => {
+                        userStore.getCurrentUser();
+                    });
+            })
+            .catch(() => {
+                twoFactorAuthDialogVisible.value = false;
+            });
     }
 
     /**
@@ -858,6 +847,34 @@ export const useAuthStore = defineStore('Auth', () => {
                     console.error(`You're offline.`);
                 }
             });
+    }
+
+    async function applyAutoLoginDelay() {
+        if (!generalSettingsStore.autoLoginDelayEnabled) {
+            return;
+        }
+        const seconds = generalSettingsStore.autoLoginDelaySeconds;
+        if (!seconds || seconds <= 0) {
+            return;
+        }
+        let toastId = null;
+        for (let remaining = seconds; remaining > 0; remaining--) {
+            if (toastId) {
+                toast.dismiss(toastId);
+            }
+            toastId = toast.info(
+                t('message.auto_login_delay_countdown', {
+                    seconds: remaining
+                }),
+                { duration: Infinity }
+            );
+            await new Promise((resolve) => {
+                workerTimers.setTimeout(resolve, 1000);
+            });
+        }
+        if (toastId) {
+            toast.dismiss(toastId);
+        }
     }
 
     async function loginComplete() {

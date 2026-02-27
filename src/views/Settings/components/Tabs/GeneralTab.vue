@@ -6,14 +6,14 @@
                 <div class="x-friend-item" style="cursor: default">
                     <div class="detail">
                         <span class="name">{{ t('view.settings.general.general.version') }}</span>
-                        <span class="extra" v-text="appVersion"></span>
+                        <span class="block truncate text-xs" v-text="appVersion"></span>
                     </div>
                 </div>
                 <div class="x-friend-item" @click="checkForVRCXUpdate">
                     <div class="detail">
                         <span class="name">{{ t('view.settings.general.general.latest_app_version') }}</span>
-                        <span v-if="latestAppVersion" class="extra" v-text="latestAppVersion"></span>
-                        <span v-else class="extra">{{
+                        <span v-if="latestAppVersion" class="block truncate text-xs" v-text="latestAppVersion"></span>
+                        <span v-else class="block truncate text-xs">{{
                             t('view.settings.general.general.latest_app_version_refresh')
                         }}</span>
                     </div>
@@ -21,13 +21,13 @@
                 <div class="x-friend-item" @click="openExternalLink(links.github)">
                     <div class="detail">
                         <span class="name">{{ t('view.settings.general.general.repository_url') }}</span>
-                        <span v-once class="extra">{{ links.github }}</span>
+                        <span v-once class="block truncate text-xs">{{ links.github }}</span>
                     </div>
                 </div>
                 <div class="x-friend-item" @click="openExternalLink(links.discord)">
                     <div class="detail">
                         <span class="name">{{ t('view.settings.general.general.support') }}</span>
-                        <span v-once class="extra">{{ links.discord }}</span>
+                        <span v-once class="block truncate text-xs">{{ links.discord }}</span>
                     </div>
                 </div>
             </div>
@@ -42,9 +42,8 @@
                     t('view.settings.general.vrcx_updater.change_build')
                 }}</Button>
             </div>
-            <div v-if="!noUpdater" class="options-container-item">
+            <div v-if="!noUpdater" class="text-sm mt-2 flex flex-col align-baseline">
                 <span class="name">{{ t('view.settings.general.vrcx_updater.update_action') }}</span>
-                <br />
                 <ToggleGroup
                     type="single"
                     required
@@ -110,7 +109,12 @@
             </div>
         </div>
         <div class="options-container">
-            <span class="header">{{ t('view.settings.general.favorites.header') }}</span>
+            <span class="header inline-flex items-center"
+                >{{ t('view.settings.general.favorites.header') }}
+                <TooltipWrapper side="top" :content="t('view.settings.general.favorites.header_tooltip')">
+                    <Info style="width: 12px; height: 12px; margin-left: 4px; vertical-align: middle; cursor: help" />
+                </TooltipWrapper>
+            </span>
             <br />
             <Select
                 :model-value="localFavoriteFriendsGroups"
@@ -120,153 +124,24 @@
                     <SelectValue :placeholder="t('view.settings.general.favorites.group_placeholder')" />
                 </SelectTrigger>
                 <SelectContent>
-                    <SelectItem v-for="group in favoriteFriendGroups" :key="group.key" :value="group.key">
-                        {{ group.displayName }}
-                    </SelectItem>
+                    <SelectGroup>
+                        <SelectItem v-for="group in favoriteFriendGroups" :key="group.key" :value="group.key">
+                            {{ group.displayName }}
+                        </SelectItem>
+                    </SelectGroup>
+                    <template v-if="localFriendFavoriteGroups.length">
+                        <SelectSeparator />
+                        <SelectGroup>
+                            <SelectItem
+                                v-for="group in localFriendFavoriteGroups"
+                                :key="'local:' + group"
+                                :value="'local:' + group">
+                                {{ group }}
+                            </SelectItem>
+                        </SelectGroup>
+                    </template>
                 </SelectContent>
             </Select>
-        </div>
-        <div class="options-container">
-            <span class="header">{{ t('view.settings.general.logging.header') }}</span>
-            <simple-switch
-                :label="t('view.settings.advanced.advanced.cache_debug.udon_exception_logging')"
-                :value="udonExceptionLogging"
-                @change="setUdonExceptionLogging" />
-            <simple-switch
-                :label="t('view.settings.general.logging.resource_load')"
-                :value="logResourceLoad"
-                @change="setLogResourceLoad" />
-            <simple-switch
-                :label="t('view.settings.general.logging.empty_avatar')"
-                :value="logEmptyAvatars"
-                @change="setLogEmptyAvatars" />
-        </div>
-        <div class="options-container">
-            <span class="header">{{ t('view.settings.general.automation.header') }}</span>
-            <simple-switch
-                :label="t('view.settings.general.automation.auto_change_status')"
-                :value="autoStateChangeEnabled"
-                :tooltip="t('view.settings.general.automation.auto_state_change_tooltip')"
-                @change="setAutoStateChangeEnabled" />
-            <div class="options-container-item">
-                <span class="name">{{ t('view.settings.general.automation.alone_status') }}</span>
-                <Select
-                    :model-value="autoStateChangeAloneStatus"
-                    :disabled="!autoStateChangeEnabled"
-                    @update:modelValue="setAutoStateChangeAloneStatus">
-                    <SelectTrigger style="margin-top: 8px" size="sm">
-                        <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="join me">
-                            <i class="x-user-status joinme"></i> {{ t('dialog.user.status.join_me') }}
-                        </SelectItem>
-                        <SelectItem value="active">
-                            <i class="x-user-status online"></i> {{ t('dialog.user.status.online') }}
-                        </SelectItem>
-                        <SelectItem value="ask me">
-                            <i class="x-user-status askme"></i> {{ t('dialog.user.status.ask_me') }}
-                        </SelectItem>
-                        <SelectItem value="busy">
-                            <i class="x-user-status busy"></i> {{ t('dialog.user.status.busy') }}
-                        </SelectItem>
-                    </SelectContent>
-                </Select>
-            </div>
-            <div class="options-container-item">
-                <span class="name">{{ t('view.settings.general.automation.company_status') }}</span>
-                <Select
-                    :model-value="autoStateChangeCompanyStatus"
-                    :disabled="!autoStateChangeEnabled"
-                    @update:modelValue="setAutoStateChangeCompanyStatus">
-                    <SelectTrigger style="margin-top: 8px" size="sm">
-                        <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="join me">
-                            <i class="x-user-status joinme"></i> {{ t('dialog.user.status.join_me') }}
-                        </SelectItem>
-                        <SelectItem value="active">
-                            <i class="x-user-status online"></i> {{ t('dialog.user.status.online') }}
-                        </SelectItem>
-                        <SelectItem value="ask me">
-                            <i class="x-user-status askme"></i> {{ t('dialog.user.status.ask_me') }}
-                        </SelectItem>
-                        <SelectItem value="busy">
-                            <i class="x-user-status busy"></i> {{ t('dialog.user.status.busy') }}
-                        </SelectItem>
-                    </SelectContent>
-                </Select>
-            </div>
-            <div class="options-container-item">
-                <span class="name">{{ t('view.settings.general.automation.allowed_instance_types') }}</span>
-                <Select
-                    :model-value="autoStateChangeInstanceTypes"
-                    :disabled="!autoStateChangeEnabled"
-                    multiple
-                    @update:modelValue="setAutoStateChangeInstanceTypes">
-                    <SelectTrigger style="margin-top: 8px" size="sm">
-                        <SelectValue :placeholder="t('view.settings.general.automation.instance_type_placeholder')" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem v-for="instanceType in instanceTypes" :key="instanceType" :value="instanceType">
-                            {{ instanceType }}
-                        </SelectItem>
-                    </SelectContent>
-                </Select>
-            </div>
-            <div class="options-container-item">
-                <span class="name">{{ t('view.settings.general.automation.alone_condition') }}</span>
-                <RadioGroup
-                    :model-value="autoStateChangeNoFriends ? 'true' : 'false'"
-                    :disabled="!autoStateChangeEnabled"
-                    class="gap-2 flex"
-                    style="margin-top: 8px"
-                    @update:modelValue="handleAutoStateChangeNoFriendsRadio">
-                    <div class="flex items-center space-x-2">
-                        <RadioGroupItem id="autoStateChangeNoFriends-false" value="false" />
-                        <label for="autoStateChangeNoFriends-false">
-                            {{ t('view.settings.general.automation.alone') }}
-                        </label>
-                    </div>
-                    <div class="flex items-center space-x-2">
-                        <RadioGroupItem id="autoStateChangeNoFriends-true" value="true" />
-                        <label for="autoStateChangeNoFriends-true">
-                            {{ t('view.settings.general.automation.no_friends') }}
-                        </label>
-                    </div>
-                </RadioGroup>
-            </div>
-            <div class="options-container-item">
-                <span class="name"
-                    >{{ t('view.settings.general.automation.auto_invite_request_accept') }}
-                    <TooltipWrapper
-                        side="top"
-                        style="margin-left: 5px"
-                        :content="t('view.settings.general.automation.auto_invite_request_accept_tooltip')">
-                        <el-icon><InfoFilled /></el-icon>
-                    </TooltipWrapper>
-                </span>
-                <br />
-                <ToggleGroup
-                    type="single"
-                    required
-                    variant="outline"
-                    size="sm"
-                    :model-value="autoAcceptInviteRequests"
-                    style="margin-top: 5px"
-                    @update:model-value="setAutoAcceptInviteRequests">
-                    <ToggleGroupItem value="Off">{{
-                        t('view.settings.general.automation.auto_invite_request_accept_off')
-                    }}</ToggleGroupItem>
-                    <ToggleGroupItem value="All Favorites">{{
-                        t('view.settings.general.automation.auto_invite_request_accept_favs')
-                    }}</ToggleGroupItem>
-                    <ToggleGroupItem value="Selected Favorites">{{
-                        t('view.settings.general.automation.auto_invite_request_accept_selected_favs')
-                    }}</ToggleGroupItem>
-                </ToggleGroup>
-            </div>
         </div>
         <div class="options-container">
             <span class="header">{{ t('view.settings.general.contributors.header') }}</span>
@@ -283,8 +158,10 @@
             <div class="options-container-item" style="display: block">
                 <p>
                     &copy; 2019-2026
-                    <a class="x-link" @click="openExternalLink('https://github.com/pypy-vrc')">pypy</a> &amp;
-                    <a class="x-link" @click="openExternalLink('https://github.com/Natsumi-sama')">Natsumi</a>
+                    <a class="cursor-pointer" @click="openExternalLink('https://github.com/pypy-vrc')">pypy</a> &amp;
+                    <a class="cursor-pointer" @click="openExternalLink('https://github.com/Natsumi-sama')">Natsumi</a>
+                    &amp;
+                    <a class="cursor-pointer" @click="openExternalLink('https://github.com/Map1en')">Map1en</a>
                 </p>
                 <p>{{ t('view.settings.general.legal_notice.info') }}</p>
                 <p>{{ t('view.settings.general.legal_notice.disclaimer1') }}</p>
@@ -303,18 +180,26 @@
 <script setup>
     import { computed, defineAsyncComponent, ref } from 'vue';
     import { Button } from '@/components/ui/button';
-    import { InfoFilled } from '@element-plus/icons-vue';
+    import { Info } from 'lucide-vue-next';
     import { storeToRefs } from 'pinia';
     import { useI18n } from 'vue-i18n';
 
-    import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../../components/ui/select';
+    import {
+        Select,
+        SelectContent,
+        SelectGroup,
+        SelectItem,
+        SelectSeparator,
+        SelectTrigger,
+        SelectValue
+    } from '../../../../components/ui/select';
     import { useFavoriteStore, useGeneralSettingsStore, useVRCXUpdaterStore } from '../../../../stores';
-    import { RadioGroup, RadioGroupItem } from '../../../../components/ui/radio-group';
     import { ToggleGroup, ToggleGroupItem } from '../../../../components/ui/toggle-group';
     import { links } from '../../../../shared/constants';
     import { openExternalLink } from '../../../../shared/utils';
 
     import SimpleSwitch from '../SimpleSwitch.vue';
+    import TooltipWrapper from '../../../../components/ui/tooltip/TooltipWrapper.vue';
 
     const { t } = useI18n();
 
@@ -328,16 +213,7 @@
         isCloseToTray,
         disableGpuAcceleration,
         disableVrOverlayGpuAcceleration,
-        localFavoriteFriendsGroups,
-        udonExceptionLogging,
-        logResourceLoad,
-        logEmptyAvatars,
-        autoStateChangeEnabled,
-        autoStateChangeAloneStatus,
-        autoStateChangeCompanyStatus,
-        autoStateChangeInstanceTypes,
-        autoStateChangeNoFriends,
-        autoAcceptInviteRequests
+        localFavoriteFriendsGroups
     } = storeToRefs(generalSettingsStore);
 
     const {
@@ -346,34 +222,14 @@
         setIsCloseToTray,
         setDisableGpuAcceleration,
         setDisableVrOverlayGpuAcceleration,
-        setUdonExceptionLogging,
-        setLogResourceLoad,
-        setLogEmptyAvatars,
-        setAutoStateChangeEnabled,
-        setAutoStateChangeAloneStatus,
-        setAutoStateChangeCompanyStatus,
-        setAutoStateChangeInstanceTypes,
-        setAutoStateChangeNoFriends,
-        setAutoAcceptInviteRequests,
         setLocalFavoriteFriendsGroups,
         promptProxySettings
     } = generalSettingsStore;
 
-    const { favoriteFriendGroups } = storeToRefs(favoriteStore);
+    const { favoriteFriendGroups, localFriendFavoriteGroups } = storeToRefs(favoriteStore);
 
     const { appVersion, autoUpdateVRCX, latestAppVersion, noUpdater } = storeToRefs(vrcxUpdaterStore);
     const { setAutoUpdateVRCX, checkForVRCXUpdate, showVRCXUpdateDialog, showChangeLogDialog } = vrcxUpdaterStore;
-
-    const instanceTypes = ref([
-        'invite',
-        'invite+',
-        'friends',
-        'friends+',
-        'public',
-        'groupPublic',
-        'groupPlus',
-        'groupOnly'
-    ]);
 
     const ossDialog = ref(false);
     const isLinux = computed(() => LINUX);
@@ -387,12 +243,5 @@
 
     function openOSSDialog() {
         ossDialog.value = true;
-    }
-
-    function handleAutoStateChangeNoFriendsRadio(value) {
-        const nextValue = value === 'true';
-        if (nextValue !== autoStateChangeNoFriends.value) {
-            setAutoStateChangeNoFriends();
-        }
     }
 </script>

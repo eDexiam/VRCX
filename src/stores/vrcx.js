@@ -6,6 +6,15 @@ import { useI18n } from 'vue-i18n';
 import Noty from 'noty';
 
 import {
+    DEFAULT_MAX_TABLE_SIZE,
+    DEFAULT_SEARCH_LIMIT,
+    LEGACY_MAX_TABLE_SIZE_DEFAULT,
+    SEARCH_LIMIT_MAX,
+    SEARCH_LIMIT_MIN,
+    TABLE_MAX_SIZE_MAX
+} from '../shared/constants';
+import { avatarRequest, worldRequest } from '../api';
+import {
     clearPiniaActionTrail,
     getPiniaActionTrail
 } from '../plugin/piniaActionTrail';
@@ -34,7 +43,6 @@ import { useUserStore } from './user';
 import { useVrcStatusStore } from './vrcStatus';
 import { useWorldStore } from './world';
 import { watchState } from '../service/watchState';
-import { worldRequest } from '../api';
 
 import configRepository from '../service/config';
 
@@ -74,7 +82,8 @@ export const useVrcxStore = defineStore('Vrcx', () => {
     const isRegistryBackupDialogVisible = ref(false);
     const ipcEnabled = ref(false);
     const clearVRCXCacheFrequency = ref(172800);
-    const maxTableSize = ref(1000);
+    const maxTableSize = ref(DEFAULT_MAX_TABLE_SIZE);
+    const searchLimit = ref(DEFAULT_SEARCH_LIMIT);
     const proxyServer = ref('');
 
     async function init() {
@@ -148,12 +157,43 @@ export const useVrcxStore = defineStore('Vrcx', () => {
 
         maxTableSize.value = await configRepository.getInt(
             'VRCX_maxTableSize',
-            1000
+            LEGACY_MAX_TABLE_SIZE_DEFAULT
         );
-        if (maxTableSize.value > 10000) {
-            maxTableSize.value = 1000;
+        if (maxTableSize.value > TABLE_MAX_SIZE_MAX) {
+            maxTableSize.value = TABLE_MAX_SIZE_MAX;
+        }
+        const maxTableSizeMigrated = await configRepository.getBool(
+            'VRCX_maxTableSizeMigrated500',
+            false
+        );
+        // Migrate old default table size (1000) to new default (500)
+        if (
+            maxTableSize.value === LEGACY_MAX_TABLE_SIZE_DEFAULT &&
+            !maxTableSizeMigrated
+        ) {
+            maxTableSize.value = DEFAULT_MAX_TABLE_SIZE;
+            await configRepository.setInt(
+                'VRCX_maxTableSize',
+                maxTableSize.value
+            );
+            await configRepository.setBool(
+                'VRCX_maxTableSizeMigrated500',
+                true
+            );
         }
         database.setMaxTableSize(maxTableSize.value);
+
+        searchLimit.value = await configRepository.getInt(
+            'VRCX_searchLimit',
+            DEFAULT_SEARCH_LIMIT
+        );
+        if (searchLimit.value < SEARCH_LIMIT_MIN) {
+            searchLimit.value = SEARCH_LIMIT_MIN;
+        }
+        if (searchLimit.value > SEARCH_LIMIT_MAX) {
+            searchLimit.value = SEARCH_LIMIT_MAX;
+        }
+        database.setSearchTableSize(searchLimit.value);
 
         refreshCustomScript();
     }
@@ -195,7 +235,7 @@ export const useVrcxStore = defineStore('Vrcx', () => {
                 toast.dismiss(msgBox);
                 if (state.databaseVersion) {
                     // only display when database exists
-                    toast.success('Database upgrade complete');
+                    toast.success(t('message.database.upgrade_complete'));
                 }
                 state.databaseVersion = databaseVersion;
             } catch (err) {
@@ -211,6 +251,7 @@ export const useVrcxStore = defineStore('Vrcx', () => {
     }
 
     function clearVRCXCache() {
+        console.log('Clearing VRCX cache...');
         failedGetRequests.clear();
         userStore.cachedUsers.forEach((ref, id) => {
             if (
@@ -532,13 +573,15 @@ export const useVrcxStore = defineStore('Vrcx', () => {
             if (advancedSettingsStore.sentryErrorReporting) {
                 try {
                     import('@sentry/vue').then((Sentry) => {
-                        const trail = getPiniaActionTrail().filter((entry) => {
-                            if (!entry) return false;
-                            return (
-                                typeof entry.t === 'string' &&
-                                typeof entry.a === 'string'
-                            );
-                        });
+                        const trail = getPiniaActionTrail()
+                            .filter((entry) => {
+                                if (!entry) return false;
+                                return (
+                                    typeof entry.t === 'string' &&
+                                    typeof entry.a === 'string'
+                                );
+                            })
+                            .reverse();
                         const trailText = JSON.stringify(trail);
                         Sentry.withScope((scope) => {
                             scope.setLevel('fatal');
@@ -596,10 +639,28 @@ export const useVrcxStore = defineStore('Vrcx', () => {
             case 'local-favorite-world':
                 console.log('local-favorite-world', commandArg);
                 const [id, group] = commandArg.split(':');
-                worldRequest.getCachedWorld({ worldId: id }).then((args1) => {
+                if (!id || !group) {
+                    toast.error('Invalid local favorite world command');
+                    break;
+                }
+                worldRequest.getCachedWorld({ worldId: id }).then(() => {
                     searchStore.directAccessWorld(id);
                     favoriteStore.addLocalWorldFavorite(id, group);
-                    return args1;
+                });
+                break;
+            case 'local-favorite-avatar':
+                console.log('local-favorite-avatar', commandArg);
+                const [avatarIdFav, avatarGroup] = commandArg.split(':');
+                if (!avatarIdFav || !avatarGroup) {
+                    toast.error('Invalid local favorite avatar command');
+                    break;
+                }
+                avatarRequest.getAvatar({ avatarId: avatarIdFav }).then(() => {
+                    avatarStore.showAvatarDialog(avatarIdFav);
+                    favoriteStore.addLocalAvatarFavorite(
+                        avatarIdFav,
+                        avatarGroup
+                    );
                 });
                 break;
             case 'addavatardb':
@@ -784,6 +845,7 @@ export const useVrcxStore = defineStore('Vrcx', () => {
         ipcEnabled,
         clearVRCXCacheFrequency,
         maxTableSize,
+        searchLimit,
         clearVRCXCache,
         eventVrcxMessage,
         eventLaunchCommand,

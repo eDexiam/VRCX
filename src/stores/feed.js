@@ -1,11 +1,10 @@
-import { ref, shallowReactive, watch } from 'vue';
+import { ref, shallowRef, watch } from 'vue';
 import { defineStore } from 'pinia';
 
 import { database } from '../service/database';
 import { useFriendStore } from './friend';
 import { useNotificationStore } from './notification';
 import { useSharedFeedStore } from './sharedFeed';
-import { useUiStore } from './ui';
 import { useVrcxStore } from './vrcx';
 import { watchState } from '../service/watchState';
 
@@ -14,13 +13,14 @@ import configRepository from '../service/config';
 export const useFeedStore = defineStore('Feed', () => {
     const friendStore = useFriendStore();
     const notificationStore = useNotificationStore();
-    const UiStore = useUiStore();
     const vrcxStore = useVrcxStore();
     const sharedFeedStore = useSharedFeedStore();
 
+    const feedTableData = shallowRef([]);
     const feedTable = ref({
-        data: shallowReactive([]),
         search: '',
+        dateFrom: '',
+        dateTo: '',
         vip: false,
         loading: false,
         filter: [],
@@ -28,13 +28,10 @@ export const useFeedStore = defineStore('Feed', () => {
         pageSizeLinked: true
     });
 
-    const feedSessionTable = ref([]);
-
     watch(
         () => watchState.isLoggedIn,
         (isLoggedIn) => {
-            feedTable.value.data.length = 0;
-            feedSessionTable.value = [];
+            feedTableData.value = [];
             if (isLoggedIn) {
                 initFeedTable();
             }
@@ -64,7 +61,7 @@ export const useFeedStore = defineStore('Feed', () => {
     init();
 
     function feedSearch(row) {
-        const value = feedTable.value.search.toUpperCase();
+        const value = feedTable.value.search.trim().toUpperCase();
         if (!value) {
             return true;
         }
@@ -145,24 +142,37 @@ export const useFeedStore = defineStore('Feed', () => {
             feedTable.value.vip
         );
         feedTable.value.loading = true;
-        let vipList = [];
-        if (feedTable.value.vip) {
-            vipList = Array.from(friendStore.localFavoriteFriends.values());
+        try {
+            let vipList = [];
+            if (feedTable.value.vip) {
+                vipList = Array.from(friendStore.localFavoriteFriends.values());
+            }
+            const search = feedTable.value.search.trim();
+            const { dateFrom, dateTo } = feedTable.value;
+            const rows =
+                search || dateFrom || dateTo
+                    ? await database.searchFeedDatabase(
+                          search,
+                          feedTable.value.filter,
+                          vipList,
+                          vrcxStore.searchLimit,
+                          dateFrom,
+                          dateTo
+                      )
+                    : await database.lookupFeedDatabase(
+                          feedTable.value.filter,
+                          vipList
+                      );
+            feedTableData.value = [];
+            feedTableData.value = [...feedTableData.value, ...rows];
+        } finally {
+            feedTable.value.loading = false;
         }
-        const rows = await database.lookupFeedDatabase(
-            feedTable.value.search,
-            feedTable.value.filter,
-            vipList
-        );
-        feedTable.value.data = shallowReactive(rows);
-        feedTable.value.loading = false;
     }
 
     function addFeed(feed) {
         notificationStore.queueFeedNoty(feed);
-        feedSessionTable.value.push(feed);
-        sweepFeedSessionTable();
-        sharedFeedStore.updateSharedFeed(false);
+        sharedFeedStore.addEntry(feed);
         if (
             feedTable.value.filter.length > 0 &&
             !feedTable.value.filter.includes(feed.type)
@@ -178,70 +188,38 @@ export const useFeedStore = defineStore('Feed', () => {
         if (!feedSearch(feed)) {
             return;
         }
-        feedTable.value.data.push(feed);
-        sweepFeed();
-        UiStore.notifyMenu('feed');
-    }
-
-    function sweepFeedSessionTable() {
-        const data = feedSessionTable.value;
-        const k = data.length;
-        if (!k) {
+        if (
+            feedTable.value.dateFrom &&
+            feed.created_at < feedTable.value.dateFrom
+        ) {
             return;
         }
-
-        // 24 hour limit
-        const date = new Date();
-        date.setDate(date.getDate() - 1);
-        const limit = date.toJSON();
-
-        if (data[0].created_at < limit) {
-            let i = 0;
-            while (i < k && data[i].created_at < limit) {
-                ++i;
-            }
-            if (i === k) {
-                feedSessionTable.value = [];
-                return;
-            }
-            if (i) {
-                data.splice(0, i);
-            }
+        if (
+            feedTable.value.dateTo &&
+            feed.created_at > feedTable.value.dateTo
+        ) {
+            return;
         }
-
-        const maxLen = Math.floor(vrcxStore.maxTableSize * 1.5);
-        if (maxLen > 0 && data.length > maxLen + 100) {
-            data.splice(0, 100);
-        }
+        feedTableData.value = [feed, ...feedTableData.value];
+        sweepFeed();
     }
 
     function sweepFeed() {
-        const { data } = feedTable.value;
-        const j = data.length;
+        const j = feedTableData.value.length;
         if (j > vrcxStore.maxTableSize + 50) {
-            data.splice(0, 50);
+            feedTableData.value = feedTableData.value.slice(0, -50);
         }
-
-        sweepFeedSessionTable();
     }
 
     async function initFeedTable() {
         feedTable.value.loading = true;
-
-        feedTableLookup();
-
-        const getFeedDatabaseResult = await database.getFeedDatabase();
-        if (getFeedDatabaseResult && getFeedDatabaseResult.length > 0) {
-            // rough, maybe 100 is enough
-            feedSessionTable.value = getFeedDatabaseResult.slice(-100);
-        } else {
-            feedSessionTable.value = [];
-        }
+        await feedTableLookup();
+        feedTable.value.loading = false;
     }
 
     return {
         feedTable,
-        feedSessionTable,
+        feedTableData,
         initFeedTable,
         feedTableLookup,
         addFeed

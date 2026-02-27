@@ -89,7 +89,6 @@ function withSpacerColumn(columns, enabled, spacerId, stretchAfterId) {
         header: () => null,
         cell: () => null,
         enableSorting: false,
-        enableResizing: false,
         size: 0,
         minSize: 0,
         meta: { thClass: 'p-0', tdClass: 'p-0' }
@@ -233,7 +232,7 @@ export function useVrcxVueTable(options) {
         });
     }
 
-    const dataSource = computed(() => resolveMaybeGetter(options.data));
+    const dataSource = computed(() => options.data);
     const columnsSource = computed(() => resolveMaybeGetter(options.columns));
 
     const table = useVueTable({

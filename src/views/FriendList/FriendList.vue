@@ -12,18 +12,20 @@
                 :on-page-size-change="handlePageSizeChange"
                 :on-row-click="handleRowClick">
                 <template #toolbar>
-                    <div class="flex items-center justify-between">
+                    <div class="mb-2 flex items-center justify-between">
                         <div class="flex flex-none mr-2 items-center">
                             <TooltipWrapper side="bottom" :content="t('view.friend_list.favorites_only_tooltip')">
-                                <Switch
-                                    v-model="friendsListSearchFilterVIP"
-                                    @update:modelValue="friendsListSearchChange" />
+                                <span class="inline-flex">
+                                    <Switch
+                                        v-model="friendsListSearchFilterVIP"
+                                        @update:modelValue="friendsListSearchChange" />
+                                </span>
                             </TooltipWrapper>
                             <Select
                                 multiple
                                 :model-value="Array.isArray(friendsListSearchFilters) ? friendsListSearchFilters : []"
                                 @update:modelValue="handleFriendListFilterChange">
-                                <SelectTrigger class="mx-2 w-[150px]">
+                                <SelectTrigger class="mx-2 w-37.5">
                                     <SelectValue :placeholder="t('view.friend_list.filter_placeholder')" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -78,34 +80,37 @@
                     </div>
                 </template>
             </DataTableLayout>
-            <el-dialog
-                v-model="friendsListLoadDialogVisible"
-                :title="t('view.friend_list.load_dialog_title')"
-                width="420px"
-                :close-on-click-modal="false"
-                :close-on-press-escape="false"
-                :show-close="false"
-                align-center>
-                <div style="margin-bottom: 10px" v-text="t('view.friend_list.load_dialog_message')"></div>
-                <div class="flex items-center gap-2">
-                    <Progress :model-value="friendsListLoadingPercent" class="h-4 w-full" />
-                    <span class="text-xs w-10 text-right">{{ friendsListLoadingPercent }}%</span>
-                </div>
-                <div style="margin-top: 10px; text-align: right">
-                    <span>{{ friendsListLoadingCurrent }} / {{ friendsListLoadingTotal }}</span>
-                </div>
-                <template #footer>
-                    <Button variant="secondary" @click="cancelFriendsListLoad">
-                        {{ t('view.friend_list.load_cancel') }}
-                    </Button>
-                </template>
-            </el-dialog>
+            <Dialog v-model:open="friendsListLoadDialogVisible">
+                <DialogContent
+                    :show-close-button="false"
+                    @interact-outside.prevent
+                    @escape-key-down.prevent
+                    class="sm:max-w-[420px]">
+                    <DialogHeader>
+                        <DialogTitle>{{ t('view.friend_list.load_dialog_title') }}</DialogTitle>
+                    </DialogHeader>
+                    <div style="margin-bottom: 10px" v-text="t('view.friend_list.load_dialog_message')"></div>
+                    <div class="flex items-center gap-2">
+                        <Progress :model-value="friendsListLoadingPercent" class="h-4 w-full" />
+                        <span class="text-xs w-10 text-right">{{ friendsListLoadingPercent }}%</span>
+                    </div>
+                    <div style="margin-top: 10px; text-align: right">
+                        <span>{{ friendsListLoadingCurrent }} / {{ friendsListLoadingTotal }}</span>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="secondary" @click="cancelFriendsListLoad">
+                            {{ t('view.friend_list.load_cancel') }}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     </div>
 </template>
 
 <script setup>
     import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+    import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
     import { computed, nextTick, ref, watch } from 'vue';
     import { Button } from '@/components/ui/button';
     import { InputGroupField } from '@/components/ui/input-group';
@@ -137,7 +142,7 @@
 
     const emit = defineEmits(['lookup-user']);
 
-    const { friends } = storeToRefs(useFriendStore());
+    const { friends, allFavoriteFriendIds } = storeToRefs(useFriendStore());
     const modalStore = useModalStore();
     const { getAllUserStats, getAllUserMutualCount, confirmDeleteFriend, handleFriendDelete } = useFriendStore();
     const { randomUserColours } = storeToRefs(useAppearanceSettingsStore());
@@ -178,7 +183,6 @@
     const friendsListColumns = computed(() =>
         createColumns({
             randomUserColours,
-            bulkUnfriendMode: friendsListBulkUnfriendMode,
             selectedFriends,
             onToggleFriendSelection: toggleFriendSelection,
             onConfirmDeleteFriend: confirmDeleteFriend
@@ -187,7 +191,9 @@
 
     const { table, sorting, pagination } = useVrcxVueTable({
         persistKey: 'friendList',
-        data: friendsListDisplayData,
+        get data() {
+            return friendsListDisplayData.value;
+        },
         columns: friendsListColumns.value,
         getRowId: (row) => row?.id ?? row?.displayName ?? '',
         enablePinning: true,
@@ -202,7 +208,7 @@
     const totalItems = computed(() => {
         const length = table.getFilteredRowModel().rows.length;
         const max = vrcxStore.maxTableSize;
-        return length > max && length < max + 51 ? max : length;
+        return length > max ? max : length;
     });
 
     const handlePageSizeChange = (size) => {
@@ -220,6 +226,18 @@
                 ...prev,
                 columns: /** @type {any} */ (next)
             }));
+        },
+        { immediate: true }
+    );
+
+    watch(
+        friendsListBulkUnfriendMode,
+        (enabled) => {
+            const column = table?.getColumn?.('bulkSelect');
+            if (!column) {
+                return;
+            }
+            column.toggleVisibility(Boolean(enabled));
         },
         { immediate: true }
     );
@@ -268,7 +286,7 @@
         }
         for (const ctx of friends.value.values()) {
             if (!ctx.ref) continue;
-            if (friendsListSearchFilterVIP.value && !ctx.isVIP) continue;
+            if (friendsListSearchFilterVIP.value && !allFavoriteFriendIds.value.has(ctx.id)) continue;
             if (query) {
                 let match = false;
                 if (!match && filters.includes('Display Name') && ctx.ref.displayName) {
@@ -342,6 +360,7 @@
 
     async function bulkUnfriendSelection() {
         if (!selectedFriends.value.size) return;
+        const selectedFriendsCount = selectedFriends.value.size;
         for (const item of friendsListDisplayData.value) {
             if (selectedFriends.value.has(item.id)) {
                 console.log(`Unfriending ${item.displayName} (${item.id})`);
@@ -350,7 +369,7 @@
             }
         }
         modalStore.alert({
-            description: `Unfriended ${selectedFriends.value.size} friends.`,
+            description: `Unfriended ${selectedFriendsCount} friends.`,
             title: 'Bulk Unfriend Complete'
         });
         selectedFriends.value.clear();
