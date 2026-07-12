@@ -1,4 +1,9 @@
 import Location from '../../components/Location.vue';
+import {
+    Avatar,
+    AvatarFallback,
+    AvatarImage
+} from '../../components/ui/avatar';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import {
@@ -12,6 +17,7 @@ import {
     Ban,
     BellOff,
     Check,
+    Image,
     Link,
     MessageCircle,
     Reply,
@@ -21,17 +27,20 @@ import {
 } from 'lucide-vue-next';
 import { storeToRefs } from 'pinia';
 
-import { checkCanInvite, formatDateFilter } from '../../shared/utils';
-import { i18n } from '../../plugin';
+import { formatDateFilter } from '../../shared/utils';
+import { checkCanInvite } from '../../shared/utils/invite';
+import { i18n } from '../../plugins';
 import {
     useGameStore,
-    useGroupStore,
+    useInstanceStore,
     useLocationStore,
     useUiStore,
     useUserStore,
-    useWorldStore,
     useNotificationStore
 } from '../../stores';
+import { showUserDialog } from '../../coordinators/userCoordinator';
+import { showWorldDialog } from '../../coordinators/worldCoordinator';
+import { showGroupDialog } from '../../coordinators/groupCoordinator';
 
 import Emoji from '../../components/Emoji.vue';
 
@@ -55,19 +64,26 @@ export const createColumns = ({
     deleteNotificationLog,
     deleteNotificationLogPrompt
 }) => {
-    const { showUserDialog, showSendBoopDialog } = useUserStore();
-    const { showWorldDialog } = useWorldStore();
-    const { showGroupDialog } = useGroupStore();
+    const { showSendBoopDialog } = useUserStore();
+
     const { shiftHeld } = storeToRefs(useUiStore());
     const { currentUser } = storeToRefs(useUserStore());
     const { lastLocation } = storeToRefs(useLocationStore());
     const { isGameRunning } = storeToRefs(useGameStore());
     const { isNotificationExpired } = useNotificationStore();
 
+    const { cachedInstances } = useInstanceStore();
+
     const canInvite = () => {
         const location = lastLocation.value?.location;
         return (
-            Boolean(location) && isGameRunning.value && checkCanInvite(location)
+            Boolean(location) &&
+            isGameRunning.value &&
+            checkCanInvite(location, {
+                currentUserId: currentUser.value?.id,
+                lastLocationStr: lastLocation.value?.location,
+                cachedInstances: cachedInstances
+            })
         );
     };
 
@@ -93,12 +109,23 @@ export const createColumns = ({
 
     return [
         {
+            id: 'spacer',
+            header: () => null,
+            enableSorting: false,
+            size: 20,
+            minSize: 0,
+            maxSize: 20,
+            cell: () => null
+        },
+        {
             accessorFn: (row) => getNotificationCreatedAtTs(row),
             id: 'created_at',
             size: 120,
+            meta: { label: () => t('table.notification.date') },
             header: ({ column }) => (
                 <Button
                     variant="ghost"
+                    class="pl-0!"
                     onClick={() =>
                         column.toggleSorting(column.getIsSorted() === 'asc')
                     }
@@ -145,6 +172,7 @@ export const createColumns = ({
             accessorKey: 'type',
             size: 180,
             header: () => t('table.notification.type'),
+            meta: { label: () => t('table.notification.type') },
             cell: ({ row }) => {
                 const original = row.original;
                 const typeKey = `view.notification.filters.${original.type}`;
@@ -222,7 +250,8 @@ export const createColumns = ({
         {
             accessorKey: 'senderUsername',
             meta: {
-                class: 'overflow-hidden'
+                class: 'overflow-hidden',
+                label: () => t('table.notification.user')
             },
             size: 150,
             header: () => t('table.notification.user'),
@@ -278,7 +307,8 @@ export const createColumns = ({
         {
             accessorKey: 'groupName',
             meta: {
-                class: 'overflow-hidden'
+                class: 'overflow-hidden',
+                label: () => t('table.notification.group')
             },
             size: 150,
             header: () => t('table.notification.group'),
@@ -384,6 +414,7 @@ export const createColumns = ({
             accessorKey: 'photo',
             size: 80,
             header: () => t('table.notification.photo'),
+            meta: { label: () => t('table.notification.photo') },
             cell: ({ row }) => {
                 const original = row.original;
                 if (original.type === 'boop') {
@@ -403,32 +434,43 @@ export const createColumns = ({
                 }
 
                 if (original.details?.imageUrl) {
+                    const detailsUrl = getSmallThumbnailUrl(
+                        original.details.imageUrl
+                    );
                     return (
-                        <img
-                            class="cursor-pointer h-7.5 w-7.5 rounded object-cover"
-                            src={getSmallThumbnailUrl(
-                                original.details.imageUrl
-                            )}
+                        <Avatar
+                            class="cursor-pointer size-7.5 rounded"
                             onClick={() =>
                                 showFullscreenImageDialog(
                                     original.details.imageUrl
                                 )
                             }
-                            loading="lazy"
-                        />
+                        >
+                            <AvatarImage
+                                src={detailsUrl}
+                                class="object-cover"
+                            />
+                            <AvatarFallback class="rounded">
+                                <Image class="size-4 text-muted-foreground" />
+                            </AvatarFallback>
+                        </Avatar>
                     );
                 }
 
                 if (original.imageUrl) {
+                    const imgUrl = getSmallThumbnailUrl(original.imageUrl);
                     return (
-                        <img
-                            class="cursor-pointer h-7.5 w-7.5 rounded object-cover"
-                            src={getSmallThumbnailUrl(original.imageUrl)}
+                        <Avatar
+                            class="cursor-pointer size-7.5 rounded"
                             onClick={() =>
                                 showFullscreenImageDialog(original.imageUrl)
                             }
-                            loading="lazy"
-                        />
+                        >
+                            <AvatarImage src={imgUrl} class="object-cover" />
+                            <AvatarFallback class="rounded">
+                                <Image class="size-4 text-muted-foreground" />
+                            </AvatarFallback>
+                        </Avatar>
                     );
                 }
 
@@ -441,7 +483,8 @@ export const createColumns = ({
             enableSorting: false,
             meta: {
                 class: 'min-w-0 overflow-hidden',
-                stretch: true
+                stretch: true,
+                label: () => t('table.notification.message')
             },
             minSize: 100,
             cell: ({ row }) => {
@@ -531,7 +574,8 @@ export const createColumns = ({
         {
             id: 'action',
             meta: {
-                class: 'text-right'
+                class: 'text-right',
+                label: () => t('table.notification.action')
             },
             size: 120,
             minSize: 120,
@@ -565,7 +609,10 @@ export const createColumns = ({
                                         <TooltipTrigger asChild>
                                             <button
                                                 type="button"
-                                                class="inline-flex h-6 ml-1 items-center justify-center text-muted-foreground hover:text-foreground"
+                                                class="inline-flex h-6 ml-1 items-center justify-center text-muted-foreground hover:text-foreground cursor-pointer"
+                                                aria-label={t(
+                                                    'view.notification.actions.accept'
+                                                )}
                                                 onClick={() =>
                                                     acceptFriendRequestNotification(
                                                         original
@@ -590,7 +637,10 @@ export const createColumns = ({
                                         <TooltipTrigger asChild>
                                             <button
                                                 type="button"
-                                                class="inline-flex h-6 ml-1 items-center justify-center text-muted-foreground hover:text-foreground"
+                                                class="inline-flex h-6 ml-1 items-center justify-center text-muted-foreground hover:text-foreground cursor-pointer"
+                                                aria-label={t(
+                                                    'view.notification.actions.decline_with_message'
+                                                )}
                                                 onClick={() =>
                                                     showSendInviteResponseDialog(
                                                         original
@@ -617,7 +667,10 @@ export const createColumns = ({
                                                 <TooltipTrigger asChild>
                                                     <button
                                                         type="button"
-                                                        class="inline-flex h-6 ml-1 items-center justify-center text-muted-foreground hover:text-foreground"
+                                                        class="inline-flex h-6 ml-1 items-center justify-center text-muted-foreground hover:text-foreground cursor-pointer"
+                                                        aria-label={t(
+                                                            'view.notification.actions.invite'
+                                                        )}
                                                         onClick={() =>
                                                             acceptRequestInvite(
                                                                 original
@@ -640,7 +693,10 @@ export const createColumns = ({
                                             <TooltipTrigger asChild>
                                                 <button
                                                     type="button"
-                                                    class="inline-flex h-6 ml-1 items-center justify-center text-muted-foreground hover:text-foreground"
+                                                    class="inline-flex h-6 ml-1 items-center justify-center text-muted-foreground hover:text-foreground cursor-pointer"
+                                                    aria-label={t(
+                                                        'view.notification.actions.decline_with_message'
+                                                    )}
                                                     onClick={() =>
                                                         showSendInviteRequestResponseDialog(
                                                             original
@@ -698,7 +754,10 @@ export const createColumns = ({
                                                   <TooltipTrigger asChild>
                                                       <button
                                                           type="button"
-                                                          class="inline-flex h-6 ml-1 items-center justify-center text-muted-foreground hover:text-foreground"
+                                                          class="inline-flex h-6 ml-1 items-center justify-center text-muted-foreground hover:text-foreground cursor-pointer"
+                                                          aria-label={
+                                                              response.text
+                                                          }
                                                           onClick={onClick}
                                                       >
                                                           <ResponseIcon class="h-4 w-4" />
@@ -719,7 +778,10 @@ export const createColumns = ({
                                         <TooltipTrigger asChild>
                                             <button
                                                 type="button"
-                                                class="inline-flex h-6 ml-1 items-center justify-center text-muted-foreground hover:text-foreground"
+                                                class="inline-flex h-6 ml-1 items-center justify-center text-muted-foreground hover:text-foreground cursor-pointer"
+                                                aria-label={t(
+                                                    'view.notification.actions.decline'
+                                                )}
                                                 onClick={() =>
                                                     shiftHeld.value
                                                         ? hideNotification(
@@ -754,7 +816,10 @@ export const createColumns = ({
                                         <TooltipTrigger asChild>
                                             <button
                                                 type="button"
-                                                class="inline-flex h-6 ml-1 items-center justify-center text-muted-foreground hover:text-foreground"
+                                                class="inline-flex h-6 ml-1 items-center justify-center text-muted-foreground hover:text-foreground cursor-pointer"
+                                                aria-label={t(
+                                                    'view.notification.actions.delete_log'
+                                                )}
                                                 onClick={() =>
                                                     shiftHeld.value
                                                         ? deleteNotificationLog(
@@ -772,13 +837,6 @@ export const createColumns = ({
                                                 )}
                                             </button>
                                         </TooltipTrigger>
-                                        <TooltipContent side="top">
-                                            <span>
-                                                {t(
-                                                    'view.notification.actions.delete_log'
-                                                )}
-                                            </span>
-                                        </TooltipContent>
                                     </Tooltip>
                                 ) : null}
                             </span>
@@ -788,7 +846,10 @@ export const createColumns = ({
                                 <TooltipTrigger asChild>
                                     <button
                                         type="button"
-                                        class="inline-flex h-6 ml-1 items-center justify-center text-muted-foreground hover:text-foreground"
+                                        class="inline-flex h-6 ml-1 items-center justify-center text-muted-foreground hover:text-foreground cursor-pointer"
+                                        aria-label={t(
+                                            'view.notification.actions.delete_log'
+                                        )}
                                         onClick={() =>
                                             shiftHeld.value
                                                 ? deleteNotificationLog(

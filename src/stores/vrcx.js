@@ -3,36 +3,34 @@ import { defineStore } from 'pinia';
 import { toast } from 'vue-sonner';
 import { useI18n } from 'vue-i18n';
 
-import Noty from 'noty';
-
 import {
     DEFAULT_MAX_TABLE_SIZE,
     DEFAULT_SEARCH_LIMIT,
-    LEGACY_MAX_TABLE_SIZE_DEFAULT,
     SEARCH_LIMIT_MAX,
-    SEARCH_LIMIT_MIN,
-    TABLE_MAX_SIZE_MAX
+    SEARCH_LIMIT_MIN
 } from '../shared/constants';
-import { avatarRequest, worldRequest } from '../api';
-import {
-    clearPiniaActionTrail,
-    getPiniaActionTrail
-} from '../plugin/piniaActionTrail';
+import { avatarRequest, queryRequest } from '../api';
 import { debounce, parseLocation } from '../shared/utils';
-import { AppDebug } from '../service/appConfig';
-import { database } from '../service/database';
-import { failedGetRequests } from '../service/request';
+import { AppDebug } from '../services/appConfig';
+import { database } from '../services/database';
 import { refreshCustomScript } from '../shared/utils/base/ui';
 import { useAdvancedSettingsStore } from './settings/advanced';
 import { useAvatarProviderStore } from './avatarProvider';
-import { useAvatarStore } from './avatar';
+import {
+    addLocalWorldFavorite,
+    addLocalAvatarFavorite
+} from '../coordinators/favoriteCoordinator';
 import { useFavoriteStore } from './favorite';
-import { useFriendStore } from './friend';
-import { useGalleryStore } from './gallery';
 import { useGameLogStore } from './gameLog';
 import { useGameStore } from './game';
-import { useGroupStore } from './group';
-import { useInstanceStore } from './instance';
+import { showGroupDialog } from '../coordinators/groupCoordinator';
+import { showWorldDialog } from '../coordinators/worldCoordinator';
+import {
+    showAvatarDialog,
+    selectAvatarWithConfirmation,
+    selectAvatarWithoutConfirmation
+} from '../coordinators/avatarCoordinator';
+import { showUserDialog, addCustomTag } from '../coordinators/userCoordinator';
 import { useLocationStore } from './location';
 import { useModalStore } from './modal';
 import { useNotificationStore } from './notification';
@@ -41,21 +39,18 @@ import { useSearchStore } from './search';
 import { useUpdateLoopStore } from './updateLoop';
 import { useUserStore } from './user';
 import { useVrcStatusStore } from './vrcStatus';
-import { useWorldStore } from './world';
-import { watchState } from '../service/watchState';
+import { clearVRCXCache } from '../coordinators/vrcxCoordinator';
+import { resetSearchIndexOnLogin } from '../coordinators/searchIndexCoordinator';
+import { watchState } from '../services/watchState';
 
-import configRepository from '../service/config';
+import configRepository from '../services/config';
 
 export const useVrcxStore = defineStore('Vrcx', () => {
     const gameStore = useGameStore();
     const locationStore = useLocationStore();
     const notificationStore = useNotificationStore();
-    const avatarStore = useAvatarStore();
-    const worldStore = useWorldStore();
-    const instanceStore = useInstanceStore();
-    const friendStore = useFriendStore();
+
     const favoriteStore = useFavoriteStore();
-    const groupStore = useGroupStore();
     const userStore = useUserStore();
     const photonStore = usePhotonStore();
     const advancedSettingsStore = useAdvancedSettingsStore();
@@ -64,7 +59,6 @@ export const useVrcxStore = defineStore('Vrcx', () => {
     const gameLogStore = useGameLogStore();
     const updateLoopStore = useUpdateLoopStore();
     const vrcStatusStore = useVrcStatusStore();
-    const galleryStore = useGalleryStore();
     const { t } = useI18n();
     const modalStore = useModalStore();
 
@@ -77,6 +71,16 @@ export const useVrcxStore = defineStore('Vrcx', () => {
         windowState: '',
         externalNotifierVersion: 0
     });
+    const databaseUpgradeState = ref({
+        visible: false,
+        fromVersion: 0,
+        toVersion: 0
+    });
+    const databaseReadyForAutoLogin = ref(false);
+    let resolveDatabaseInit = () => {};
+    const databaseInitComplete = new Promise((resolve) => {
+        resolveDatabaseInit = resolve;
+    });
 
     const currentlyDroppingFile = ref(null);
     const isRegistryBackupDialogVisible = ref(false);
@@ -85,146 +89,151 @@ export const useVrcxStore = defineStore('Vrcx', () => {
     const maxTableSize = ref(DEFAULT_MAX_TABLE_SIZE);
     const searchLimit = ref(DEFAULT_SEARCH_LIMIT);
     const proxyServer = ref('');
+    const appStartAt = Date.now();
 
+    /**
+     *
+     */
     async function init() {
-        if (LINUX) {
-            window.electron.ipcRenderer.on('launch-command', (command) => {
-                if (command) {
-                    eventLaunchCommand(command);
+        try {
+            if (LINUX) {
+                try {
+                    window.electron.ipcRenderer.on(
+                        'launch-command',
+                        (command) => {
+                            if (command) {
+                                eventLaunchCommand(command);
+                            }
+                        }
+                    );
+
+                    window.electron.onWindowPositionChanged(
+                        (event, position) => {
+                            state.locationX = position.x;
+                            state.locationY = position.y;
+                            debounce(saveVRCXWindowOption, 300)();
+                        }
+                    );
+
+                    window.electron.onWindowSizeChanged((event, size) => {
+                        state.sizeWidth = size.width;
+                        state.sizeHeight = size.height;
+                        debounce(saveVRCXWindowOption, 300)();
+                    });
+
+                    window.electron.onWindowStateChange((event, newState) => {
+                        state.windowState = newState.toString();
+                        debounce(saveVRCXWindowOption, 300)();
+                    });
+
+                    window.electron.onBrowserFocus(() => {
+                        vrcStatusStore.onBrowserFocus();
+                    });
+                } catch (err) {
+                    console.error(
+                        'Failed to register Linux IPC handlers:',
+                        err
+                    );
                 }
-            });
+            }
 
-            window.electron.onWindowPositionChanged((event, position) => {
-                state.locationX = position.x;
-                state.locationY = position.y;
-                debounce(saveVRCXWindowOption, 300)();
-            });
-
-            window.electron.onWindowSizeChanged((event, size) => {
-                state.sizeWidth = size.width;
-                state.sizeHeight = size.height;
-                debounce(saveVRCXWindowOption, 300)();
-            });
-
-            window.electron.onWindowStateChange((event, newState) => {
-                state.windowState = newState.toString();
-                debounce(saveVRCXWindowOption, 300)();
-            });
-
-            window.electron.onBrowserFocus(() => {
-                vrcStatusStore.onBrowserFocus();
-            });
-        }
-
-        state.databaseVersion = await configRepository.getInt(
-            'VRCX_databaseVersion',
-            0
-        );
-        updateDatabaseVersion();
-
-        clearVRCXCacheFrequency.value = await configRepository.getInt(
-            'VRCX_clearVRCXCacheFrequency',
-            172800
-        );
-
-        if (!(await VRCXStorage.Get('VRCX_DatabaseLocation'))) {
-            await VRCXStorage.Set('VRCX_DatabaseLocation', '');
-        }
-        if (!(await VRCXStorage.Get('VRCX_ProxyServer'))) {
-            await VRCXStorage.Set('VRCX_ProxyServer', '');
-        }
-        if ((await VRCXStorage.Get('VRCX_DisableGpuAcceleration')) === '') {
-            await VRCXStorage.Set('VRCX_DisableGpuAcceleration', 'false');
-        }
-        if (
-            (await VRCXStorage.Get('VRCX_DisableVrOverlayGpuAcceleration')) ===
-            ''
-        ) {
-            await VRCXStorage.Set(
-                'VRCX_DisableVrOverlayGpuAcceleration',
-                'false'
+            state.databaseVersion = await configRepository.getInt(
+                'VRCX_databaseVersion',
+                0
             );
-        }
-        proxyServer.value = await VRCXStorage.Get('VRCX_ProxyServer');
-        state.locationX = parseInt(await VRCXStorage.Get('VRCX_LocationX'), 10);
-        state.locationY = parseInt(await VRCXStorage.Get('VRCX_LocationY'), 10);
-        state.sizeWidth = parseInt(await VRCXStorage.Get('VRCX_SizeWidth'), 10);
-        state.sizeHeight = parseInt(
-            await VRCXStorage.Get('VRCX_SizeHeight'),
-            10
-        );
-        state.windowState = await VRCXStorage.Get('VRCX_WindowState');
+            const databaseUpgradeSucceeded = await updateDatabaseVersion();
+            if (!databaseUpgradeSucceeded) {
+                return;
+            }
 
-        maxTableSize.value = await configRepository.getInt(
-            'VRCX_maxTableSize',
-            LEGACY_MAX_TABLE_SIZE_DEFAULT
-        );
-        if (maxTableSize.value > TABLE_MAX_SIZE_MAX) {
-            maxTableSize.value = TABLE_MAX_SIZE_MAX;
-        }
-        const maxTableSizeMigrated = await configRepository.getBool(
-            'VRCX_maxTableSizeMigrated500',
-            false
-        );
-        // Migrate old default table size (1000) to new default (500)
-        if (
-            maxTableSize.value === LEGACY_MAX_TABLE_SIZE_DEFAULT &&
-            !maxTableSizeMigrated
-        ) {
-            maxTableSize.value = DEFAULT_MAX_TABLE_SIZE;
-            await configRepository.setInt(
-                'VRCX_maxTableSize',
-                maxTableSize.value
+            clearVRCXCacheFrequency.value = await configRepository.getInt(
+                'VRCX_clearVRCXCacheFrequency',
+                172800
             );
-            await configRepository.setBool(
-                'VRCX_maxTableSizeMigrated500',
-                true
-            );
-        }
-        database.setMaxTableSize(maxTableSize.value);
 
-        searchLimit.value = await configRepository.getInt(
-            'VRCX_searchLimit',
-            DEFAULT_SEARCH_LIMIT
-        );
-        if (searchLimit.value < SEARCH_LIMIT_MIN) {
-            searchLimit.value = SEARCH_LIMIT_MIN;
-        }
-        if (searchLimit.value > SEARCH_LIMIT_MAX) {
-            searchLimit.value = SEARCH_LIMIT_MAX;
-        }
-        database.setSearchTableSize(searchLimit.value);
-
-        refreshCustomScript();
-    }
-
-    init();
-
-    async function updateDatabaseVersion() {
-        // requires dbVars.userPrefix to be already set
-        const databaseVersion = 13;
-        let msgBox;
-        if (state.databaseVersion < databaseVersion) {
-            if (state.databaseVersion) {
-                msgBox = toast.warning(
-                    'DO NOT CLOSE VRCX, database upgrade in progress...',
-                    { duration: Infinity, position: 'bottom-right' }
+            if (!(await VRCXStorage.Get('VRCX_DatabaseLocation'))) {
+                await VRCXStorage.Set('VRCX_DatabaseLocation', '');
+            }
+            if (!(await VRCXStorage.Get('VRCX_ProxyServer'))) {
+                await VRCXStorage.Set('VRCX_ProxyServer', '');
+            }
+            if ((await VRCXStorage.Get('VRCX_DisableGpuAcceleration')) === '') {
+                await VRCXStorage.Set('VRCX_DisableGpuAcceleration', 'false');
+            }
+            if (
+                (await VRCXStorage.Get(
+                    'VRCX_DisableVrOverlayGpuAcceleration'
+                )) === ''
+            ) {
+                await VRCXStorage.Set(
+                    'VRCX_DisableVrOverlayGpuAcceleration',
+                    'false'
                 );
             }
+            proxyServer.value = await VRCXStorage.Get('VRCX_ProxyServer');
+            state.locationX = parseInt(
+                await VRCXStorage.Get('VRCX_LocationX'),
+                10
+            );
+            state.locationY = parseInt(
+                await VRCXStorage.Get('VRCX_LocationY'),
+                10
+            );
+            state.sizeWidth = parseInt(
+                await VRCXStorage.Get('VRCX_SizeWidth'),
+                10
+            );
+            state.sizeHeight = parseInt(
+                await VRCXStorage.Get('VRCX_SizeHeight'),
+                10
+            );
+            state.windowState = await VRCXStorage.Get('VRCX_WindowState');
+
+            maxTableSize.value = await configRepository.getInt(
+                'VRCX_maxTableSize_v2',
+                DEFAULT_MAX_TABLE_SIZE
+            );
+            database.setMaxTableSize(maxTableSize.value);
+
+            searchLimit.value = await configRepository.getInt(
+                'VRCX_searchLimit',
+                DEFAULT_SEARCH_LIMIT
+            );
+            if (searchLimit.value < SEARCH_LIMIT_MIN) {
+                searchLimit.value = SEARCH_LIMIT_MIN;
+            }
+            if (searchLimit.value > SEARCH_LIMIT_MAX) {
+                searchLimit.value = SEARCH_LIMIT_MAX;
+            }
+            database.setSearchTableSize(searchLimit.value);
+
+            refreshCustomScript();
+            databaseReadyForAutoLogin.value = true;
+        } finally {
+            resolveDatabaseInit();
+        }
+    }
+
+    resetSearchIndexOnLogin();
+    init();
+
+    /**
+     *
+     */
+    async function updateDatabaseVersion() {
+        // requires dbVars.userPrefix to be already set
+        const databaseVersion = 16;
+        if (state.databaseVersion < databaseVersion) {
+            databaseUpgradeState.value = {
+                visible: state.databaseVersion > 0,
+                fromVersion: state.databaseVersion,
+                toVersion: databaseVersion
+            };
             console.log(
                 `Updating database from ${state.databaseVersion} to ${databaseVersion}...`
             );
             try {
-                await database.cleanLegendFromFriendLog(); // fix friendLog spammed with crap
-                await database.fixGameLogTraveling(); // fix bug with gameLog location being set as traveling
-                await database.fixNegativeGPS(); // fix GPS being a negative value due to VRCX bug with traveling
-                await database.fixBrokenLeaveEntries(); // fix user instance timer being higher than current user location timer
-                await database.fixBrokenGroupInvites(); // fix notification v2 in wrong table
-                await database.fixBrokenNotifications(); // fix notifications being null
-                await database.fixBrokenGroupChange(); // fix spam group left & name change
-                await database.fixCancelFriendRequestTypo(); // fix CancelFriendRequst typo
-                await database.fixBrokenGameLogDisplayNames(); // fix gameLog display names "DisplayName (userId)"
-                await database.upgradeDatabaseVersion(); // update database version
+                await database.upgradeDatabaseVersion(); // Migrations
                 await database.vacuum(); // succ
                 await database.optimize();
                 await configRepository.setInt(
@@ -232,83 +241,74 @@ export const useVrcxStore = defineStore('Vrcx', () => {
                     databaseVersion
                 );
                 console.log('Database update complete.');
-                toast.dismiss(msgBox);
-                if (state.databaseVersion) {
-                    // only display when database exists
-                    toast.success(t('message.database.upgrade_complete'));
-                }
                 state.databaseVersion = databaseVersion;
+                databaseUpgradeState.value.visible = false;
             } catch (err) {
                 console.error(err);
-                toast.dismiss(msgBox);
-                toast.error(
-                    'Database upgrade failed, check console for details',
-                    { duration: 120000 }
-                );
+                databaseUpgradeState.value.visible = false;
+                await modalStore.alert({
+                    title: t('message.database.upgrade_failed_title'),
+                    description: t(
+                        'message.database.upgrade_failed_description'
+                    ),
+                    dismissible: false
+                });
                 AppApi.ShowDevTools();
+                return false;
             }
         }
+        return true;
     }
 
-    function clearVRCXCache() {
-        console.log('Clearing VRCX cache...');
-        failedGetRequests.clear();
-        userStore.cachedUsers.forEach((ref, id) => {
-            if (
-                !friendStore.friends.has(id) &&
-                !locationStore.lastLocation.playerList.has(ref.id) &&
-                id !== userStore.currentUser.id
-            ) {
-                userStore.cachedUsers.delete(id);
-            }
-        });
-        worldStore.cachedWorlds.forEach((ref, id) => {
-            if (
-                !favoriteStore.getCachedFavoritesByObjectId(id) &&
-                ref.authorId !== userStore.currentUser.id &&
-                !favoriteStore.localWorldFavoritesList.includes(id)
-            ) {
-                worldStore.cachedWorlds.delete(id);
-            }
-        });
-        avatarStore.cachedAvatars.forEach((ref, id) => {
-            if (
-                !favoriteStore.getCachedFavoritesByObjectId(id) &&
-                ref.authorId !== userStore.currentUser.id &&
-                !favoriteStore.localAvatarFavoritesList.includes(id) &&
-                !avatarStore.avatarHistory.includes(id)
-            ) {
-                avatarStore.cachedAvatars.delete(id);
-            }
-        });
-        groupStore.cachedGroups.forEach((ref, id) => {
-            if (!groupStore.currentUserGroups.has(id)) {
-                groupStore.cachedGroups.delete(id);
-            }
-        });
-        instanceStore.cachedInstances.forEach((ref, id) => {
-            if (
-                [...friendStore.friends.values()].some(
-                    (f) => f.$location?.tag === id
-                )
-            ) {
-                return;
-            }
-            // delete instances over an hour old
-            if (Date.parse(ref.$fetchedAt) < Date.now() - 3600000) {
-                instanceStore.cachedInstances.delete(id);
-            }
-        });
-        avatarStore.cachedAvatarNames.clear();
-        userStore.customUserTags.clear();
-        galleryStore.cachedEmoji.clear();
+    async function waitForDatabaseInit() {
+        await databaseInitComplete;
+        return databaseReadyForAutoLogin.value;
     }
 
+    /**
+     * @param {string} value
+     */
+    function setProxyServer(value) {
+        proxyServer.value = value;
+    }
+
+    /**
+     * @param {boolean} value
+     */
+    function setIpcEnabled(value) {
+        ipcEnabled.value = value;
+    }
+
+    /**
+     * @param {number} value
+     */
+    function setClearVRCXCacheFrequency(value) {
+        clearVRCXCacheFrequency.value = value;
+    }
+
+    /**
+     * @param {number} value
+     */
+    function setMaxTableSize(value) {
+        maxTableSize.value = value;
+    }
+
+    /**
+     * @param {number} value
+     */
+    function setSearchLimit(value) {
+        searchLimit.value = value;
+    }
+
+    /**
+     *
+     * @param data
+     */
     function eventVrcxMessage(data) {
         let entry;
         switch (data.MsgType) {
             case 'CustomTag':
-                userStore.addCustomTag(data);
+                addCustomTag(data);
                 break;
             case 'ClearCustomTags':
                 userStore.customUserTags.forEach((value, key) => {
@@ -361,6 +361,9 @@ export const useVrcxStore = defineStore('Vrcx', () => {
         }
     }
 
+    /**
+     *
+     */
     async function saveVRCXWindowOption() {
         if (LINUX) {
             VRCXStorage.Set('VRCX_LocationX', state.locationX.toString());
@@ -371,6 +374,10 @@ export const useVrcxStore = defineStore('Vrcx', () => {
         }
     }
 
+    /**
+     *
+     * @param path
+     */
     async function processScreenshot(path) {
         let newPath = path;
         if (advancedSettingsStore.screenshotHelper) {
@@ -425,6 +432,10 @@ export const useVrcxStore = defineStore('Vrcx', () => {
     }
 
     // use in C# side
+    /**
+     *
+     * @param json
+     */
     function ipcEvent(json) {
         if (!watchState.isLoggedIn) {
             return;
@@ -507,7 +518,7 @@ export const useVrcxStore = defineStore('Vrcx', () => {
                 for (const [id, dt] of Object.entries(data.Event7List)) {
                     photonStore.photonEvent7List.set(parseInt(id, 10), dt);
                 }
-                photonStore.photonLastEvent7List = Date.parse(data.dt);
+                photonStore.setPhotonLastEvent7List(Date.parse(data.dt));
                 break;
             case 'VrcxMessage':
                 if (AppDebug.debugPhotonLogging || AppDebug.debugIPC) {
@@ -523,7 +534,7 @@ export const useVrcxStore = defineStore('Vrcx', () => {
                     photonStore.setPhotonLoggingEnabled();
                 }
                 ipcEnabled.value = true;
-                updateLoopStore.ipcTimeout = 60; // 30 seconds
+                updateLoopStore.setIpcTimeout(60); // 30 seconds
                 break;
             case 'MsgPing':
                 if (AppDebug.debugIPC) {
@@ -561,6 +572,9 @@ export const useVrcxStore = defineStore('Vrcx', () => {
         { flush: 'sync' }
     );
 
+    /**
+     *
+     */
     async function startupLaunchCommand() {
         const command = await AppApi.GetLaunchCommand();
         if (!command) {
@@ -573,29 +587,16 @@ export const useVrcxStore = defineStore('Vrcx', () => {
             if (advancedSettingsStore.sentryErrorReporting) {
                 try {
                     import('@sentry/vue').then((Sentry) => {
-                        const trail = getPiniaActionTrail()
-                            .filter((entry) => {
-                                if (!entry) return false;
-                                return (
-                                    typeof entry.t === 'string' &&
-                                    typeof entry.a === 'string'
-                                );
-                            })
-                            .reverse();
-                        const trailText = JSON.stringify(trail);
                         Sentry.withScope((scope) => {
                             scope.setLevel('fatal');
                             scope.setTag('reason', 'crash-recovery');
-                            scope.setContext('pinia_actions', {
-                                trailText,
+                            scope.setContext('session', {
                                 sessionTime: performance.now() / 1000 / 60
                             });
                             Sentry.captureMessage(
                                 `crash message: ${crashMessage}`
                             );
                         });
-
-                        clearPiniaActionTrail();
                     });
                 } catch (error) {
                     console.error('Error setting up Sentry feedback:', error);
@@ -609,6 +610,10 @@ export const useVrcxStore = defineStore('Vrcx', () => {
     }
 
     // called from C#
+    /**
+     *
+     * @param input
+     */
     function eventLaunchCommand(input) {
         if (!watchState.isLoggedIn) {
             return;
@@ -624,17 +629,17 @@ export const useVrcxStore = defineStore('Vrcx', () => {
                     !searchStore.directAccessWorld(input.replace('world/', ''))
                 ) {
                     // fallback for mangled world ids
-                    worldStore.showWorldDialog(commandArg);
+                    showWorldDialog(commandArg);
                 }
                 break;
             case 'avatar':
-                avatarStore.showAvatarDialog(commandArg);
+                showAvatarDialog(commandArg);
                 break;
             case 'user':
-                userStore.showUserDialog(commandArg);
+                showUserDialog(commandArg);
                 break;
             case 'group':
-                groupStore.showGroupDialog(commandArg);
+                showGroupDialog(commandArg);
                 break;
             case 'local-favorite-world':
                 console.log('local-favorite-world', commandArg);
@@ -643,10 +648,12 @@ export const useVrcxStore = defineStore('Vrcx', () => {
                     toast.error('Invalid local favorite world command');
                     break;
                 }
-                worldRequest.getCachedWorld({ worldId: id }).then(() => {
-                    searchStore.directAccessWorld(id);
-                    favoriteStore.addLocalWorldFavorite(id, group);
-                });
+                queryRequest
+                    .fetch('world.location', { worldId: id })
+                    .then(() => {
+                        searchStore.directAccessWorld(id);
+                        addLocalWorldFavorite(id, group);
+                    });
                 break;
             case 'local-favorite-avatar':
                 console.log('local-favorite-avatar', commandArg);
@@ -656,11 +663,8 @@ export const useVrcxStore = defineStore('Vrcx', () => {
                     break;
                 }
                 avatarRequest.getAvatar({ avatarId: avatarIdFav }).then(() => {
-                    avatarStore.showAvatarDialog(avatarIdFav);
-                    favoriteStore.addLocalAvatarFavorite(
-                        avatarIdFav,
-                        avatarGroup
-                    );
+                    showAvatarDialog(avatarIdFav);
+                    addLocalAvatarFavorite(avatarIdFav, avatarGroup);
                 });
                 break;
             case 'addavatardb':
@@ -677,18 +681,13 @@ export const useVrcxStore = defineStore('Vrcx', () => {
                     break;
                 }
                 if (advancedSettingsStore.showConfirmationOnSwitchAvatar) {
-                    avatarStore.selectAvatarWithConfirmation(avatarId);
+                    selectAvatarWithConfirmation(avatarId);
                     // Makes sure the window is focused
                     shouldFocusWindow = true;
                 } else {
-                    avatarStore
-                        .selectAvatarWithoutConfirmation(avatarId)
-                        .then(() => {
-                            new Noty({
-                                type: 'success',
-                                text: 'Avatar changed via launch command'
-                            }).show();
-                        });
+                    selectAvatarWithoutConfirmation(avatarId).then(() => {
+                        toast.success('Avatar changed via launch command');
+                    });
                     shouldFocusWindow = false;
                 }
                 break;
@@ -697,13 +696,13 @@ export const useVrcxStore = defineStore('Vrcx', () => {
                 if (!type) break;
                 const data = input.replace(`import/${type}/`, '');
                 if (type === 'avatar') {
-                    favoriteStore.avatarImportDialogInput = data;
+                    favoriteStore.setAvatarImportDialogInput(data);
                     favoriteStore.showAvatarImportDialog();
                 } else if (type === 'world') {
-                    favoriteStore.worldImportDialogInput = data;
+                    favoriteStore.setWorldImportDialogInput(data);
                     favoriteStore.showWorldImportDialog();
                 } else if (type === 'friend') {
-                    favoriteStore.friendImportDialogInput = data;
+                    favoriteStore.setFriendImportDialogInput(data);
                     favoriteStore.showFriendImportDialog();
                 }
                 break;
@@ -713,6 +712,10 @@ export const useVrcxStore = defineStore('Vrcx', () => {
         }
     }
 
+    /**
+     *
+     * @param name
+     */
     async function backupVrcRegistry(name) {
         let regJson;
         try {
@@ -746,6 +749,9 @@ export const useVrcxStore = defineStore('Vrcx', () => {
         // await this.updateRegistryBackupDialog();
     }
 
+    /**
+     *
+     */
     async function checkAutoBackupRestoreVrcRegistry() {
         if (
             !advancedSettingsStore.vrcRegistryAutoBackup ||
@@ -788,10 +794,16 @@ export const useVrcxStore = defineStore('Vrcx', () => {
         }
     }
 
+    /**
+     *
+     */
     function showRegistryBackupDialog() {
         isRegistryBackupDialogVisible.value = true;
     }
 
+    /**
+     *
+     */
     async function tryAutoBackupVrcRegistry() {
         if (!advancedSettingsStore.vrcRegistryAutoBackup) {
             return;
@@ -839,7 +851,15 @@ export const useVrcxStore = defineStore('Vrcx', () => {
     return {
         state,
 
+        appStartAt,
+        databaseUpgradeState,
+        databaseReadyForAutoLogin,
         proxyServer,
+        setProxyServer,
+        setIpcEnabled,
+        setClearVRCXCacheFrequency,
+        setMaxTableSize,
+        setSearchLimit,
         currentlyDroppingFile,
         isRegistryBackupDialogVisible,
         ipcEnabled,
@@ -856,6 +876,7 @@ export const useVrcxStore = defineStore('Vrcx', () => {
         ipcEvent,
         dragEnterCef,
         backupVrcRegistry,
-        updateDatabaseVersion
+        updateDatabaseVersion,
+        waitForDatabaseInit
     };
 });

@@ -6,7 +6,7 @@
             <DialogHeader>
                 <DialogTitle>{{ t('dialog.invite_response_message.header') }}</DialogTitle>
             </DialogHeader>
-            <div style="font-size: 12px">
+            <div class="text-xs">
                 <span>{{ t('dialog.invite_response_message.confirmation') }}</span>
             </div>
 
@@ -26,8 +26,8 @@
     import { toast } from 'vue-sonner';
     import { useI18n } from 'vue-i18n';
 
+    import { useGalleryStore, useNotificationStore } from '../../../stores';
     import { notificationRequest } from '../../../api';
-    import { useGalleryStore } from '../../../stores';
 
     const { t } = useI18n();
 
@@ -65,9 +65,13 @@
                     toast.error(t('message.error'));
                 })
                 .then((args) => {
-                    notificationRequest.hideNotification({
-                        notificationId: D.invite.id
-                    });
+                    notificationRequest
+                        .hideNotification({
+                            notificationId: D.invite.id
+                        })
+                        .then(() => {
+                            useNotificationStore().handleNotificationHide(D.invite.id);
+                        });
                     toast.success(t('message.invite.response_photo_sent'));
                     return args;
                 })
@@ -82,9 +86,13 @@
                     toast.error(t('message.error'));
                 })
                 .then((args) => {
-                    notificationRequest.hideNotification({
-                        notificationId: D.invite.id
-                    });
+                    notificationRequest
+                        .hideNotification({
+                            notificationId: D.invite.id
+                        })
+                        .then(() => {
+                            useNotificationStore().handleNotificationHide(D.invite.id);
+                        });
                     toast.success(t('message.invite.response_sent'));
                     return args;
                 })

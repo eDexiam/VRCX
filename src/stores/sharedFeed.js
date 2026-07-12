@@ -7,7 +7,7 @@ import {
     getGroupName,
     getWorldName
 } from '../shared/utils';
-import { database } from '../service/database';
+import { database } from '../services/database';
 import { useFriendStore } from './friend';
 import { useInstanceStore } from './instance';
 import { useLocationStore } from './location';
@@ -16,7 +16,7 @@ import { useNotificationStore } from './notification';
 import { useNotificationsSettingsStore } from './settings/notifications';
 import { useUserStore } from './user';
 import { useWristOverlaySettingsStore } from './settings/wristOverlay';
-import { watchState } from '../service/watchState';
+import { watchState } from '../services/watchState';
 
 export const useSharedFeedStore = defineStore('SharedFeed', () => {
     const friendStore = useFriendStore();
@@ -31,14 +31,17 @@ export const useSharedFeedStore = defineStore('SharedFeed', () => {
     const onPlayerJoining = ref([]);
 
     async function rebuildOnPlayerJoining() {
+        const wristFilter =
+            notificationsSettingsStore.sharedFeedFilters.wrist.OnPlayerJoining;
         let newOnPlayerJoining = [];
         for (const ref of userStore.currentTravelers.values()) {
+            if (!wristFilter || wristFilter === 'Off') {
+                break;
+            }
             const isFavorite = friendStore.localFavoriteFriends.has(ref.id);
             if (
                 locationStore.lastLocation.playerList.has(ref.id) ||
-                (notificationsSettingsStore.sharedFeedFilters.wrist
-                    .OnPlayerJoining === 'VIP' &&
-                    !isFavorite)
+                (wristFilter === 'VIP' && !isFavorite)
             ) {
                 continue;
             }
@@ -356,7 +359,7 @@ export const useSharedFeedStore = defineStore('SharedFeed', () => {
         const wristFilter = notificationsSettingsStore.sharedFeedFilters.wrist;
         // BlockedOnPlayerJoined, BlockedOnPlayerLeft, MutedOnPlayerJoined, MutedOnPlayerLeft
         for (const ref of moderationStore.cachedPlayerModerations.values()) {
-            if (ref.sourceUserId !== ctx.userId) {
+            if (ref.targetUserId !== ctx.userId) {
                 continue;
             }
 

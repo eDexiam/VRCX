@@ -11,11 +11,22 @@
     } from '@/components/ui/alert-dialog';
     import { storeToRefs } from 'pinia';
     import { useModalStore } from '@/stores';
+    import { nextTick, ref, watch } from 'vue';
 
     const modalStore = useModalStore();
 
-    const { alertOpen, alertMode, alertTitle, alertDescription, alertOkText, alertCancelText, alertDismissible } =
-        storeToRefs(modalStore);
+    const {
+        alertOpen,
+        alertMode,
+        alertTitle,
+        alertDescription,
+        alertOkText,
+        alertCancelText,
+        alertDismissible,
+        alertDestructive
+    } = storeToRefs(modalStore);
+
+    const actionRef = ref(null);
 
     function onEscapeKeyDown(event) {
         if (!alertDismissible.value) {
@@ -40,6 +51,14 @@
         }
         modalStore.handleDismiss();
     }
+
+    watch(alertOpen, async (newVal) => {
+        if (newVal) {
+            await nextTick();
+            await nextTick();
+            actionRef.value?.$el?.focus?.();
+        }
+    });
 </script>
 
 <template>
@@ -60,7 +79,10 @@
                     {{ alertCancelText }}
                 </AlertDialogCancel>
 
-                <AlertDialogAction @click="modalStore.handleOk">
+                <AlertDialogAction
+                    ref="actionRef"
+                    :variant="alertDestructive ? 'destructive' : undefined"
+                    @click="modalStore.handleOk">
                     {{ alertOkText }}
                 </AlertDialogAction>
             </AlertDialogFooter>

@@ -4,24 +4,29 @@ import { toast } from 'vue-sonner';
 import { useMagicKeys } from '@vueuse/core';
 import { useRouter } from 'vue-router';
 
-import { AppDebug } from '../service/appConfig';
+import { AppDebug } from '../services/appConfig';
 import { refreshCustomCss } from '../shared/utils/base/ui';
-import { updateLocalizedStrings } from '../plugin/i18n';
+import { updateLocalizedStrings } from '../plugins/i18n';
 import { useAppearanceSettingsStore } from './settings/appearance';
 import { useAvatarStore } from './avatar';
 import { useGroupStore } from './group';
+import {
+    clearGroupMemberModerationDialog,
+    showGroupDialog,
+    showGroupMemberModerationDialog
+} from '../coordinators/groupCoordinator';
+import { showWorldDialog } from '../coordinators/worldCoordinator';
+import { showAvatarDialog } from '../coordinators/avatarCoordinator';
+import { showUserDialog } from '../coordinators/userCoordinator';
 import { useInstanceStore } from './instance';
 import { useNotificationStore } from './notification';
+import { useNotificationsSettingsStore } from './settings/notifications';
 import { useSearchStore } from './search';
 import { useUserStore } from './user';
 import { useWorldStore } from './world';
 
 export const useUiStore = defineStore('Ui', () => {
     const notificationStore = useNotificationStore();
-    const userStore = useUserStore();
-    const worldStore = useWorldStore();
-    const avatarStore = useAvatarStore();
-    const groupStore = useGroupStore();
     const instanceStore = useInstanceStore();
     const router = useRouter();
     const keys = useMagicKeys();
@@ -30,6 +35,7 @@ export const useUiStore = defineStore('Ui', () => {
 
     const ctrlR = keys['Ctrl+R'];
     const ctrlD = keys['Ctrl+D'];
+    const metaD = keys['Meta+D'];
     const shift = keys['Shift'];
     const ctrlShiftI = keys['Ctrl+Shift+I'];
     const altShiftR = keys['Alt+Shift+R'];
@@ -46,6 +52,12 @@ export const useUiStore = defineStore('Ui', () => {
     });
 
     watch(ctrlD, (isPressed) => {
+        if (isPressed) {
+            directAccessPaste();
+        }
+    });
+
+    watch(metaD, (isPressed) => {
         if (isPressed) {
             directAccessPaste();
         }
@@ -135,19 +147,19 @@ export const useUiStore = defineStore('Ui', () => {
         }
         jumpDialogCrumb(index);
         if (item.type === 'user') {
-            userStore.showUserDialog(item.id);
+            showUserDialog(item.id);
             return;
         }
         if (item.type === 'world') {
-            worldStore.showWorldDialog(item.tag, item.shortName);
+            showWorldDialog(item.tag, item.shortName);
             return;
         }
         if (item.type === 'avatar') {
-            avatarStore.showAvatarDialog(item.id);
+            showAvatarDialog(item.id);
             return;
         }
         if (item.type === 'group') {
-            groupStore.showGroupDialog(item.id);
+            showGroupDialog(item.id);
             return;
         }
         if (item.type === 'previous-instances-user') {
@@ -164,6 +176,10 @@ export const useUiStore = defineStore('Ui', () => {
         }
         if (item.type === 'previous-instances-info') {
             instanceStore.showPreviousInstancesInfoDialog(item.id);
+            return;
+        }
+        if (item.type === 'group-member-moderation') {
+            showGroupMemberModerationDialog(item.id);
             return;
         }
         console.error(
@@ -183,20 +199,22 @@ export const useUiStore = defineStore('Ui', () => {
         const groupStore = useGroupStore();
         const instanceStore = useInstanceStore();
 
-        userStore.userDialog.visible = false;
-        worldStore.worldDialog.visible = false;
-        avatarStore.avatarDialog.visible = false;
-        groupStore.groupDialog.visible = false;
+        userStore.setUserDialogVisible(false);
+        worldStore.setWorldDialogVisible(false);
+        avatarStore.setAvatarDialogVisible(false);
+        groupStore.setGroupDialogVisible(false);
+        groupStore.setGroupMemberModerationVisible(false);
+        clearGroupMemberModerationDialog();
         instanceStore.hidePreviousInstancesDialogs();
         clearDialogCrumbs();
     }
 
     /**
-     * @param {Object} data
+     * @param {object} data
      * @param {string} data.type
      * @param {string} data.id
-     * @param {string?} data.tag
-     * @param {string?} data.shortName
+     * @param {string} [data.tag]
+     * @param {string} [data.shortName]
      * @returns {boolean}
      */
     function openDialog(data) {
@@ -217,27 +235,31 @@ export const useUiStore = defineStore('Ui', () => {
             worldStore.worldDialog.visible ||
             avatarStore.avatarDialog.visible ||
             groupStore.groupDialog.visible ||
+            groupStore.groupMemberModeration.visible ||
             (instanceStore.previousInstancesInfoDialog.visible &&
                 !isPrevInfo) ||
             (instanceStore.previousInstancesListDialog.visible && !isPrevList);
 
         if (type !== 'user') {
-            userStore.userDialog.visible = false;
+            userStore.setUserDialogVisible(false);
         }
         if (type !== 'world') {
-            worldStore.worldDialog.visible = false;
+            worldStore.setWorldDialogVisible(false);
         }
         if (type !== 'avatar') {
-            avatarStore.avatarDialog.visible = false;
+            avatarStore.setAvatarDialogVisible(false);
         }
         if (type !== 'group') {
-            groupStore.groupDialog.visible = false;
+            groupStore.setGroupDialogVisible(false);
+        }
+        if (type !== 'group-member-moderation') {
+            groupStore.setGroupMemberModerationVisible(false);
         }
         if (!isPrevInfo) {
-            instanceStore.previousInstancesInfoDialog.visible = false;
+            instanceStore.setPreviousInstancesInfoDialogVisible(false);
         }
         if (!isPrevList) {
-            instanceStore.previousInstancesListDialog.visible = false;
+            instanceStore.setPreviousInstancesListDialogVisible(false);
         }
         if (!hadActiveDialog) {
             clearDialogCrumbs();
@@ -279,7 +301,7 @@ export const useUiStore = defineStore('Ui', () => {
                 const name = String(routeName);
                 removeNotify(name);
                 if (name === 'notification') {
-                    notificationStore.unseenNotifications = [];
+                    notificationStore.clearUnseenNotifications();
                 }
             }
         }
@@ -301,11 +323,28 @@ export const useUiStore = defineStore('Ui', () => {
         updateTrayIconNotify();
     }
 
+    function clearAllNotifications() {
+        notifiedMenus.value = [];
+        updateTrayIconNotify();
+    }
+
     function updateTrayIconNotify(force = false) {
-        const newState =
-            appearanceSettings.notificationIconDot &&
-            (notifiedMenus.value.includes('notification') ||
-                notifiedMenus.value.includes('friend-log'));
+        const notificationsSettingsStore = useNotificationsSettingsStore();
+        let newState;
+        if (
+            notificationsSettingsStore.notificationLayout ===
+            'notification-center'
+        ) {
+            newState =
+                appearanceSettings.notificationIconDot &&
+                (notificationStore.hasUnseenNotifications ||
+                    notifiedMenus.value.includes('friend-log'));
+        } else {
+            newState =
+                appearanceSettings.notificationIconDot &&
+                (notifiedMenus.value.includes('notification') ||
+                    notifiedMenus.value.includes('friend-log'));
+        }
 
         if (trayIconNotify.value !== newState || force) {
             trayIconNotify.value = newState;
@@ -325,6 +364,7 @@ export const useUiStore = defineStore('Ui', () => {
 
         notifyMenu,
         removeNotify,
+        clearAllNotifications,
         showConsole,
         updateTrayIconNotify,
         pushDialogCrumb,

@@ -16,7 +16,7 @@ vi.mock('../../views/Feed/Feed.vue', () => ({
 vi.mock('../../views/Feed/columns.jsx', () => ({
     columns: []
 }));
-vi.mock('../../plugin/router', () => ({
+vi.mock('../../plugins/router', () => ({
     router: {
         beforeEach: vi.fn(),
         push: vi.fn(),
@@ -39,11 +39,11 @@ vi.mock('vue-router', async (importOriginal) => {
     };
 });
 
-vi.mock('../../plugin/interopApi', () => ({
+vi.mock('../../plugins/interopApi', () => ({
     initInteropApi: vi.fn()
 }));
 
-vi.mock('../../service/database', () => ({
+vi.mock('../../services/database', () => ({
     database: new Proxy(
         {},
         {
@@ -55,7 +55,7 @@ vi.mock('../../service/database', () => ({
     )
 }));
 
-vi.mock('../../service/config', () => ({
+vi.mock('../../services/config', () => ({
     default: {
         init: vi.fn(),
         getString: vi
@@ -81,10 +81,10 @@ vi.mock('../../service/config', () => ({
         remove: vi.fn()
     }
 }));
-vi.mock('../../service/jsonStorage', () => ({
+vi.mock('../../services/jsonStorage', () => ({
     default: vi.fn()
 }));
-vi.mock('../../service/watchState', () => ({
+vi.mock('../../services/watchState', () => ({
     watchState: { isLoggedIn: false }
 }));
 
@@ -112,6 +112,10 @@ const i18n = createI18n({
 });
 
 const stubs = {
+    ContextMenu: { template: '<div><slot /></div>' },
+    ContextMenuTrigger: { template: '<div><slot /></div>' },
+    ContextMenuContent: { template: '<div><slot /></div>' },
+    WorldActionMenuItems: { template: '<div />' },
     TooltipWrapper: {
         template: '<span><slot /></span>',
         props: [
@@ -126,9 +130,14 @@ const stubs = {
     AlertTriangle: { template: '<span class="alert-triangle" />' }
 };
 
-function mountLocation(props = {}) {
+function mountLocation(
+    props = {},
+    appearanceOverrides = {},
+    mountOptions = {}
+) {
     return mount(Location, {
         props,
+        ...mountOptions,
         global: {
             plugins: [
                 i18n,
@@ -139,7 +148,9 @@ function mountLocation(props = {}) {
                         World: {},
                         Search: {},
                         AppearanceSettings: {
-                            showInstanceIdInLocation: false
+                            showInstanceIdInLocation: false,
+                            isAgeGatedInstancesVisible: false,
+                            ...appearanceOverrides
                         },
                         Group: {}
                     }
@@ -177,8 +188,26 @@ describe('Location.vue', () => {
 
         test('shows dash placeholder when location is empty', () => {
             const wrapper = mountLocation({ location: '' });
-            const placeholder = wrapper.find('.transparent');
+            const placeholder = wrapper.find('.text-transparent');
             expect(placeholder.exists()).toBe(true);
+        });
+    });
+
+    describe('context menu attrs', () => {
+        test('keeps external classes on the visible location node when context menu is enabled', () => {
+            const wrapper = mountLocation(
+                { location: 'wrld_12345:67890', enableContextMenu: true },
+                {},
+                {
+                    attrs: {
+                        class: 'text-xs custom-location'
+                    }
+                }
+            );
+
+            const locationNode = wrapper.find('.custom-location');
+            expect(locationNode.exists()).toBe(true);
+            expect(locationNode.classes()).toContain('text-xs');
         });
     });
 
@@ -340,6 +369,36 @@ describe('Location.vue', () => {
             expect(wrapper.text()).toContain('First Name');
             await wrapper.setProps({ hint: 'Second Name' });
             expect(wrapper.text()).toContain('Second Name');
+        });
+    });
+
+    describe('age-restricted display', () => {
+        test('shows Restricted with lock when ageGate instance and setting is hidden', () => {
+            const wrapper = mountLocation(
+                { location: 'wrld_12345:67890~ageGate', hint: 'Test World' },
+                { isAgeGatedInstancesVisible: false }
+            );
+            expect(wrapper.text()).toContain('Restricted');
+            expect(wrapper.find('.lucide-lock').exists()).toBe(true);
+            expect(wrapper.text()).not.toContain('Test World');
+        });
+
+        test('shows normal location when ageGate instance and setting is visible', () => {
+            const wrapper = mountLocation(
+                { location: 'wrld_12345:67890~ageGate', hint: 'Test World' },
+                { isAgeGatedInstancesVisible: true }
+            );
+            expect(wrapper.text()).toContain('Test World');
+            expect(wrapper.text()).not.toContain('Restricted');
+        });
+
+        test('shows normal location for non-ageGate instance even when setting is hidden', () => {
+            const wrapper = mountLocation(
+                { location: 'wrld_12345:67890', hint: 'Normal World' },
+                { isAgeGatedInstancesVisible: false }
+            );
+            expect(wrapper.text()).toContain('Normal World');
+            expect(wrapper.text()).not.toContain('Restricted');
         });
     });
 });

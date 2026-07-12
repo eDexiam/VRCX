@@ -1,11 +1,17 @@
 import { Trash2 } from 'lucide-vue-next';
 
 import { Button } from '../../../components/ui/button';
-import { i18n } from '../../../plugin';
+import { i18n } from '../../../plugins';
 
 const { t } = i18n.global;
 
-export const createColumns = ({ userImage, userImageFull, onShowFullscreenImage, onShowUser, onDelete }) => [
+export const createColumns = ({
+    userImage,
+    userImageFull,
+    onShowFullscreenImage,
+    onShowUser,
+    onDelete
+}) => [
     {
         id: 'image',
         header: () => t('table.import.image'),

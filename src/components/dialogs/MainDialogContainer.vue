@@ -19,7 +19,7 @@
     import { ArrowLeft } from 'lucide-vue-next';
     import { Button } from '@/components/ui/button';
     import { TooltipWrapper } from '@/components/ui/tooltip';
-    import { computed } from 'vue';
+    import { computed, ref } from 'vue';
     import { storeToRefs } from 'pinia';
 
     import AvatarDialog from './AvatarDialog/AvatarDialog.vue';
@@ -28,6 +28,7 @@
     import PreviousInstancesListDialog from './PreviousInstancesDialog/PreviousInstancesListDialog.vue';
     import UserDialog from './UserDialog/UserDialog.vue';
     import WorldDialog from './WorldDialog/WorldDialog.vue';
+    import GroupMemberModerationDialog from './GroupDialog/GroupMemberModerationDialog.vue';
 
     const avatarStore = useAvatarStore();
     const groupStore = useGroupStore();
@@ -37,6 +38,20 @@
     const worldStore = useWorldStore();
 
     const { previousInstancesInfoDialog, previousInstancesListDialog } = storeToRefs(instanceStore);
+
+    const previousIds = ref({
+        userDialog: {
+            mutualFriend: null,
+            group: null,
+            avatar: null,
+            world: null,
+            favoriteWorld: null
+        }
+    });
+
+    function updateUserPreviousId(key, value) {
+        previousIds.value.userDialog[key] = value;
+    }
 
     const dialogCrumbs = computed(() => uiStore.dialogCrumbs);
     const activeType = computed(() => {
@@ -58,6 +73,9 @@
             }
             if (groupStore.groupDialog.visible) {
                 return 'group';
+            }
+            if (groupStore.groupMemberModeration.visible) {
+                return 'group-member-moderation';
             }
             return null;
         })();
@@ -81,12 +99,16 @@
                 return PreviousInstancesListDialog;
             case 'previous-instances-group':
                 return PreviousInstancesListDialog;
+            case 'group-member-moderation':
+                return GroupMemberModerationDialog;
             default:
                 return null;
         }
     });
     const activeComponentProps = computed(() => {
         switch (activeType.value) {
+            case 'user':
+                return { previousIds: previousIds.value.userDialog, updatePreviousId: updateUserPreviousId };
             case 'previous-instances-user':
                 return { variant: 'user' };
             case 'previous-instances-world':
@@ -109,11 +131,13 @@
     const dialogClass = computed(() => {
         switch (activeType.value) {
             case 'world':
-                return 'x-dialog x-world-dialog translate-y-0 sm:max-w-235';
+                return 'x-dialog translate-y-0 sm:max-w-235 overflow-hidden flex flex-col';
             case 'avatar':
-                return 'x-dialog x-avatar-dialog sm:max-w-235 translate-y-0';
+                return 'x-dialog sm:max-w-235 translate-y-0 overflow-hidden flex flex-col';
             case 'group':
-                return 'x-dialog x-group-dialog group-body translate-y-0 sm:max-w-235';
+                return 'x-dialog translate-y-0 sm:max-w-235 overflow-hidden flex flex-col';
+            case 'group-member-moderation':
+                return 'x-dialog translate-y-0 max-w-none flex flex-col sm:min-w-[90vw] sm:max-w-[90vw] sm:min-h-[80vh] sm:max-h-[80vh]';
             case 'previous-instances-info':
             case 'previous-instances-user':
             case 'previous-instances-world':
@@ -121,7 +145,7 @@
                 return 'x-dialog translate-y-0 sm:max-w-250';
             case 'user':
             default:
-                return 'x-dialog x-user-dialog sm:max-w-235 translate-y-0';
+                return 'x-dialog sm:max-w-235 translate-y-0 overflow-hidden flex flex-col';
         }
     });
 
@@ -149,7 +173,7 @@
 <template>
     <Dialog v-if="isOpen" v-model:open="isOpen">
         <DialogContent :class="dialogClass" style="top: 10vh" :show-close-button="false">
-            <Breadcrumb v-if="shouldShowBreadcrumbs" class="mb-2">
+            <Breadcrumb v-if="shouldShowBreadcrumbs" class="mb-2 flex-shrink-0">
                 <BreadcrumbList>
                     <TooltipWrapper :content="backCrumbLabel" :disabled="!backCrumbLabel" :delayDuration="500">
                         <Button variant="ghost" size="icon-sm" @click="handleBreadcrumbClick(dialogCrumbs.length - 2)">

@@ -1,16 +1,22 @@
 <template>
-    <span class="x-location-world">
-        <span v-if="region" :class="['flags', 'inline-block', 'mr-1.25', region]"></span>
+    <div class="flex items-center gap-2">
+        <span v-if="region" :class="cn('flags inline-block shrink-0', region)"></span>
         <span @click="showLaunchDialog" class="cursor-pointer">
             <Unlock v-if="isUnlocked" :class="['inline-block', 'mr-1.25']" />
             <span> {{ accessTypeName }} #{{ instanceName }}</span>
         </span>
-        <span v-if="groupName" @click="showGroupDialog" class="cursor-pointer">({{ groupName }})</span>
-        <TooltipWrapper v-if="isClosed" :content="t('dialog.user.info.instance_closed')">
-            <AlertTriangle :class="['inline-block', 'ml-1']" style="color: lightcoral" />
-        </TooltipWrapper>
-        <Lock v-if="strict" style="display: inline-block; margin-left: 5px" />
-    </span>
+        <span v-if="groupName" @click="openLocationGroupDialog" class="cursor-pointer">({{ groupName }})</span>
+        <div v-if="closedAt">
+            <TooltipWrapper side="top">
+                <template #content>
+                    {{ t('dialog.user.info.instance_closed_at') }}:
+                    {{ formatDateFilter(closedAt, 'long') }}
+                </template>
+                <AlertTriangle class="text-orange-500 my-auto" />
+            </TooltipWrapper>
+        </div>
+        <Lock v-if="strict" class="text-muted-foreground" />
+    </div>
 </template>
 
 <script setup>
@@ -19,16 +25,17 @@
     import { storeToRefs } from 'pinia';
     import { useI18n } from 'vue-i18n';
 
-    import { useGroupStore, useInstanceStore, useLaunchStore } from '../stores';
-    import { getGroupName, parseLocation } from '../shared/utils';
+    import { useInstanceStore, useLaunchStore } from '../stores';
+    import { showGroupDialog } from '../coordinators/groupCoordinator';
+    import { formatDateFilter, getGroupName, parseLocation } from '../shared/utils';
     import { accessTypeLocaleKeyMap } from '../shared/constants';
+    import { cn } from '@/lib/utils';
 
     const { t } = useI18n();
     const { cachedInstances } = useInstanceStore();
     const { lastInstanceApplied } = storeToRefs(useInstanceStore());
 
     const launchStore = useLaunchStore();
-    const groupStore = useGroupStore();
 
     const props = defineProps({
         locationobject: Object,
@@ -48,8 +55,11 @@
     const isUnlocked = ref(false);
     const strict = ref(false);
     const groupName = ref('');
-    const isClosed = ref(false);
+    const closedAt = ref('');
 
+    /**
+     *
+     */
     function parse() {
         const locObj = props.locationobject;
         location.value = locObj.tag;
@@ -64,6 +74,7 @@
         region.value = locObj.region || 'us';
 
         instanceName.value = locObj.instanceName;
+        closedAt.value = '';
 
         const L = parseLocation(locObj.tag);
         if (!L.isRealInstance) {
@@ -76,7 +87,7 @@
                 instanceName.value = instanceRef.displayName;
             }
             if (instanceRef.closedAt) {
-                isClosed.value = true;
+                closedAt.value = instanceRef.closedAt;
             }
         }
 
@@ -94,6 +105,10 @@
         }
     }
 
+    /**
+     *
+     * @param accessTypeNameRaw
+     */
     function translateAccessType(accessTypeNameRaw) {
         const key = accessTypeLocaleKeyMap[accessTypeNameRaw];
         if (!key) {
@@ -118,20 +133,20 @@
         { immediate: true }
     );
 
+    /**
+     *
+     */
     function showLaunchDialog() {
         launchStore.showLaunchDialog(location.value, shortName.value);
     }
 
-    function showGroupDialog() {
+    /**
+     *
+     */
+    function openLocationGroupDialog() {
         if (!location.value) return;
         const L = parseLocation(location.value);
         if (!L.groupId) return;
-        groupStore.showGroupDialog(L.groupId);
+        showGroupDialog(L.groupId);
     }
 </script>
-
-<style scoped>
-    .inline-block {
-        display: inline-block;
-    }
-</style>

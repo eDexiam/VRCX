@@ -65,7 +65,7 @@
 <script setup>
     import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
     import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-    import { ref } from 'vue';
+    import { ref, watch } from 'vue';
     import { storeToRefs } from 'pinia';
     import { useI18n } from 'vue-i18n';
     import { useRouter } from 'vue-router';
@@ -93,6 +93,20 @@
 
     const activeTab = ref('friend');
 
+    watch(isNotificationCenterOpen, (open) => {
+        if (open) {
+            if (unseenFriendNotifications.value.length) {
+                activeTab.value = 'friend';
+            } else if (unseenGroupNotifications.value.length) {
+                activeTab.value = 'group';
+            } else if (unseenOtherNotifications.value.length) {
+                activeTab.value = 'other';
+            } else {
+                activeTab.value = 'friend';
+            }
+        }
+    });
+
     // Dialog state
     const sendInviteResponseDialog = ref({
         messageSlot: {},
@@ -103,7 +117,7 @@
 
     function navigateToTable() {
         isNotificationCenterOpen.value = false;
-        router.push({ name: 'notification' });
+        router.push({ name: 'notification', query: { fromCenter: '1' } });
     }
 
     function showSendInviteResponseDialog(invite) {

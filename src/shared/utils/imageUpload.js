@@ -1,72 +1,39 @@
-import { toast } from 'vue-sonner';
-function resolveMessage(message) {
-    if (typeof message === 'function') {
-        return message();
-    }
-    return message;
+const UPLOAD_TIMEOUT_MS = 30_000;
+
+/**
+ *
+ * @param promise
+ */
+export function withUploadTimeout(promise) {
+    return Promise.race([
+        promise,
+        new Promise((_, reject) =>
+            setTimeout(
+                () => reject(new Error('Upload timed out')),
+                UPLOAD_TIMEOUT_MS
+            )
+        )
+    ]);
 }
 
-function getInputElement(selector) {
-    if (!selector) {
-        return null;
-    }
-    if (typeof selector === 'function') {
-        return selector();
-    }
-    if (typeof selector === 'string') {
-        return document.querySelector(selector);
-    }
-    return selector;
-}
-
-export function handleImageUploadInput(event, options = {}) {
-    const {
-        inputSelector,
-        maxSize = 100000000,
-        acceptPattern = /image.*/,
-        tooLargeMessage,
-        invalidTypeMessage,
-        onClear
-    } = options;
-
-    const clearInput = () => {
-        onClear?.();
-        const input = getInputElement(inputSelector);
-        if (input) {
-            input.value = '';
-        }
-    };
-
-    const files = event?.target?.files || event?.dataTransfer?.files;
-    if (!files || files.length === 0) {
-        clearInput();
-        return { file: null, clearInput };
-    }
-
-    const file = files[0];
-    if (file.size >= maxSize) {
-        if (tooLargeMessage) {
-            toast.error(resolveMessage(tooLargeMessage));
-        }
-        clearInput();
-        return { file: null, clearInput };
-    }
-
-    let acceptRegex = null;
-    if (acceptPattern) {
-        acceptRegex =
-            acceptPattern instanceof RegExp
-                ? acceptPattern
-                : new RegExp(acceptPattern);
-    }
-
-    if (acceptRegex && !acceptRegex.test(file.type)) {
-        if (invalidTypeMessage) {
-            toast.error(resolveMessage(invalidTypeMessage));
-        }
-        clearInput();
-        return { file: null, clearInput };
-    }
-
-    return { file, clearInput };
+/**
+ * File -> base64
+ * @param {Blob|File} blob
+ * @returns {Promise<string>} base64 encoded string
+ */
+export function readFileAsBase64(blob) {
+    return new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onerror = reject;
+        r.onabort = reject;
+        r.onload = () => {
+            const bytes = new Uint8Array(r.result);
+            let binary = '';
+            for (let i = 0; i < bytes.length; i++) {
+                binary += String.fromCharCode(bytes[i]);
+            }
+            resolve(btoa(binary));
+        };
+        r.readAsArrayBuffer(blob);
+    });
 }

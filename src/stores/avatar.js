@@ -1,41 +1,16 @@
-import { nextTick, ref, watch } from 'vue';
+import { ref, watch } from 'vue';
 import { defineStore } from 'pinia';
-import { toast } from 'vue-sonner';
-import { useI18n } from 'vue-i18n';
 
+import { checkVRChatCache } from '../shared/utils';
+import { queryRequest } from '../api';
 import {
-    checkVRChatCache,
-    extractFileId,
-    getAvailablePlatforms,
-    getBundleDateSize,
-    getPlatformInfo,
-    replaceBioSymbols,
-    storeAvatarImage
-} from '../shared/utils';
-import { avatarRequest, miscRequest } from '../api';
-import { AppDebug } from '../service/appConfig';
-import { database } from '../service/database';
-import { useAdvancedSettingsStore } from './settings/advanced';
-import { useAvatarProviderStore } from './avatarProvider';
-import { useFavoriteStore } from './favorite';
-import { useModalStore } from './modal';
-import { useUiStore } from './ui';
-import { useUserStore } from './user';
-import { useVRCXUpdaterStore } from './vrcxUpdater';
-import { watchState } from '../service/watchState';
-
-import webApiService from '../service/webapi';
+    getAvatarHistory,
+    preloadOwnAvatars
+} from '../coordinators/avatarCoordinator';
+import { database } from '../services/database';
+import { watchState } from '../services/watchState';
 
 export const useAvatarStore = defineStore('Avatar', () => {
-    const favoriteStore = useFavoriteStore();
-    const avatarProviderStore = useAvatarProviderStore();
-    const vrcxUpdaterStore = useVRCXUpdaterStore();
-    const advancedSettingsStore = useAdvancedSettingsStore();
-    const userStore = useUserStore();
-    const modalStore = useModalStore();
-    const uiStore = useUiStore();
-    const { t } = useI18n();
-
     let cachedAvatarModerations = new Map();
     let cachedAvatars = new Map();
     let cachedAvatarNames = new Map();
@@ -79,187 +54,31 @@ export const useAvatarStore = defineStore('Avatar', () => {
             avatarHistory.value = [];
             if (isLoggedIn) {
                 getAvatarHistory();
+                preloadOwnAvatars();
             }
         },
         { flush: 'sync' }
     );
 
     /**
-    / * @param {object} json
-    / * @returns {object} ref
-    */
-    function applyAvatar(json) {
-        json.name = replaceBioSymbols(json.name);
-        json.description = replaceBioSymbols(json.description);
-        let ref = cachedAvatars.get(json.id);
-        if (typeof ref === 'undefined') {
-            ref = {
-                acknowledgements: '',
-                authorId: '',
-                authorName: '',
-                created_at: '',
-                description: '',
-                featured: false,
-                highestPrice: null,
-                id: '',
-                imageUrl: '',
-                listingDate: null,
-                lock: false,
-                lowestPrice: null,
-                name: '',
-                pendingUpload: false,
-                performance: {},
-                productId: null,
-                publishedListings: [],
-                releaseStatus: '',
-                searchable: false,
-                styles: [],
-                tags: [],
-                thumbnailImageUrl: '',
-                unityPackageUrl: '',
-                unityPackageUrlObject: {},
-                unityPackages: [],
-                updated_at: '',
-                version: 0,
-                ...json
-            };
-            cachedAvatars.set(ref.id, ref);
-        } else {
-            const { unityPackages } = ref;
-            Object.assign(ref, json);
-            if (
-                json.unityPackages?.length > 0 &&
-                unityPackages.length > 0 &&
-                !json.unityPackages[0].assetUrl
-            ) {
-                ref.unityPackages = unityPackages;
-            }
-        }
-        for (const listing of ref.publishedListings) {
-            listing.displayName = replaceBioSymbols(listing.displayName);
-            listing.description = replaceBioSymbols(listing.description);
-        }
-        favoriteStore.applyFavorite('avatar', ref.id);
-        if (favoriteStore.localAvatarFavoritesList.includes(ref.id)) {
-            const avatarRef = ref;
-            for (
-                let i = 0;
-                i < favoriteStore.localAvatarFavoriteGroups.length;
-                ++i
-            ) {
-                const groupName = favoriteStore.localAvatarFavoriteGroups[i];
-                if (!favoriteStore.localAvatarFavorites[groupName]) {
-                    continue;
-                }
-                for (
-                    let j = 0;
-                    j < favoriteStore.localAvatarFavorites[groupName].length;
-                    ++j
-                ) {
-                    const favoriteRef =
-                        favoriteStore.localAvatarFavorites[groupName][j];
-                    if (favoriteRef.id === avatarRef.id) {
-                        favoriteStore.localAvatarFavorites[groupName][j] =
-                            avatarRef;
-                    }
-                }
-            }
-
-            // update db cache
-            database.addAvatarToCache(avatarRef);
-        }
-        return ref;
+     * @param {boolean} value
+     */
+    function setAvatarDialogLoading(value) {
+        avatarDialog.value.loading = value;
     }
 
     /**
-     *
-     * @param {string} avatarId
-     * @returns
+     * @param {boolean} value
      */
-    function showAvatarDialog(avatarId) {
-        const D = avatarDialog.value;
-        const isMainDialogOpen = uiStore.openDialog({
-            type: 'avatar',
-            id: avatarId
-        });
-        D.visible = true;
-        if (isMainDialogOpen && D.id === avatarId) {
-            uiStore.setDialogCrumbLabel('avatar', D.id, D.ref?.name || D.id);
-            nextTick(() => (D.loading = false));
-            return;
-        }
-        D.loading = true;
-        D.id = avatarId;
-        D.inCache = false;
-        D.cacheSize = '';
-        D.cacheLocked = false;
-        D.cachePath = '';
-        D.fileAnalysis = {};
-        D.isQuestFallback = false;
-        D.isPC = false;
-        D.isQuest = false;
-        D.isIos = false;
-        D.hasImposter = false;
-        D.imposterVersion = '';
-        D.platformInfo = {};
-        D.galleryImages = [];
-        D.galleryLoading = true;
-        D.isFavorite =
-            favoriteStore.getCachedFavoritesByObjectId(avatarId) ||
-            (userStore.isLocalUserVrcPlusSupporter &&
-                favoriteStore.localAvatarFavoritesList.includes(avatarId));
-        D.isBlocked = cachedAvatarModerations.has(avatarId);
-        const ref2 = cachedAvatars.get(avatarId);
-        if (typeof ref2 !== 'undefined') {
-            D.ref = ref2;
-            uiStore.setDialogCrumbLabel('avatar', D.id, D.ref?.name || D.id);
-            nextTick(() => (D.loading = false));
-        }
-        avatarRequest
-            .getAvatar({ avatarId })
-            .then((args) => {
-                const ref = applyAvatar(args.json);
-                D.ref = ref;
-                uiStore.setDialogCrumbLabel(
-                    'avatar',
-                    D.id,
-                    D.ref?.name || D.id
-                );
-                getAvatarGallery(avatarId);
-                updateVRChatAvatarCache();
-                if (/quest/.test(ref.tags)) {
-                    D.isQuestFallback = true;
-                }
-                const { isPC, isQuest, isIos } = getAvailablePlatforms(
-                    ref.unityPackages
-                );
-                D.isPC = isPC;
-                D.isQuest = isQuest;
-                D.isIos = isIos;
-                D.platformInfo = getPlatformInfo(ref.unityPackages);
-                for (let i = ref.unityPackages.length - 1; i > -1; i--) {
-                    const unityPackage = ref.unityPackages[i];
-                    if (unityPackage.variant === 'impostor') {
-                        D.hasImposter = true;
-                        D.imposterVersion = unityPackage.impostorizerVersion;
-                        break;
-                    }
-                }
-                if (Object.keys(D.fileAnalysis).length === 0) {
-                    getBundleDateSize(ref);
-                }
-            })
-            .catch((err) => {
-                D.loading = false;
-                D.id = null;
-                D.visible = false;
-                uiStore.jumpBackDialogCrumb();
-                toast.error(t('message.api_handler.avatar_private_or_deleted'));
-                throw err;
-            })
-            .finally(() => {
-                nextTick(() => (D.loading = false));
-            });
+    function setAvatarDialogVisible(value) {
+        avatarDialog.value.visible = value;
+    }
+
+    /**
+     * @param {boolean} value
+     */
+    function setAvatarDialogIsFavorite(value) {
+        avatarDialog.value.isFavorite = value;
     }
 
     /**
@@ -269,8 +88,8 @@ export const useAvatarStore = defineStore('Avatar', () => {
      */
     async function getAvatarGallery(avatarId) {
         const D = avatarDialog.value;
-        const args = await avatarRequest
-            .getAvatarGallery(avatarId)
+        const args = await queryRequest
+            .fetch('avatarGallery', { avatarId })
             .finally(() => {
                 D.galleryLoading = false;
             });
@@ -332,6 +151,16 @@ export const useAvatarStore = defineStore('Avatar', () => {
         return ref;
     }
 
+    /**
+     *
+     */
+    function resetCachedAvatarModerations() {
+        cachedAvatarModerations.clear();
+    }
+
+    /**
+     *
+     */
     function updateVRChatAvatarCache() {
         const D = avatarDialog.value;
         if (D.visible) {
@@ -352,395 +181,43 @@ export const useAvatarStore = defineStore('Avatar', () => {
 
     /**
      *
-     * @returns {Promise<void>}
      */
-    async function getAvatarHistory() {
-        const historyArray = await database.getAvatarHistory(
-            userStore.currentUser.id
-        );
-        for (let i = 0; i < historyArray.length; i++) {
-            const avatar = historyArray[i];
-            if (avatar.authorId === userStore.currentUser.id) {
-                continue;
-            }
-            applyAvatar(avatar);
-        }
-        avatarHistory.value = historyArray;
-    }
-
-    /**
-     * @param {string} avatarId
-     */
-    function addAvatarToHistory(avatarId) {
-        avatarRequest
-            .getAvatar({ avatarId })
-            .then((args) => {
-                const ref = applyAvatar(args.json);
-
-                database.addAvatarToCache(ref);
-                database.addAvatarToHistory(ref.id);
-
-                if (ref.authorId === userStore.currentUser.id) {
-                    return;
-                }
-
-                const historyArray = avatarHistory.value;
-                for (let i = 0; i < historyArray.length; ++i) {
-                    if (historyArray[i].id === ref.id) {
-                        historyArray.splice(i, 1);
-                    }
-                }
-
-                avatarHistory.value.unshift(ref);
-            })
-            .catch((err) => {
-                console.error('Failed to add avatar to history:', err);
-            });
-    }
-
     function clearAvatarHistory() {
         avatarHistory.value = [];
         database.clearAvatarHistory();
     }
 
-    function promptClearAvatarHistory() {
-        modalStore
-            .confirm({
-                description: t('confirm.clear_avatar_history'),
-                title: 'Confirm'
-            })
-            .then(({ ok }) => {
-                if (!ok) return;
-                clearAvatarHistory();
-            })
-            .catch(() => {});
+    /**
+     * @param {Array} value
+     */
+    function setAvatarHistory(value) {
+        avatarHistory.value = value;
     }
 
     /**
-     *
-     * @param {string} imageUrl
-     * @returns {Promise<object>}
+     * @param {*} value
      */
-    async function getAvatarName(imageUrl) {
-        const fileId = extractFileId(imageUrl);
-        if (!fileId) {
-            return {
-                ownerId: '',
-                avatarName: '-'
-            };
-        }
-        if (cachedAvatarNames.has(fileId)) {
-            return cachedAvatarNames.get(fileId);
-        }
-        try {
-            const args = await miscRequest.getFile({ fileId });
-            return storeAvatarImage(args, cachedAvatarNames);
-        } catch (error) {
-            console.error('Failed to get avatar images:', error);
-            return {
-                ownerId: '',
-                avatarName: '-'
-            };
-        }
-    }
-
-    async function lookupAvatars(type, search) {
-        const avatars = new Map();
-        if (type === 'search') {
-            try {
-                const url = `${
-                    avatarProviderStore.avatarRemoteDatabaseProvider
-                }?${type}=${encodeURIComponent(search)}&n=5000`;
-                const response = await webApiService.execute({
-                    url,
-                    method: 'GET',
-                    headers: {
-                        Referer: 'https://vrcx.app',
-                        'VRCX-ID': vrcxUpdaterStore.vrcxId
-                    }
-                });
-                const json = JSON.parse(response.data);
-                if (AppDebug.debugWebRequests) {
-                    console.log(url, json, response);
-                }
-                if (response.status === 200 && typeof json === 'object') {
-                    json.forEach((avatar) => {
-                        if (!avatars.has(avatar.Id)) {
-                            const ref = {
-                                authorId: '',
-                                authorName: '',
-                                name: '',
-                                description: '',
-                                id: '',
-                                imageUrl: '',
-                                thumbnailImageUrl: '',
-                                created_at: '0001-01-01T00:00:00.0000000Z',
-                                updated_at: '0001-01-01T00:00:00.0000000Z',
-                                releaseStatus: 'public',
-                                ...avatar
-                            };
-                            avatars.set(ref.id, ref);
-                        }
-                    });
-                } else {
-                    throw new Error(`Error: ${response.data}`);
-                }
-            } catch (err) {
-                const msg = `Avatar search failed for ${search} with ${avatarProviderStore.avatarRemoteDatabaseProvider}\n${err}`;
-                console.error(msg);
-                toast.error(msg);
-            }
-        } else if (type === 'authorId') {
-            const length =
-                avatarProviderStore.avatarRemoteDatabaseProviderList.length;
-            for (let i = 0; i < length; ++i) {
-                const url =
-                    avatarProviderStore.avatarRemoteDatabaseProviderList[i];
-                const avatarArray = await lookupAvatarsByAuthor(url, search);
-                avatarArray.forEach((avatar) => {
-                    if (!avatars.has(avatar.id)) {
-                        avatars.set(avatar.id, avatar);
-                    }
-                });
-            }
-        }
-        return avatars;
-    }
-
-    async function lookupAvatarByImageFileId(authorId, fileId) {
-        for (const providerUrl of avatarProviderStore.avatarRemoteDatabaseProviderList) {
-            const avatar = await lookupAvatarByFileId(providerUrl, fileId);
-            if (avatar?.id) {
-                return avatar.id;
-            }
-        }
-
-        for (const providerUrl of avatarProviderStore.avatarRemoteDatabaseProviderList) {
-            const avatarArray = await lookupAvatarsByAuthor(
-                providerUrl,
-                authorId
-            );
-            for (const avatar of avatarArray) {
-                if (extractFileId(avatar.imageUrl) === fileId) {
-                    return avatar.id;
-                }
-            }
-        }
-        return null;
-    }
-
-    async function lookupAvatarByFileId(providerUrl, fileId) {
-        try {
-            const url = `${providerUrl}?fileId=${encodeURIComponent(fileId)}`;
-            const response = await webApiService.execute({
-                url,
-                method: 'GET',
-                headers: {
-                    Referer: 'https://vrcx.app',
-                    'VRCX-ID': vrcxUpdaterStore.vrcxId
-                }
-            });
-            const json = JSON.parse(response.data);
-            if (AppDebug.debugWebRequests) {
-                console.log(url, json, response);
-            }
-            if (response.status === 200 && typeof json === 'object') {
-                const ref = {
-                    authorId: '',
-                    authorName: '',
-                    name: '',
-                    description: '',
-                    id: '',
-                    imageUrl: '',
-                    thumbnailImageUrl: '',
-                    created_at: '0001-01-01T00:00:00.0000000Z',
-                    updated_at: '0001-01-01T00:00:00.0000000Z',
-                    releaseStatus: 'public',
-                    ...json
-                };
-                return ref;
-            } else {
-                return null;
-            }
-        } catch (err) {
-            // ignore errors for now, not all providers support this lookup type
-            return null;
-        }
-    }
-
-    async function lookupAvatarsByAuthor(providerUrl, authorId) {
-        const avatars = [];
-        if (!providerUrl || !authorId) {
-            return avatars;
-        }
-        const url = `${providerUrl}?authorId=${encodeURIComponent(authorId)}`;
-        try {
-            const response = await webApiService.execute({
-                url,
-                method: 'GET',
-                headers: {
-                    Referer: 'https://vrcx.app',
-                    'VRCX-ID': vrcxUpdaterStore.vrcxId
-                }
-            });
-            const json = JSON.parse(response.data);
-            if (AppDebug.debugWebRequests) {
-                console.log(url, json, response);
-            }
-            if (response.status === 200 && typeof json === 'object') {
-                json.forEach((avatar) => {
-                    const ref = {
-                        authorId: '',
-                        authorName: '',
-                        name: '',
-                        description: '',
-                        id: '',
-                        imageUrl: '',
-                        thumbnailImageUrl: '',
-                        created_at: '0001-01-01T00:00:00.0000000Z',
-                        updated_at: '0001-01-01T00:00:00.0000000Z',
-                        releaseStatus: 'public',
-                        ...avatar
-                    };
-                    avatars.push(ref);
-                });
-            } else {
-                throw new Error(`Error: ${response.data}`);
-            }
-        } catch (err) {
-            const msg = `Avatar lookup failed for ${authorId} with ${url}\n${err}`;
-            console.error(msg);
-            toast.error(msg);
-        }
-        return avatars;
-    }
-
-    function selectAvatarWithConfirmation(id) {
-        modalStore
-            .confirm({
-                description: t('confirm.select_avatar'),
-                title: 'Confirm'
-            })
-            .then(({ ok }) => {
-                if (!ok) return;
-                selectAvatarWithoutConfirmation(id);
-            })
-            .catch(() => {});
-    }
-
-    async function selectAvatarWithoutConfirmation(id) {
-        if (userStore.currentUser.currentAvatar === id) {
-            toast.info('Avatar already selected');
-            return;
-        }
-        return avatarRequest
-            .selectAvatar({
-                avatarId: id
-            })
-            .then(() => {
-                toast.success('Avatar changed');
-            });
-    }
-
-    function checkAvatarCache(fileId) {
-        let avatarId = '';
-        for (let ref of cachedAvatars.values()) {
-            if (extractFileId(ref.imageUrl) === fileId) {
-                avatarId = ref.id;
-            }
-        }
-        return avatarId;
-    }
-
-    async function checkAvatarCacheRemote(fileId, ownerUserId) {
-        if (advancedSettingsStore.avatarRemoteDatabase) {
-            try {
-                toast.dismiss(loadingToastId.value);
-                loadingToastId.value = toast.loading(
-                    t('message.avatar_lookup.loading')
-                );
-                const avatarId = await lookupAvatarByImageFileId(
-                    ownerUserId,
-                    fileId
-                );
-                return avatarId;
-            } catch (err) {
-                console.error('Failed to lookup avatar by image file id:', err);
-            } finally {
-                toast.dismiss(loadingToastId.value);
-            }
-        }
-        return null;
-    }
-
-    async function showAvatarAuthorDialog(
-        refUserId,
-        ownerUserId,
-        currentAvatarImageUrl
-    ) {
-        const fileId = extractFileId(currentAvatarImageUrl);
-        if (!fileId) {
-            toast.error(t('message.avatar_lookup.failed'));
-        } else if (refUserId === userStore.currentUser.id) {
-            showAvatarDialog(userStore.currentUser.currentAvatar);
-        } else {
-            let avatarId = checkAvatarCache(fileId);
-            let avatarInfo;
-            if (!avatarId) {
-                avatarInfo = await getAvatarName(currentAvatarImageUrl);
-                if (avatarInfo.ownerId === userStore.currentUser.id) {
-                    await userStore.refreshUserDialogAvatars(fileId);
-                    return;
-                }
-            }
-            if (!avatarId) {
-                avatarId = await checkAvatarCacheRemote(fileId, ownerUserId);
-            }
-            if (!avatarId) {
-                if (ownerUserId === refUserId) {
-                    toast.warning(
-                        t('message.avatar_lookup.private_or_not_found')
-                    );
-                } else {
-                    toast.warning(t('message.avatar_lookup.not_found'));
-                    userStore.showUserDialog(avatarInfo.ownerId);
-                }
-            }
-            if (avatarId) {
-                showAvatarDialog(avatarId);
-            }
-        }
-    }
-
-    function addAvatarWearTime(avatarId) {
-        if (!userStore.currentUser.$previousAvatarSwapTime || !avatarId) {
-            return;
-        }
-        const timeSpent =
-            Date.now() - userStore.currentUser.$previousAvatarSwapTime;
-        database.addAvatarTimeSpent(avatarId, timeSpent);
+    function setLoadingToastId(value) {
+        loadingToastId.value = value;
     }
 
     return {
         avatarDialog,
         avatarHistory,
+        loadingToastId,
         cachedAvatarModerations,
         cachedAvatars,
         cachedAvatarNames,
 
-        showAvatarDialog,
         applyAvatarModeration,
+        resetCachedAvatarModerations,
         getAvatarGallery,
         updateVRChatAvatarCache,
-        getAvatarHistory,
-        addAvatarToHistory,
-        applyAvatar,
-        promptClearAvatarHistory,
-        getAvatarName,
-        lookupAvatars,
-        selectAvatarWithConfirmation,
-        selectAvatarWithoutConfirmation,
-        showAvatarAuthorDialog,
-        addAvatarWearTime
+        clearAvatarHistory,
+        setAvatarHistory,
+        setLoadingToastId,
+        setAvatarDialogVisible,
+        setAvatarDialogIsFavorite,
+        setAvatarDialogLoading
     };
 });

@@ -24,23 +24,31 @@
                     </div>
                     <VirtualCombobox
                         v-if="graphReady"
+                        class="min-w-60"
                         :model-value="selectedFriendId"
                         @update:modelValue="navigateToFriend"
-                        :groups="friendPickerGroups"
+                        :groups="excludePickerGroups"
                         :placeholder="t('view.charts.mutual_friend.actions.go_to_friend')"
                         :search-placeholder="t('view.charts.mutual_friend.actions.go_to_friend')"
                         :close-on-select="true"
                         :deselect-on-reselect="true">
                         <template #item="{ item, selected }">
-                            <div class="x-friend-item flex w-full items-center">
+                            <div class="flex w-full items-center p-1.5 text-[13px]">
                                 <template v-if="item.user">
-                                    <div :class="['avatar', userStatusClass(item.user)]">
-                                        <img :src="userImage(item.user)" loading="lazy" />
+                                    <div
+                                        class="relative inline-block flex-none size-9 mr-2.5"
+                                        :class="userStatusClass(item.user)">
+                                        <img
+                                            class="size-full rounded-full object-cover"
+                                            :src="userImage(item.user)"
+                                            loading="lazy" />
                                     </div>
-                                    <div class="detail">
-                                        <span class="name" :style="{ color: item.user.$userColour }">{{
-                                            item.user.displayName
-                                        }}</span>
+                                    <div class="flex-1 overflow-hidden">
+                                        <span
+                                            class="block truncate font-medium leading-[18px]"
+                                            :style="{ color: item.user.$userColour }"
+                                            >{{ item.user.displayName }}</span
+                                        >
                                     </div>
                                 </template>
                                 <template v-else>
@@ -172,14 +180,19 @@
                                             :search-placeholder="t('view.charts.mutual_friend.actions.go_to_friend')"
                                             :multiple="true">
                                             <template #item="{ item, selected }">
-                                                <div class="x-friend-item flex w-full items-center">
+                                                <div class="flex w-full items-center p-1.5 text-[13px]">
                                                     <template v-if="item.user">
-                                                        <div :class="['avatar', userStatusClass(item.user)]">
-                                                            <img :src="userImage(item.user)" loading="lazy" />
+                                                        <div
+                                                            class="relative inline-block flex-none size-9 mr-2.5"
+                                                            :class="userStatusClass(item.user)">
+                                                            <img
+                                                                class="size-full rounded-full object-cover"
+                                                                :src="userImage(item.user)"
+                                                                loading="lazy" />
                                                         </div>
-                                                        <div class="detail">
+                                                        <div class="flex-1 overflow-hidden">
                                                             <span
-                                                                class="name"
+                                                                class="block truncate font-medium leading-[18px]"
                                                                 :style="{ color: item.user.$userColour }"
                                                                 >{{ item.user.displayName }}</span
                                                             >
@@ -223,11 +236,31 @@
                 </div>
             </div>
 
-            <div
-                v-show="!(hasFetched && !isFetching && !graphReady)"
-                ref="graphContainerRef"
-                class="mt-3 h-[calc(100vh-260px)] min-h-[520px] w-full flex-1 rounded-lg bg-transparent"
-                :style="{ backgroundColor: canvasBackground }"></div>
+            <ContextMenu @update:open="onNodeMenuOpenChange">
+                <ContextMenuTrigger as-child>
+                    <div
+                        v-show="!(hasFetched && !isFetching && !graphReady)"
+                        ref="graphContainerRef"
+                        class="mt-3 h-[calc(100vh-260px)] min-h-[520px] w-full flex-1 rounded-lg bg-transparent"
+                        :style="{ backgroundColor: canvasBackground }"></div>
+                </ContextMenuTrigger>
+                <ContextMenuContent v-if="contextMenuNodeId" class="min-w-40">
+                    <ContextMenuItem @click="handleNodeMenuViewDetails">
+                        <UserIcon class="size-4" />
+                        {{ t('view.charts.mutual_friend.context_menu.view_details') }}
+                    </ContextMenuItem>
+                    <ContextMenuSeparator />
+                    <ContextMenuItem @click="handleNodeMenuRefresh">
+                        <RefreshCwIcon class="size-4" />
+                        {{ t('view.charts.mutual_friend.context_menu.refresh_mutuals') }}
+                    </ContextMenuItem>
+                    <ContextMenuSeparator />
+                    <ContextMenuItem @click="handleNodeMenuHide">
+                        <EyeOffIcon class="size-4" />
+                        {{ t('view.charts.mutual_friend.context_menu.hide_friend') }}
+                    </ContextMenuItem>
+                </ContextMenuContent>
+            </ContextMenu>
 
             <Empty v-if="hasFetched && !isFetching && !graphReady" class="mt-3 w-full flex-1">
                 <EmptyHeader>
@@ -244,11 +277,25 @@
 <script setup>
     defineOptions({ name: 'ChartsMutual' });
 
+    import { useLocalStorage } from '@vueuse/core';
     import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
     import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
     import { Field, FieldContent, FieldGroup, FieldLabel } from '@/components/ui/field';
     import { Empty, EmptyDescription, EmptyHeader } from '@/components/ui/empty';
-    import { Check as CheckIcon, Settings } from 'lucide-vue-next';
+    import {
+        ContextMenu,
+        ContextMenuContent,
+        ContextMenuItem,
+        ContextMenuSeparator,
+        ContextMenuTrigger
+    } from '@/components/ui/context-menu';
+    import {
+        Check as CheckIcon,
+        EyeOff as EyeOffIcon,
+        RefreshCw as RefreshCwIcon,
+        Settings,
+        User as UserIcon
+    } from 'lucide-vue-next';
     import { Button } from '@/components/ui/button';
     import { Progress } from '@/components/ui/progress';
     import { Slider } from '@/components/ui/slider';
@@ -260,12 +307,13 @@
     import { useI18n } from 'vue-i18n';
 
     import BackToTop from '@/components/BackToTop.vue';
+    import dayjs from 'dayjs';
     import EdgeCurveProgram from '@sigma/edge-curve';
     import Graph from 'graphology';
     import Sigma from 'sigma';
-    import forceAtlas2 from 'graphology-layout-forceatlas2';
     import louvain from 'graphology-communities-louvain';
-    import noverlap from 'graphology-layout-noverlap';
+
+    import GraphLayoutWorker from '../graphLayoutWorker.js?worker&inline';
 
     import {
         useAppearanceSettingsStore,
@@ -274,12 +322,14 @@
         useModalStore,
         useUserStore
     } from '../../../stores';
-    import { userImage, userStatusClass } from '../../../shared/utils';
-    import { database } from '../../../service/database';
-    import { watchState } from '../../../service/watchState';
+    import { useUserDisplay } from '../../../composables/useUserDisplay';
+    import { showUserDialog } from '../../../coordinators/userCoordinator';
+    import { database } from '../../../services/database';
+    import { watchState } from '../../../services/watchState';
 
-    import configRepository from '../../../service/config';
+    import configRepository from '../../../services/config';
 
+    const { userImage, userStatusClass } = useUserDisplay();
     const { t } = useI18n();
     const friendStore = useFriendStore();
     const userStore = useUserStore();
@@ -290,7 +340,6 @@
     const { currentUser } = storeToRefs(userStore);
     const { isDarkMode } = storeToRefs(appearanceStore);
     const cachedUsers = userStore.cachedUsers;
-    const showUserDialog = (userId) => userStore.showUserDialog(userId);
 
     const fetchState = chartsStore.mutualGraphFetchState;
     const status = chartsStore.mutualGraphStatus;
@@ -322,9 +371,43 @@
     let sigmaInstance = null;
     let currentGraph = null;
     let resizeObserver = null;
+    let mutualGraphResizeObserver = null;
     let pendingRender = null;
     let pendingLayoutUpdate = null;
     let lastMutualMap = null;
+    let layoutWorker = null;
+    let layoutRequestId = 0;
+    const layoutResolvers = new Map();
+    let layoutQueue = Promise.resolve();
+
+    function getLayoutWorker() {
+        if (!layoutWorker) {
+            layoutWorker = new GraphLayoutWorker();
+            layoutWorker.addEventListener('message', handleLayoutMessage);
+            layoutWorker.addEventListener('error', handleLayoutError);
+        }
+        return layoutWorker;
+    }
+
+    function handleLayoutMessage(event) {
+        const { requestId, positions, error } = event.data;
+        const resolver = layoutResolvers.get(requestId);
+        if (!resolver) return;
+        layoutResolvers.delete(requestId);
+        if (error) {
+            resolver.reject(new Error(error));
+        } else {
+            resolver.resolve(positions);
+        }
+    }
+
+    function handleLayoutError(err) {
+        // Reject all pending requests on worker-level error
+        for (const [id, resolver] of layoutResolvers) {
+            resolver.reject(err);
+            layoutResolvers.delete(id);
+        }
+    }
 
     const LAYOUT_ITERATIONS_MIN = 300;
     const LAYOUT_ITERATIONS_MAX = 1500;
@@ -489,26 +572,21 @@
 
     const selectedFriendId = ref(null);
 
+    const contextMenuNodeId = ref(null);
+    const graphMeta = ref(new Map());
+    const isRefreshingNode = ref(false);
+
     const EXCLUDED_FRIENDS_KEY = 'VRCX_MutualGraphExcludedFriends';
-    const excludedFriendIds = ref(loadExcludedFriends());
+    const excludedFriendIds = useLocalStorage(EXCLUDED_FRIENDS_KEY, []);
 
-    function loadExcludedFriends() {
-        try {
-            const stored = localStorage.getItem(EXCLUDED_FRIENDS_KEY);
-            if (stored) return JSON.parse(stored);
-        } catch {
-            /* ignore */
+    watch(excludedFriendIds, async () => {
+        if (lastMutualMap) {
+            try {
+                await applyGraph(lastMutualMap);
+            } catch (err) {
+                console.error('[MutualNetworkGraph] Failed to apply graph after exclude change', err);
+            }
         }
-        return [];
-    }
-
-    function saveExcludedFriends() {
-        localStorage.setItem(EXCLUDED_FRIENDS_KEY, JSON.stringify(excludedFriendIds.value));
-    }
-
-    watch(excludedFriendIds, () => {
-        saveExcludedFriends();
-        if (lastMutualMap) applyGraph(lastMutualMap);
     });
 
     const excludePickerGroups = computed(() => {
@@ -534,25 +612,6 @@
         return [{ key: 'friends', label: t('side_panel.friends'), items }];
     });
 
-    const friendPickerGroups = computed(() => {
-        if (!currentGraph || !graphNodeCount.value) return [];
-        const currentUserId = currentUser.value?.id;
-        const items = [];
-        currentGraph.forEachNode((nodeId, attrs) => {
-            if (nodeId === currentUserId) return;
-            const cached = cachedUsers.get(nodeId);
-            const displayName = cached?.displayName || attrs.label || nodeId;
-            items.push({
-                value: nodeId,
-                label: displayName,
-                search: displayName,
-                user: cached || null
-            });
-        });
-        items.sort((a, b) => a.label.localeCompare(b.label));
-        return [{ key: 'friends', label: t('side_panel.friends'), items }];
-    });
-
     function navigateToFriend(friendId) {
         selectedFriendId.value = friendId;
         if (!friendId || !currentGraph || !sigmaInstance) return;
@@ -562,9 +621,6 @@
         const camera = sigmaInstance.getCamera();
         camera.animate({ x: nodeDisplayData.x, y: nodeDisplayData.y, ratio: 0.15 }, { duration: 300 });
     }
-    const mutualGraphResizeObserver = new ResizeObserver(() => {
-        setMutualGraphHeight();
-    });
 
     function setMutualGraphHeight() {
         if (mutualGraphRef.value) {
@@ -583,7 +639,7 @@
                 if (sigmaInstance?.refresh) sigmaInstance.refresh();
             });
             resizeObserver.observe(graphContainerRef.value);
-
+            mutualGraphResizeObserver = new ResizeObserver(() => setMutualGraphHeight());
             mutualGraphResizeObserver.observe(mutualGraphRef.value);
             setMutualGraphHeight();
 
@@ -601,7 +657,18 @@
             sigmaInstance = null;
         }
         currentGraph = null;
-        if (mutualGraphResizeObserver) mutualGraphResizeObserver.disconnect();
+        if (layoutWorker) {
+            for (const [id, resolver] of layoutResolvers) {
+                resolver.reject(new Error('Component unmounted'));
+                layoutResolvers.delete(id);
+            }
+            layoutWorker.terminate();
+            layoutWorker = null;
+        }
+        if (mutualGraphResizeObserver) {
+            mutualGraphResizeObserver.disconnect();
+            mutualGraphResizeObserver = null;
+        }
     });
 
     watch(
@@ -623,71 +690,72 @@
         return text.length > MAX_LABEL_NAME_LENGTH ? `${text.slice(0, MAX_LABEL_NAME_LENGTH)}…` : text;
     }
 
-    function initPositions(graph) {
-        const n = graph.order;
-        const radius = Math.max(50, Math.sqrt(n) * 30);
-        graph.forEachNode((node) => {
-            const a = Math.random() * Math.PI * 2;
-            const r = Math.sqrt(Math.random()) * radius;
-            graph.mergeNodeAttributes(node, {
-                x: Math.cos(a) * r,
-                y: Math.sin(a) * r
-            });
-        });
-    }
-
     function clampNumber(value, min, max) {
         const normalized = Number.isFinite(value) ? value : min;
         return Math.min(max, Math.max(min, normalized));
     }
 
-    function lerp(a, b, t) {
-        return a + (b - a) * t;
-    }
-
-    function jitterPositions(graph, magnitude) {
-        graph.forEachNode((node, attrs) => {
-            if (!Number.isFinite(attrs.x) || !Number.isFinite(attrs.y)) return;
-            graph.mergeNodeAttributes(node, {
-                x: attrs.x + (Math.random() - 0.5) * magnitude,
-                y: attrs.y + (Math.random() - 0.5) * magnitude
-            });
+    /**
+     * @param {Graph} graph
+     * @returns {{ nodes: Array, edges: Array }}
+     */
+    function serializeGraph(graph) {
+        const nodes = [];
+        graph.forEachNode((id, attributes) => {
+            nodes.push({ id, attributes: { ...attributes } });
         });
+        const edges = [];
+        graph.forEachEdge((key, attributes, source, target) => {
+            edges.push({ key, source, target, attributes: { ...attributes } });
+        });
+        return { nodes, edges };
     }
 
-    // @ts-ignore
-    function runLayout(graph, { reinitialize } = {}) {
-        if (reinitialize) initPositions(graph);
-
-        const iterations = clampNumber(layoutSettings.layoutIterations, LAYOUT_ITERATIONS_MIN, LAYOUT_ITERATIONS_MAX);
+    /**
+     * Run ForceAtlas2 + Noverlap layout in a Web Worker.
+     * Requests are serialized: a new call waits for the previous one to finish,
+     * preventing concurrent callbacks from stepping on each other.
+     * @param {Graph} graph
+     * @param {object} options
+     * @param {boolean} [options.reinitialize]
+     * @returns {Promise<void>}
+     */
+    async function runLayout(graph, { reinitialize } = {}) {
         const spacing = clampNumber(layoutSettings.layoutSpacing, LAYOUT_SPACING_MIN, LAYOUT_SPACING_MAX);
-        const t = (spacing - LAYOUT_SPACING_MIN) / (LAYOUT_SPACING_MAX - LAYOUT_SPACING_MIN);
-        const clampedT = clampNumber(t, 0, 1);
         const deltaSpacing = spacing - lastLayoutSpacing;
         lastLayoutSpacing = spacing;
 
-        const inferred = forceAtlas2.inferSettings ? forceAtlas2.inferSettings(graph) : {};
-        const settings = {
-            ...inferred,
-            barnesHutOptimize: true,
-            barnesHutTheta: 0.8,
-            strongGravityMode: true,
-            gravity: lerp(1.6, 0.6, clampedT),
-            scalingRatio: spacing,
-            slowDown: 2
-        };
+        const { nodes, edges } = serializeGraph(graph);
+        const worker = getLayoutWorker();
+        const id = ++layoutRequestId;
 
-        if (Math.abs(deltaSpacing) >= 8) jitterPositions(graph, lerp(0.5, 2.0, clampedT));
+        // Serialize: wait for any in-flight layout to finish first
+        const task = layoutQueue.then(async () => {
+            const positions = await new Promise((resolve, reject) => {
+                layoutResolvers.set(id, { resolve, reject });
+                worker.postMessage({
+                    requestId: id,
+                    nodes,
+                    edges,
+                    settings: {
+                        layoutIterations: layoutSettings.layoutIterations,
+                        layoutSpacing: spacing,
+                        deltaSpacing,
+                        reinitialize: reinitialize ?? false
+                    }
+                });
+            });
 
-        forceAtlas2.assign(graph, { iterations, settings });
-        const noverlapIterations = clampNumber(Math.round(Math.sqrt(graph.order) * 6), 200, 600);
-        noverlap.assign(graph, {
-            maxIterations: noverlapIterations,
-            settings: {
-                ratio: lerp(1.05, 1.35, clampedT),
-                margin: lerp(1, 8, clampedT)
+            for (const [nodeId, pos] of Object.entries(positions)) {
+                if (graph.hasNode(nodeId)) {
+                    graph.mergeNodeAttributes(nodeId, { x: pos.x, y: pos.y });
+                }
             }
         });
+
+        // Keep the queue going even if this request fails
+        layoutQueue = task.catch(() => {});
+        return task;
     }
 
     function applyEdgeCurvature(graph) {
@@ -754,14 +822,18 @@
     function scheduleLayoutUpdate({ runLayout: shouldRunLayout }) {
         if (!currentGraph) return;
         if (pendingLayoutUpdate) clearTimeout(pendingLayoutUpdate);
-        pendingLayoutUpdate = setTimeout(() => {
+        pendingLayoutUpdate = setTimeout(async () => {
             pendingLayoutUpdate = null;
-            applyEdgeCurvature(currentGraph);
-            if (shouldRunLayout) {
-                runLayout(currentGraph, { reinitialize: false });
-                applyCommunitySeparation(currentGraph);
+            try {
+                applyEdgeCurvature(currentGraph);
+                if (shouldRunLayout) {
+                    await runLayout(currentGraph, { reinitialize: false });
+                    applyCommunitySeparation(currentGraph);
+                }
+                renderGraph(currentGraph);
+            } catch (err) {
+                console.error('[MutualNetworkGraph] Layout update failed', err);
             }
-            renderGraph(currentGraph);
         }, 100);
     }
 
@@ -779,7 +851,7 @@
         });
     }
 
-    function buildGraphFromMutualMap(mutualMap) {
+    async function buildGraphFromMutualMap(mutualMap, meta = null) {
         const graph = new Graph({
             type: 'undirected',
             multi: false,
@@ -831,11 +903,17 @@
             const degree = nodeDegree.get(id) || 0;
             const size = 4 + (maxDegree ? (degree / maxDegree) * 18 : 0);
             const label = truncateLabelText(nodeNames.get(id) || id);
-            graph.mergeNodeAttributes(id, { label, size, type: 'border' });
+            const attrs = { label, size, type: 'border' };
+            if (meta?.has(id)) {
+                const m = meta.get(id);
+                attrs.optedOut = m.optedOut;
+                attrs.lastFetchedAt = m.lastFetchedAt;
+            }
+            graph.mergeNodeAttributes(id, attrs);
         });
 
         if (graph.order > 1) {
-            runLayout(graph, { reinitialize: true });
+            await runLayout(graph, { reinitialize: true });
             assignCommunitiesAndColors(graph);
             applyCommunitySeparation(graph);
             applyEdgeCurvature(graph);
@@ -877,6 +955,8 @@
 
         if (!sigmaInstance) {
             sigmaInstance = new Sigma(graph, container, {
+                // Sentry: VRCX-WEB-2EG
+                allowInvalidContainer: true,
                 renderLabels: true,
                 labelRenderedSizeThreshold: DEFAULT_LABEL_THRESHOLD,
                 labelColor: { color: labelColor },
@@ -890,6 +970,7 @@
 
                     const fontSize = settings.labelSize ?? 12;
                     const font = settings.labelFont ?? 'sans-serif';
+                    const smallFontSize = Math.max(9, fontSize - 2);
 
                     ctx.font = `${fontSize}px ${font}`;
                     ctx.textBaseline = 'middle';
@@ -897,9 +978,20 @@
                     const paddingX = 6;
                     const paddingY = 4;
 
-                    const textWidth = ctx.measureText(data.label).width;
-                    const w = textWidth + paddingX * 2;
-                    const h = fontSize + paddingY * 2;
+                    let subLine = '';
+                    if (data.lastFetchedAt) {
+                        subLine = `${t('view.charts.mutual_friend.context_menu.last_fetched')}: ${dayjs(data.lastFetchedAt).format('YYYY-MM-DD HH:mm')}`;
+                    }
+
+                    const labelWidth = ctx.measureText(data.label).width;
+                    ctx.font = `${smallFontSize}px ${font}`;
+                    const subWidth = subLine ? ctx.measureText(subLine).width : 0;
+                    ctx.font = `${fontSize}px ${font}`;
+
+                    const w = Math.max(labelWidth, subWidth) + paddingX * 2;
+                    const lineHeight = fontSize + paddingY;
+                    const totalLines = subLine ? 2 : 1;
+                    const h = lineHeight * totalLines + paddingY;
 
                     const x = data.x + data.size - 5;
                     const y = data.y - h / 2;
@@ -912,8 +1004,18 @@
                     ctx.fillStyle = 'rgba(255, 255, 255, 1)';
                     ctx.fillRect(x, y, w, h);
 
+                    ctx.shadowBlur = 0;
+                    ctx.shadowColor = 'transparent';
+
                     ctx.fillStyle = '#111827';
-                    ctx.fillText(data.label, x + paddingX, y + h / 2);
+                    ctx.font = `${fontSize}px ${font}`;
+                    ctx.fillText(data.label, x + paddingX, y + paddingY + fontSize / 2);
+
+                    if (subLine) {
+                        ctx.fillStyle = data.optedOut ? '#dc2626' : '#6b7280';
+                        ctx.font = `${smallFontSize}px ${font}`;
+                        ctx.fillText(subLine, x + paddingX, y + paddingY + lineHeight + smallFontSize / 2);
+                    }
                 }
             });
         } else {
@@ -941,8 +1043,12 @@
         sigmaInstance.setSetting('nodeReducer', (node, data) => {
             const res = { ...data };
 
+            if (data.optedOut) {
+                res.borderColor = '#9ca3af';
+            }
+
             if (!hovered) {
-                res.color = data.color;
+                res.color = data.optedOut ? '#d1d5db' : data.color;
                 res.zIndex = 1;
                 return res;
             }
@@ -1019,12 +1125,20 @@
             if (node) showUserDialog(node);
         });
 
+        sigmaInstance.on('rightClickNode', ({ node }) => {
+            contextMenuNodeId.value = node || null;
+        });
+
+        sigmaInstance.on('rightClickStage', () => {
+            contextMenuNodeId.value = null;
+        });
+
         sigmaInstance.refresh();
     }
 
-    function applyGraph(mutualMap) {
+    async function applyGraph(mutualMap) {
         lastMutualMap = mutualMap;
-        const graph = buildGraphFromMutualMap(mutualMap);
+        const graph = await buildGraphFromMutualMap(mutualMap, graphMeta.value);
         currentGraph = graph;
         renderGraph(graph);
     }
@@ -1039,7 +1153,12 @@
         // loadingToastId.value = toast.info(t('view.charts.mutual_friend.status.loading_cache'));
 
         try {
-            const snapshot = await database.getMutualGraphSnapshot();
+            const [snapshot, meta] = await Promise.all([
+                database.getMutualGraphSnapshot(),
+                database.getMutualGraphMeta()
+            ]);
+            graphMeta.value = meta;
+
             if (!snapshot || snapshot.size === 0) {
                 if (totalFriends.value === 0) {
                     showStatusMessage(t('view.charts.mutual_friend.status.no_friends_to_process'), 'info');
@@ -1073,7 +1192,7 @@
                 return;
             }
 
-            applyGraph(mutualMap);
+            await applyGraph(mutualMap);
             chartsStore.markMutualGraphLoaded({ notify: false });
             fetchState.processedFriends = Math.min(mutualMap.size, totalFriends.value || mutualMap.size);
             status.friendSignature = totalFriends.value;
@@ -1121,10 +1240,108 @@
         if (isFetching.value || isOptOut.value) return;
         const mutualMap = await chartsStore.fetchMutualGraph();
         if (!mutualMap) return;
-        applyGraph(mutualMap);
+        try {
+            await applyGraph(mutualMap);
+        } catch (err) {
+            console.error('[MutualNetworkGraph] Failed to apply graph after fetch', err);
+        }
     }
 
     function cancelFetch() {
         chartsStore.requestMutualGraphCancel();
+    }
+
+    function onNodeMenuOpenChange(open) {
+        if (!open) {
+            contextMenuNodeId.value = null;
+        }
+    }
+
+    function handleNodeMenuViewDetails() {
+        if (contextMenuNodeId.value) {
+            showUserDialog(contextMenuNodeId.value);
+        }
+        contextMenuNodeId.value = null;
+    }
+
+    function handleNodeMenuHide() {
+        if (contextMenuNodeId.value) {
+            if (!excludedFriendIds.value.includes(contextMenuNodeId.value)) {
+                excludedFriendIds.value = [...excludedFriendIds.value, contextMenuNodeId.value];
+            }
+        }
+        contextMenuNodeId.value = null;
+    }
+
+    async function handleNodeMenuRefresh() {
+        const nodeId = contextMenuNodeId.value;
+        contextMenuNodeId.value = null;
+        if (!nodeId || isRefreshingNode.value) return;
+
+        const isFriend = friends.value?.has(nodeId);
+
+        if (!isFriend) {
+            try {
+                const { ok } = await modalStore.confirm({
+                    title: t('view.charts.mutual_friend.context_menu.confirm_non_friend_title'),
+                    description: t('view.charts.mutual_friend.context_menu.confirm_non_friend_message'),
+                    confirmText: t('common.actions.confirm'),
+                    cancelText: t('common.actions.cancel')
+                });
+                if (!ok) return;
+            } catch {
+                return;
+            }
+        }
+
+        isRefreshingNode.value = true;
+        try {
+            const result = await chartsStore.fetchSingleFriendMutuals(nodeId);
+
+            if (result.optedOut) {
+                toast.warning(t('view.charts.mutual_friend.context_menu.user_opted_out'), { duration: 5000 });
+                graphMeta.value.set(nodeId, {
+                    lastFetchedAt: new Date().toISOString(),
+                    optedOut: true
+                });
+            } else if (result.success) {
+                const cached = cachedUsers.get(nodeId);
+                const name = cached?.displayName || nodeId;
+                toast.success(t('view.charts.mutual_friend.context_menu.refresh_success', { name }), {
+                    duration: 3000
+                });
+                graphMeta.value.set(nodeId, {
+                    lastFetchedAt: new Date().toISOString(),
+                    optedOut: false
+                });
+            } else {
+                toast.error(t('view.charts.mutual_friend.context_menu.refresh_error'), { duration: 4000 });
+                return;
+            }
+
+            const snapshot = await database.getMutualGraphSnapshot();
+            if (snapshot && snapshot.size > 0) {
+                const mutualMap = new Map();
+                snapshot.forEach((mutualIds, fId) => {
+                    if (!fId) return;
+                    const friendEntry = friends.value?.get ? friends.value.get(fId) : undefined;
+                    const fallbackRef = friendEntry?.ref || cachedUsers.get(fId);
+                    let normalizedMutuals = Array.isArray(mutualIds) ? mutualIds : [];
+                    normalizedMutuals = normalizedMutuals.filter(
+                        (id) => id != 'usr_00000000-0000-0000-0000-000000000000'
+                    );
+                    mutualMap.set(fId, {
+                        friend: friendEntry || (fallbackRef ? { id: fId, ref: fallbackRef } : { id: fId }),
+                        mutuals: normalizedMutuals.map((id) => ({ id }))
+                    });
+                });
+                await applyGraph(mutualMap);
+            }
+        } catch (err) {
+            console.error('[MutualNetworkGraph] Refresh node error', err);
+            toast.error(t('view.charts.mutual_friend.context_menu.refresh_error'), { duration: 4000 });
+        } finally {
+            isRefreshingNode.value = false;
+        }
     }
 </script>

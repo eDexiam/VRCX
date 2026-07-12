@@ -3,13 +3,41 @@ import { resolve } from 'node:path';
 import fs from 'node:fs';
 
 import { defineConfig, loadEnv } from 'vite';
+import { browserslistToTargets } from 'lightningcss';
 
+import browserslist from 'browserslist';
 import tailwindcss from '@tailwindcss/vite';
 import vue from '@vitejs/plugin-vue';
 import vueJsx from '@vitejs/plugin-vue-jsx';
 
 import { languageCodes } from './localization/locales';
 
+/**
+ * Vite plugin to remove legacy remixicon font files (eot, woff, ttf, svg)
+ * from the build output, keeping only woff2. Saves ~4.5 MB.
+ *
+ * Chrome 144 picks woff2 from the multi-format @font-face src list and
+ * never requests the other formats, so deleting them is safe.
+ *
+ * @returns {import('vite').Plugin}
+ */
+function remixiconWoff2Only() {
+    return {
+        name: 'remixicon-woff2-only',
+        generateBundle(_, bundle) {
+            for (const key of Object.keys(bundle)) {
+                if (/remixicon\.(eot|ttf|svg|woff)$/.test(key)) {
+                    delete bundle[key];
+                }
+            }
+        }
+    };
+}
+
+/**
+ *
+ * @param assetId
+ */
 function getAssetLanguage(assetId) {
     if (!assetId) return null;
 
@@ -31,20 +59,37 @@ function getAssetLanguage(assetId) {
     return language || null;
 }
 
+/**
+ *
+ * @param moduleId
+ */
 function getManualChunk(moduleId) {
-    const language = getAssetLanguage(moduleId);
+    const basename = moduleId.split('/').pop();
+    const language = getAssetLanguage(basename);
     if (!language) return;
 
-    return `languages/${language}`;
+    return `i18n/${language}`;
 }
 
-const defaultAssetName = '[hash][extname]';
+const defaultAssetName = '[name][extname]';
 
+/**
+ * @param {string} name
+ */
+function isFont(name) {
+    return /\.(woff2?|ttf|otf|eot)$/.test(name);
+}
+
+/**
+ *
+ * @param {import('rolldown').PreRenderedAsset} assetInfo
+ */
 function getAssetFilename({ name }) {
     const language = getAssetLanguage(name);
     if (!language) return `assets/${defaultAssetName}`;
 
-    return 'assets/languages/[name][extname]';
+    if (isFont(name)) return 'assets/fonts/[name][extname]';
+    return 'assets/i18n/[name][extname]';
 }
 
 export default defineConfig(({ mode }) => {
@@ -66,6 +111,7 @@ export default defineConfig(({ mode }) => {
     return {
         base: '',
         plugins: [
+            remixiconWoff2Only(),
             vue(),
             vueJsx({
                 tsTransform: 'built-in'
@@ -81,7 +127,9 @@ export default defineConfig(({ mode }) => {
                         },
                         sourcemaps: {
                             assets: './build/html/**',
-                            filesToDeleteAfterUpload: './build/html/**/*.js.map'
+                            filesToDeleteAfterUpload:
+                                './build/html/**/*.js.map',
+                            ignore: []
                         }
                     })
                 )
@@ -94,11 +142,26 @@ export default defineConfig(({ mode }) => {
         css: {
             transformer: 'lightningcss',
             lightningcss: {
-                minify: true,
-                targets: {
-                    chrome: 140
-                }
+                drafts: {
+                    customMedia: true
+                },
+                errorRecovery: true,
+                targets: browserslistToTargets(browserslist('Chrome 145'))
             }
+        },
+        optimizeDeps: {
+            include: [
+                'vue',
+                'vue/jsx-runtime',
+                'reka-ui',
+                'pinia',
+                'vue-i18n',
+                'tailwindcss',
+                'lucide-vue-next',
+                '@vueuse/core',
+                'vue-sonner',
+                'dayjs'
+            ]
         },
         define: {
             LINUX: JSON.stringify(process.env.PLATFORM === 'linux'),
@@ -111,16 +174,20 @@ export default defineConfig(({ mode }) => {
             strictPort: true
         },
         build: {
-            target: 'chrome140',
+            target: 'chrome145',
             outDir: '../build/html',
             license: true,
             emptyOutDir: true,
             copyPublicDir: true,
             reportCompressedSize: false,
             chunkSizeWarningLimit: 5000,
-            sourcemap: buildAndUploadSourceMaps,
-            assetsInlineLimit: 0,
-            rollupOptions: {
+            sourcemap: buildAndUploadSourceMaps ? 'hidden' : false,
+            assetsInlineLimit(filePath) {
+                if (isFont(filePath)) return 0;
+                if (filePath.endsWith('.json')) return 0;
+                return 40960;
+            },
+            rolldownOptions: {
                 preserveEntrySignatures: false,
                 input: {
                     index: resolve(import.meta.dirname, './index.html'),

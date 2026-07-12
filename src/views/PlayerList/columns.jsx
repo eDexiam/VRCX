@@ -5,6 +5,7 @@ import {
     Apple,
     ArrowUpDown,
     IdCard,
+    User,
     Monitor,
     Smartphone
 } from 'lucide-vue-next';
@@ -13,31 +14,33 @@ import {
     getFaviconUrl,
     languageClass,
     openExternalLink,
-    statusClass,
-    userImage
+    statusClass
 } from '../../shared/utils';
-import { i18n } from '../../plugin';
+import { i18n } from '../../plugins';
 
 const { t } = i18n.global;
 
-const sortButton = ({ column, label, descFirst = false }) => (
-    <Button
-        variant="ghost"
-        size="sm"
-        class="-ml-2 h-8 px-2"
-        onClick={() => {
-            const sorted = column.getIsSorted();
-            if (!sorted && descFirst) {
-                column.toggleSorting(true);
-                return;
-            }
-            column.toggleSorting(sorted === 'asc');
-        }}
-    >
-        {label}
-        <ArrowUpDown class="ml-1 h-4 w-4" />
-    </Button>
-);
+const sortButton = ({ column, label, descFirst = false }) => {
+    const resolvedLabel = typeof label === 'function' ? label() : label;
+    return (
+        <Button
+            variant="ghost"
+            size="sm"
+            class="-ml-2 h-8 px-2"
+            onClick={() => {
+                const sorted = column.getIsSorted();
+                if (!sorted && descFirst) {
+                    column.toggleSorting(true);
+                    return;
+                }
+                column.toggleSorting(sorted === 'asc');
+            }}
+        >
+            {resolvedLabel}
+            <ArrowUpDown class="ml-1 h-4 w-4" />
+        </Button>
+    );
+};
 
 const getInstanceIconWeight = (item) => {
     if (!item) return 0;
@@ -61,7 +64,8 @@ export const createColumns = ({
     chatboxUserBlacklist,
     onBlockChatbox,
     onUnblockChatbox,
-    sortAlphabetically
+    sortAlphabetically,
+    userImage
 }) => {
     const cols = [
         {
@@ -70,6 +74,7 @@ export const createColumns = ({
             header: () => t('table.playerList.avatar'),
             size: 70,
             enableSorting: false,
+            meta: { label: () => t('table.playerList.avatar') },
             cell: ({ row }) => {
                 const userRef = row.original?.ref;
                 const src = userImage(userRef);
@@ -80,7 +85,17 @@ export const createColumns = ({
                             src={src}
                             class="h-4 w-4 rounded-sm object-cover"
                             loading="lazy"
+                            onError={(e) => {
+                                e.target.style.display = 'none';
+                                e.target.nextElementSibling.style.display = '';
+                            }}
                         />
+                        <div
+                            class="h-4 w-4 rounded-sm bg-muted flex items-center justify-center"
+                            style="display: none"
+                        >
+                            <User class="h-3 w-3 text-muted-foreground" />
+                        </div>
                     </div>
                 );
             }
@@ -89,8 +104,12 @@ export const createColumns = ({
             id: 'timer',
             accessorFn: (row) => row?.timer,
             header: ({ column }) =>
-                sortButton({ column, label: t('table.playerList.timer') }),
+                sortButton({
+                    column,
+                    label: () => t('table.playerList.timer')
+                }),
             size: 90,
+            meta: { label: () => t('table.playerList.timer') },
             sortingFn: (rowA, rowB) =>
                 (rowA.original?.timer ?? 0) - (rowB.original?.timer ?? 0),
             cell: ({ row }) => <Timer epoch={row.original?.timer} />
@@ -101,9 +120,10 @@ export const createColumns = ({
             header: ({ column }) =>
                 sortButton({
                     column,
-                    label: t('table.playerList.displayName')
+                    label: () => t('table.playerList.displayName')
                 }),
             size: 200,
+            meta: { label: () => t('table.playerList.displayName') },
             sortingFn: (rowA, rowB) =>
                 sortAlphabetically(rowA.original, rowB.original, 'displayName'),
             cell: ({ row }) => {
@@ -118,8 +138,9 @@ export const createColumns = ({
             id: 'rank',
             accessorFn: (row) => row?.ref?.$trustSortNum,
             header: ({ column }) =>
-                sortButton({ column, label: t('table.playerList.rank') }),
+                sortButton({ column, label: () => t('table.playerList.rank') }),
             size: 110,
+            meta: { label: () => t('table.playerList.rank') },
             sortingFn: (rowA, rowB) =>
                 (rowA.original?.ref?.$trustSortNum ?? 0) -
                 (rowB.original?.ref?.$trustSortNum ?? 0),
@@ -143,7 +164,8 @@ export const createColumns = ({
             size: 200,
             minSize: 100,
             meta: {
-                stretch: true
+                stretch: true,
+                label: () => t('table.playerList.status')
             },
             enableSorting: false,
             cell: ({ row }) => {
@@ -170,9 +192,17 @@ export const createColumns = ({
             id: 'photonId',
             accessorFn: (row) => row?.photonId,
             header: ({ column }) =>
-                sortButton({ column, label: t('table.playerList.photonId') }),
+                sortButton({
+                    column,
+                    label: () => t('table.playerList.photonId')
+                }),
             size: 110,
             enableHiding: true,
+            meta: {
+                label: () => t('table.playerList.photonId'),
+                disableVisibilityToggle: true,
+                defaultHidden: true
+            },
             sortingFn: (rowA, rowB) =>
                 (rowA.original?.photonId ?? 0) - (rowB.original?.photonId ?? 0),
             cell: ({ row }) => {
@@ -187,8 +217,8 @@ export const createColumns = ({
                             <button
                                 class={
                                     isBlocked
-                                        ? 'mr-1 text-xs underline text-destructive'
-                                        : 'mr-1 text-xs underline'
+                                        ? 'mr-1 text-xs underline cursor-pointer text-destructive'
+                                        : 'mr-1 text-xs underline cursor-pointer'
                                 }
                                 onClick={(e) => {
                                     e.stopPropagation();
@@ -212,13 +242,14 @@ export const createColumns = ({
             header: ({ column }) =>
                 sortButton({
                     column,
-                    label: t('table.playerList.icon'),
+                    label: () => t('table.playerList.icon'),
                     descFirst: true
                 }),
             size: 90,
             accessorFn: (row) => getInstanceIconWeight(row),
             meta: {
-                class: 'text-center'
+                class: 'text-center',
+                label: () => t('table.playerList.icon')
             },
             sortingFn: (rowA, rowB, columnId) => {
                 const a = rowA.original;
@@ -291,6 +322,7 @@ export const createColumns = ({
             header: () => t('table.playerList.platform'),
             size: 90,
             enableSorting: false,
+            meta: { label: () => t('table.playerList.platform') },
             cell: ({ row }) => {
                 const userRef = row.original?.ref;
                 const platform = userRef?.$platform;
@@ -330,6 +362,7 @@ export const createColumns = ({
             header: () => t('table.playerList.language'),
             size: 100,
             enableSorting: false,
+            meta: { label: () => t('table.playerList.language') },
             cell: ({ row }) => {
                 const userRef = row.original?.ref;
                 const langs = userRef?.$languages ?? [];
@@ -366,6 +399,7 @@ export const createColumns = ({
             header: () => t('table.playerList.bioLink'),
             size: 100,
             enableSorting: false,
+            meta: { label: () => t('table.playerList.bioLink') },
             cell: ({ row }) => {
                 const links =
                     row.original?.ref?.bioLinks?.filter(Boolean) ?? [];
@@ -402,7 +436,8 @@ export const createColumns = ({
             size: 150,
             minSize: 20,
             meta: {
-                stretch: true
+                stretch: true,
+                label: () => t('table.playerList.note')
             },
             enableSorting: false,
             cell: ({ row }) => {

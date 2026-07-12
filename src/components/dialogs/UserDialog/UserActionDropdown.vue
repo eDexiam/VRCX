@@ -5,10 +5,21 @@
                 v-if="userDialog.isFavorite"
                 side="top"
                 :content="t('dialog.user.actions.favorites_tooltip')">
-                <Button class="rounded-full" size="icon-lg" @click="userDialogCommand('Add Favorite')"><Star /></Button>
+                <Button
+                    class="rounded-full"
+                    size="icon-lg"
+                    @click="userDialogCommand('Add Favorite')"
+                    :ariaLabel="t('dialog.user.actions.favorites_tooltip')"
+                    ><Star
+                /></Button>
             </TooltipWrapper>
             <TooltipWrapper v-else side="top" :content="t('dialog.user.actions.favorites_tooltip')">
-                <Button class="rounded-full" size="icon-lg" variant="outline" @click="userDialogCommand('Add Favorite')"
+                <Button
+                    class="rounded-full"
+                    size="icon-lg"
+                    variant="outline"
+                    @click="userDialogCommand('Add Favorite')"
+                    :ariaLabel="t('dialog.user.actions.favorites_tooltip')"
                     ><Star
                 /></Button>
             </TooltipWrapper>
@@ -20,7 +31,8 @@
                         :variant="hasRisk ? 'destructive' : 'outline'"
                         size="icon-lg"
                         class="rounded-full"
-                        :class="{ 'dot-indicator': hasRequest }">
+                        :class="{ 'dot-indicator': hasRequest }"
+                        :ariaLabel="t('nav_tooltip.manage')">
                         <MoreHorizontal />
                     </Button>
                 </div>
@@ -67,10 +79,16 @@
                         <DropdownMenuItem @click="onCommand('Request Invite')">
                             <Mail class="size-4" />
                             {{ t('dialog.user.actions.request_invite') }}
+                            <DropdownMenuShortcut v-if="isActionRecent(userDialog.id, 'Request Invite')">
+                                <Clock class="size-3.5 text-muted-foreground" />
+                            </DropdownMenuShortcut>
                         </DropdownMenuItem>
                         <DropdownMenuItem @click="onCommand('Request Invite Message')">
                             <Mail class="size-4" />
                             {{ t('dialog.user.actions.request_invite_with_message') }}
+                            <DropdownMenuShortcut v-if="isActionRecent(userDialog.id, 'Request Invite Message')">
+                                <Clock class="size-3.5 text-muted-foreground" />
+                            </DropdownMenuShortcut>
                         </DropdownMenuItem>
                         <template v-if="isGameRunning">
                             <DropdownMenuItem
@@ -78,12 +96,18 @@
                                 @click="onCommand('Invite')">
                                 <MessageSquare class="size-4" />
                                 {{ t('dialog.user.actions.invite') }}
+                                <DropdownMenuShortcut v-if="isActionRecent(userDialog.id, 'Invite')">
+                                    <Clock class="size-3.5 text-muted-foreground" />
+                                </DropdownMenuShortcut>
                             </DropdownMenuItem>
                             <DropdownMenuItem
                                 :disabled="!checkCanInvite(lastLocation.location)"
                                 @click="onCommand('Invite Message')">
                                 <MessageSquare class="size-4" />
                                 {{ t('dialog.user.actions.invite_with_message') }}
+                                <DropdownMenuShortcut v-if="isActionRecent(userDialog.id, 'Invite Message')">
+                                    <Clock class="size-3.5 text-muted-foreground" />
+                                </DropdownMenuShortcut>
                             </DropdownMenuItem>
                         </template>
                         <DropdownMenuItem :disabled="!currentUser.isBoopingEnabled" @click="onCommand('Send Boop')">
@@ -110,6 +134,9 @@
                     <DropdownMenuItem v-else @click="onCommand('Send Friend Request')">
                         <Plus class="size-4" />
                         {{ t('dialog.user.actions.send_friend_request') }}
+                        <DropdownMenuShortcut v-if="isActionRecent(userDialog.id, 'Send Friend Request')">
+                            <Clock class="size-3.5 text-muted-foreground" />
+                        </DropdownMenuShortcut>
                     </DropdownMenuItem>
                     <DropdownMenuItem @click="onCommand('Invite To Group')">
                         <MessageSquare class="size-4" />
@@ -218,6 +245,7 @@
     import {
         Check,
         CheckCircle,
+        Clock,
         Flag,
         LineChart,
         Mail,
@@ -248,10 +276,12 @@
         DropdownMenuContent,
         DropdownMenuItem,
         DropdownMenuSeparator,
+        DropdownMenuShortcut,
         DropdownMenuTrigger
     } from '../../ui/dropdown-menu';
     import { useGameStore, useLocationStore, useUserStore } from '../../../stores';
-    import { checkCanInvite } from '../../../shared/utils';
+    import { useInviteChecks } from '../../../composables/useInviteChecks';
+    import { isActionRecent } from '../../../composables/useRecentActions';
 
     const props = defineProps({
         userDialogCommand: {
@@ -265,6 +295,7 @@
     const { userDialog, currentUser } = storeToRefs(useUserStore());
     const { isGameRunning } = storeToRefs(useGameStore());
     const { lastLocation } = storeToRefs(useLocationStore());
+    const { checkCanInvite } = useInviteChecks();
 
     const hasRequest = computed(() => userDialog.value.incomingRequest || userDialog.value.outgoingRequest);
     const hasRisk = computed(

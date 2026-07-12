@@ -1,5 +1,5 @@
 <template>
-    <div class="x-container" ref="moderationRef">
+    <div class="x-container x-container--auto-height" ref="moderationRef">
         <div class="mb-4 flex items-center">
             <Select
                 multiple
@@ -23,7 +23,7 @@
             <InputGroupField
                 v-model="playerModerationTable.filters[1].value"
                 :placeholder="t('view.moderation.search_placeholder')"
-                class="filter-input flex-[0.4]" />
+                class="w-[150px] mx-2.5 flex-[0.4]" />
             <TooltipWrapper side="bottom" :content="t('view.moderation.refresh_tooltip')">
                 <Button
                     class="rounded-full"
@@ -40,7 +40,7 @@
         <DataTableLayout
             :table="table"
             :loading="playerModerationTable.loading"
-            :table-style="tableHeightStyle"
+            auto-height
             :page-sizes="pageSizes"
             :total-items="totalItems"
             :on-page-size-change="handlePageSizeChange" />
@@ -58,28 +58,23 @@
     import { useI18n } from 'vue-i18n';
 
     import { useAppearanceSettingsStore, useModalStore, useModerationStore, useVrcxStore } from '../../stores';
+    import { runRefreshPlayerModerationsFlow as refreshPlayerModerations } from '../../coordinators/moderationCoordinator';
     import { DataTableLayout } from '../../components/ui/data-table';
     import { createColumns } from './columns.jsx';
     import { moderationTypes } from '../../shared/constants';
     import { playerModerationRequest } from '../../api';
-    import { useDataTableScrollHeight } from '../../composables/useDataTableScrollHeight';
     import { useVrcxVueTable } from '../../lib/table/useVrcxVueTable';
 
-    import configRepository from '../../service/config.js';
+    import configRepository from '../../services/config.js';
 
     const { t } = useI18n();
     const { playerModerationTable } = storeToRefs(useModerationStore());
-    const { refreshPlayerModerations, handlePlayerModerationDelete } = useModerationStore();
+    const { handlePlayerModerationDelete } = useModerationStore();
     const appearanceSettingsStore = useAppearanceSettingsStore();
     const vrcxStore = useVrcxStore();
     const modalStore = useModalStore();
 
     const moderationRef = ref(null);
-    const { tableStyle: tableHeightStyle } = useDataTableScrollHeight(moderationRef, {
-        offset: 30,
-        toolbarHeight: 54,
-        paginationHeight: 52
-    });
 
     async function init() {
         playerModerationTable.value.filters[0].value = JSON.parse(
@@ -152,11 +147,6 @@
     });
 
     const pageSizes = computed(() => appearanceSettingsStore.tablePageSizes);
-    const pageSize = computed(() =>
-        playerModerationTable.value.pageSizeLinked
-            ? appearanceSettingsStore.tablePageSize
-            : playerModerationTable.value.pageSize
-    );
 
     const { table, pagination } = useVrcxVueTable({
         persistKey: 'moderation',
@@ -168,40 +158,19 @@
         initialSorting: [{ id: 'created', desc: true }],
         initialPagination: {
             pageIndex: 0,
-            pageSize: pageSize.value
+            pageSize: appearanceSettingsStore.tablePageSize
         }
     });
 
     const totalItems = computed(() => {
-        const length = table.getFilteredRowModel().rows.length;
-        const max = vrcxStore.maxTableSize;
-        return length > max && length < max + 51 ? max : length;
+        return table.getFilteredRowModel().rows.length;
     });
 
     const handlePageSizeChange = (size) => {
-        if (playerModerationTable.value.pageSizeLinked) {
-            appearanceSettingsStore.setTablePageSize(size);
-        } else {
-            playerModerationTable.value.pageSize = size;
-        }
-    };
-
-    watch(pageSize, (size) => {
-        if (pagination.value.pageSize === size) {
-            return;
-        }
         pagination.value = {
             ...pagination.value,
             pageIndex: 0,
             pageSize: size
         };
-        table.setPageSize(size);
-    });
+    };
 </script>
-
-<style scoped>
-    .filter-input {
-        width: 150px;
-        margin: 0 10px;
-    }
-</style>

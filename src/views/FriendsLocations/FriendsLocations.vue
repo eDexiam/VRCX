@@ -9,12 +9,19 @@
                 </TabsList>
             </Tabs>
             <div class="friend-view__actions">
-                <InputGroupSearch v-model="searchTerm" class="friend-view__search" placeholder="Search Friend" />
+                <InputGroupSearch
+                    v-model="searchTerm"
+                    class="friend-view__search"
+                    :placeholder="t('view.friends_locations.search_placeholder')" />
                 <TooltipWrapper :content="t('view.charts.instance_activity.settings.header')" side="top">
                     <div>
                         <Popover>
                             <PopoverTrigger asChild>
-                                <Button class="rounded-full mr-2" size="icon" variant="ghost">
+                                <Button
+                                    class="rounded-full mr-2"
+                                    size="icon"
+                                    variant="ghost"
+                                    :ariaLabel="t('view.charts.instance_activity.settings.header')">
                                     <Settings />
                                 </Button>
                             </PopoverTrigger>
@@ -94,6 +101,18 @@
                             </header>
                         </template>
 
+                        <template v-else-if="item.row.type === 'group-header'">
+                            <div
+                                class="flex cursor-pointer select-none items-center gap-1.5 px-1 py-1.5 text-[13px] font-semibold hover:opacity-80"
+                                @click="toggleGroupCollapse(item.row.groupKey)">
+                                <ChevronDown
+                                    class="size-4 shrink-0 transition-transform duration-200 ease-in-out"
+                                    :class="{ '-rotate-90': item.row.collapsed }" />
+                                <span class="flex-none">{{ item.row.label }}</span>
+                                <span class="text-xs font-normal opacity-70">({{ item.row.count }})</span>
+                            </div>
+                        </template>
+
                         <template v-else-if="item.row.type === 'divider'">
                             <div class="friend-view__divider"><span class="friend-view__divider-text"></span></div>
                         </template>
@@ -123,10 +142,11 @@
 </template>
 
 <script setup>
-    import { computed, nextTick, onBeforeMount, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+    import { useResizeObserver } from '@vueuse/core';
+    import { computed, nextTick, onBeforeMount, onMounted, reactive, ref, watch } from 'vue';
+    import { ChevronDown, Loader2, Settings } from 'lucide-vue-next';
     import { Field, FieldContent, FieldLabel } from '@/components/ui/field';
     import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-    import { Loader2, Settings } from 'lucide-vue-next';
     import { Button } from '@/components/ui/button';
     import { DataTableEmpty } from '@/components/ui/data-table';
     import { InputGroupSearch } from '@/components/ui/input-group';
@@ -135,13 +155,14 @@
     import { useVirtualizer } from '@tanstack/vue-virtual';
 
     import { Popover, PopoverContent, PopoverTrigger } from '../../components/ui/popover';
+    import { useAppearanceSettingsStore, useFavoriteStore, useFriendStore, useLocationStore } from '../../stores';
     import { Slider } from '../../components/ui/slider';
     import { Switch } from '../../components/ui/switch';
     import { getFriendsLocations } from '../../shared/utils/location.js';
-    import { useFriendStore } from '../../stores';
+    import { debounce, getFriendsSortFunction } from '../../shared/utils';
 
     import FriendLocationCard from './components/FriendsLocationsCard.vue';
-    import configRepository from '../../service/config.js';
+    import configRepository from '../../services/config.js';
 
     const { t } = useI18n();
 
@@ -154,6 +175,18 @@
         offlineFriends,
         friendsInSameInstance
     } = storeToRefs(friendStore);
+
+    const appearanceSettingsStore = useAppearanceSettingsStore();
+    const { isSidebarDivideByFriendGroup, sidebarFavoriteGroups, sidebarFavoriteGroupOrder, sidebarSortMethods } =
+        storeToRefs(appearanceSettingsStore);
+
+    const favoriteStore = useFavoriteStore();
+    const { favoriteFriendGroups, groupedByGroupKeyFavoriteFriends, localFriendFavorites } = storeToRefs(favoriteStore);
+
+    const locationStore = useLocationStore();
+    const { lastLocation } = storeToRefs(locationStore);
+
+    const collapsedGroups = reactive(new Set());
 
     const SEGMENTED_BASE_OPTIONS = [
         { label: t('view.friends_locations.online'), value: 'online' },
@@ -171,12 +204,18 @@
 
     const cardScaleBase = ref(1);
     const cardSpacingBase = ref(1);
+    const persistCardScale = debounce((value) => {
+        configRepository.setString('VRCX_FriendLocationCardScale', value.toString());
+    }, 200);
+    const persistCardSpacing = debounce((value) => {
+        configRepository.setString('VRCX_FriendLocationCardSpacing', value.toString());
+    }, 200);
 
     const cardScale = computed({
         get: () => cardScaleBase.value,
         set: (value) => {
             cardScaleBase.value = value;
-            configRepository.setString('VRCX_FriendLocationCardScale', value.toString());
+            persistCardScale(value);
         }
     });
 
@@ -184,7 +223,7 @@
         get: () => cardSpacingBase.value,
         set: (value) => {
             cardSpacingBase.value = value;
-            configRepository.setString('VRCX_FriendLocationCardSpacing', value.toString());
+            persistCardSpacing(value);
         }
     });
 
@@ -226,8 +265,8 @@
 
     const scrollbarRef = ref();
     const gridWidth = ref(0);
-    let resizeObserver;
-    let cleanupResize;
+    let measureScheduled = false;
+    let pendingGridWidthUpdate = false;
 
     const updateGridWidth = () => {
         const wrap = scrollbarRef.value;
@@ -239,44 +278,18 @@
     };
 
     const setupResizeHandling = () => {
-        if (cleanupResize) {
-            cleanupResize();
-            cleanupResize = undefined;
-        }
-
         const wrap = scrollbarRef.value;
         if (!wrap) {
             return;
         }
 
         updateGridWidth();
-
-        if (typeof ResizeObserver !== 'undefined') {
-            resizeObserver = new ResizeObserver((entries) => {
-                if (!entries || entries.length === 0) {
-                    return;
-                }
-                const [entry] = entries;
-                gridWidth.value = entry.contentRect?.width ?? wrap.clientWidth ?? 0;
-            });
-            resizeObserver.observe(wrap);
-            cleanupResize = () => {
-                resizeObserver?.disconnect();
-                resizeObserver = undefined;
-            };
-            return;
-        }
-
-        if (typeof window !== 'undefined') {
-            const handleResize = () => {
-                updateGridWidth();
-            };
-            window.addEventListener('resize', handleResize, { passive: true });
-            cleanupResize = () => {
-                window.removeEventListener('resize', handleResize);
-            };
-        }
     };
+
+    useResizeObserver(scrollbarRef, (entries) => {
+        const [entry] = entries;
+        gridWidth.value = entry?.contentRect?.width ?? scrollbarRef.value?.clientWidth ?? 0;
+    });
 
     const normalizedSearchTerm = computed(() => searchTerm.value.trim().toLowerCase());
 
@@ -289,6 +302,29 @@
               }))
             : [];
 
+    const getFriendIdentity = (friend) => friend?.id ?? friend?.userId ?? friend?.displayName ?? 'unknown';
+
+    const getEntryIdentity = (entry) => entry?.id ?? getFriendIdentity(entry?.friend);
+
+    const scheduleVirtualMeasure = ({ updateGridWidth: shouldUpdateGridWidth = false } = {}) => {
+        pendingGridWidthUpdate = pendingGridWidthUpdate || shouldUpdateGridWidth;
+        if (measureScheduled) {
+            return;
+        }
+
+        measureScheduled = true;
+        nextTick(() => {
+            measureScheduled = false;
+
+            if (pendingGridWidthUpdate) {
+                pendingGridWidthUpdate = false;
+                updateGridWidth();
+            }
+
+            virtualizer.value?.measure?.();
+        });
+    };
+
     const sameInstanceGroups = computed(() => {
         const source = friendsInSameInstance?.value;
         if (!Array.isArray(source) || source.length === 0) return [];
@@ -297,7 +333,7 @@
             .map((group, index) => {
                 if (!Array.isArray(group) || group.length === 0) return null;
                 const friends = group;
-                const instanceId = getFriendsLocations(friends) || `instance-${index + 1}`;
+                const instanceId = getFriendsLocations(friends, lastLocation.value) || `instance-${index + 1}`;
                 return {
                     instanceId: String(instanceId),
                     friends
@@ -325,16 +361,115 @@
         });
     };
 
+    const displayedVipIds = computed(() => {
+        const selectedGroups = sidebarFavoriteGroups.value;
+        const hasFilter = selectedGroups.length > 0;
+        if (!hasFilter) return allFavoriteFriendIds.value;
+
+        const ids = new Set();
+        const remoteFriendsByGroup = groupedByGroupKeyFavoriteFriends.value;
+        for (const key of selectedGroups) {
+            if (key.startsWith('local:')) {
+                const groupName = key.slice(6);
+                const userIds = localFriendFavorites.value?.[groupName];
+                if (userIds) {
+                    for (const id of userIds) ids.add(id);
+                }
+            } else if (remoteFriendsByGroup[key]) {
+                for (const f of remoteFriendsByGroup[key]) ids.add(f.id);
+            }
+        }
+        return ids;
+    });
+
+    const visibleFavoriteOnlineFriends = computed(() => {
+        const selectedGroups = sidebarFavoriteGroups.value;
+        if (selectedGroups.length === 0) {
+            return allFavoriteOnlineFriends.value;
+        }
+        return allFavoriteOnlineFriends.value.filter((friend) => displayedVipIds.value.has(friend.id));
+    });
+
+    const onlineFriendsByGroupStatus = computed(() => {
+        const selectedGroups = sidebarFavoriteGroups.value;
+        if (selectedGroups.length === 0) {
+            return onlineFriends.value.filter((f) => !allFavoriteFriendIds.value.has(f.id));
+        }
+        const selectedIds = displayedVipIds.value;
+        const nonFavOnline = onlineFriends.value.filter((f) => !selectedIds.has(f.id));
+        const existingIds = new Set(nonFavOnline.map((f) => f.id));
+        const unselectedGroupFriends = allFavoriteOnlineFriends.value.filter(
+            (f) => !selectedIds.has(f.id) && !existingIds.has(f.id)
+        );
+        return [...nonFavOnline, ...unselectedGroupFriends].sort(getFriendsSortFunction(sidebarSortMethods.value));
+    });
+
+    const vipFriendsDivideByGroup = computed(() => {
+        const remoteFriendsByGroup = groupedByGroupKeyFavoriteFriends.value;
+        const selectedGroups = sidebarFavoriteGroups.value;
+        const hasFilter = selectedGroups.length > 0;
+
+        const groups = [];
+        for (const key in remoteFriendsByGroup) {
+            if (Object.hasOwn(remoteFriendsByGroup, key)) {
+                if (hasFilter && !selectedGroups.includes(key)) continue;
+                const groupName = favoriteFriendGroups.value.find((g) => g.key === key)?.displayName || '';
+                const memberIds = new Set(remoteFriendsByGroup[key].map((f) => f.id));
+                groups.push({ key, groupName, memberIds });
+            }
+        }
+        for (const groupName in localFriendFavorites.value) {
+            const selectedKey = `local:${groupName}`;
+            if (hasFilter && !selectedGroups.includes(selectedKey)) continue;
+            const userIds = localFriendFavorites.value[groupName];
+            if (userIds?.length) {
+                groups.push({ key: selectedKey, groupName, memberIds: new Set(userIds) });
+            }
+        }
+
+        const result = [];
+        for (const { key, groupName, memberIds } of groups) {
+            const filteredFriends = visibleFavoriteOnlineFriends.value.filter((friend) => memberIds.has(friend.id));
+            if (filteredFriends.length > 0) {
+                result.push({ key, groupName, friends: filteredFriends });
+            }
+        }
+
+        const order = sidebarFavoriteGroupOrder.value;
+        return result.sort((a, b) => {
+            const idxA = order.indexOf(a.key);
+            const idxB = order.indexOf(b.key);
+            if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+            if (idxA !== -1) return -1;
+            if (idxB !== -1) return 1;
+            return (a.key ?? '').localeCompare(b.key ?? '');
+        });
+    });
+
+    const searchableEntries = computed(() =>
+        uniqueEntries([
+            ...toEntries(allFavoriteOnlineFriends.value),
+            ...toEntries(onlineFriends.value),
+            ...toEntries(activeFriends.value),
+            ...toEntries(offlineFriends.value)
+        ])
+    );
+
+    /**
+     *
+     * @param groupKey
+     */
+    function toggleGroupCollapse(groupKey) {
+        if (collapsedGroups.has(groupKey)) {
+            collapsedGroups.delete(groupKey);
+        } else {
+            collapsedGroups.add(groupKey);
+        }
+    }
+
     const filteredFriends = computed(() => {
         if (normalizedSearchTerm.value) {
-            const pools = [
-                ...toEntries(allFavoriteOnlineFriends.value),
-                ...toEntries(onlineFriends.value),
-                ...toEntries(activeFriends.value),
-                ...toEntries(offlineFriends.value)
-            ];
-
-            return uniqueEntries(pools).filter(({ friend }) => {
+            return searchableEntries.value.filter(({ friend }) => {
                 const haystack =
                     `${friend.displayName ?? friend.name ?? ''} ${friend.signature ?? ''} ${friend.worldName ?? ''}`.toLowerCase();
                 return haystack.includes(normalizedSearchTerm.value);
@@ -355,9 +490,7 @@
                             .filter((id) => typeof id === 'string' || typeof id === 'number')
                     );
 
-                    const remainingOnline = toEntries(
-                        onlineFriends.value.filter((f) => !allFavoriteFriendIds.value.has(f.id))
-                    )
+                    const remainingOnline = toEntries(onlineFriendsByGroupStatus.value)
                         .filter((entry) => {
                             if (!entry?.id) {
                                 return true;
@@ -372,10 +505,10 @@
                     return [...sameEntries, ...remainingOnline];
                 }
 
-                return toEntries(onlineFriends.value.filter((f) => !allFavoriteFriendIds.value.has(f.id)));
+                return toEntries(onlineFriendsByGroupStatus.value);
             }
             case 'favorite':
-                return toEntries(allFavoriteOnlineFriends.value);
+                return toEntries(visibleFavoriteOnlineFriends.value);
             case 'same-instance':
                 return sameInstanceEntries.value;
             case 'active':
@@ -394,6 +527,8 @@
     const shouldMergeSameInstance = computed(
         () => !showSameInstance.value && activeSegment.value === 'online' && !normalizedSearchTerm.value
     );
+
+    const displayInstanceInfo = computed(() => activeSegment.value !== 'active' && activeSegment.value !== 'offline');
 
     const buildSameInstanceGroups = (entries = []) => {
         if (!Array.isArray(entries) || entries.length === 0) {
@@ -428,18 +563,36 @@
         return buildSameInstanceGroups(filteredFriends.value);
     });
 
-    const mergedSameInstanceEntries = computed(() => {
+    const mergedEntriesBySection = computed(() => {
         if (!shouldMergeSameInstance.value) {
-            return [];
+            return {
+                sameInstance: [],
+                online: []
+            };
         }
-        return filteredFriends.value.filter((entry) => entry.section === 'same-instance');
+
+        const sameInstance = [];
+        const online = [];
+        for (const entry of filteredFriends.value) {
+            if (entry.section === 'same-instance') {
+                sameInstance.push(entry);
+            } else {
+                online.push(entry);
+            }
+        }
+
+        return {
+            sameInstance,
+            online
+        };
+    });
+
+    const mergedSameInstanceEntries = computed(() => {
+        return mergedEntriesBySection.value.sameInstance;
     });
 
     const mergedOnlineEntries = computed(() => {
-        if (!shouldMergeSameInstance.value) {
-            return [];
-        }
-        return filteredFriends.value.filter((entry) => entry.section !== 'same-instance');
+        return mergedEntriesBySection.value.online;
     });
 
     const mergedSameInstanceGroups = computed(() => {
@@ -449,61 +602,13 @@
         return buildSameInstanceGroups(mergedSameInstanceEntries.value);
     });
 
-    const gridStyle = computed(() => {
+    const computeGridLayout = (count = 1, options = {}) => {
         const baseWidth = 220;
         const baseGap = 14;
         const scale = cardScale.value;
         const spacing = cardSpacing.value;
         const minWidth = baseWidth * scale;
         const gap = Math.max(6, (baseGap + (scale - 1) * 10) * spacing);
-
-        return (count = 1, options = {}) => {
-            const containerWidth = Math.max(gridWidth.value ?? 0, 0);
-            const itemCount = Math.max(Number(count) || 0, 0);
-            const safeCount = itemCount > 0 ? itemCount : 1;
-            const maxColumns = Math.max(1, Math.floor((containerWidth + gap) / (minWidth + gap)) || 1);
-            const preferredColumns = options?.preferredColumns;
-            const requestedColumns = preferredColumns
-                ? Math.max(1, Math.min(Math.round(preferredColumns), maxColumns))
-                : maxColumns;
-            const columns = Math.max(1, Math.min(safeCount, requestedColumns));
-            const forceStretch = Boolean(options?.forceStretch);
-            const disableAutoStretch = Boolean(options?.disableAutoStretch);
-            const matchMaxColumnWidth = Boolean(options?.matchMaxColumnWidth);
-            const shouldStretch = !disableAutoStretch && (forceStretch || itemCount >= maxColumns);
-
-            let cardWidth = minWidth;
-            const maxColumnWidth = maxColumns > 0 ? (containerWidth - gap * (maxColumns - 1)) / maxColumns : minWidth;
-
-            if (shouldStretch && columns > 0) {
-                const columnsWidth = containerWidth - gap * (columns - 1);
-                const rawWidth = columnsWidth > 0 ? columnsWidth / columns : minWidth;
-
-                if (Number.isFinite(rawWidth) && rawWidth > 0) {
-                    cardWidth = Math.max(minWidth, rawWidth);
-                }
-            } else if (matchMaxColumnWidth && Number.isFinite(maxColumnWidth) && maxColumnWidth > 0) {
-                cardWidth = Math.max(minWidth, maxColumnWidth);
-            }
-
-            return {
-                '--friend-card-min-width': `${Math.round(minWidth)}px`,
-                '--friend-card-gap': `${Math.round(gap)}px`,
-                '--friend-card-target-width': `${Math.round(cardWidth)}px`,
-                '--friend-grid-columns': `${columns}`,
-                '--friend-card-spacing': `${spacing.toFixed(2)}`
-            };
-        };
-    });
-
-    const getGridMetrics = (count = 1, options = {}) => {
-        const baseWidth = 220;
-        const baseGap = 14;
-        const scale = cardScale.value;
-        const spacing = cardSpacing.value;
-        const minWidth = baseWidth * scale;
-        const gap = Math.max(6, (baseGap + (scale - 1) * 10) * spacing);
-
         const containerWidth = Math.max(gridWidth.value ?? 0, 0);
         const itemCount = Math.max(Number(count) || 0, 0);
         const safeCount = itemCount > 0 ? itemCount : 1;
@@ -540,12 +645,25 @@
         };
     };
 
+    const gridStyle = computed(() => {
+        return (count = 1, options = {}) => {
+            const { minWidth, gap, cardWidth, columns } = computeGridLayout(count, options);
+            return {
+                '--friend-card-min-width': `${Math.round(minWidth)}px`,
+                '--friend-card-gap': `${Math.round(gap)}px`,
+                '--friend-card-target-width': `${Math.round(cardWidth)}px`,
+                '--friend-grid-columns': `${columns}`,
+                '--friend-card-spacing': `${cardSpacing.value.toFixed(2)}`
+            };
+        };
+    });
+
     const chunkCardItems = (items = [], keyPrefix = 'row') => {
         const safeItems = Array.isArray(items) ? items : [];
         if (!safeItems.length) {
             return [];
         }
-        const { columns } = getGridMetrics(safeItems.length, { matchMaxColumnWidth: true });
+        const { columns } = computeGridLayout(safeItems.length, { matchMaxColumnWidth: true });
         const safeColumns = Math.max(1, columns || 1);
         const rows = [];
 
@@ -559,6 +677,10 @@
 
         return rows;
     };
+
+    const isFavoriteDivideByGroup = computed(
+        () => isSidebarDivideByFriendGroup.value && activeSegment.value === 'favorite' && !normalizedSearchTerm.value
+    );
 
     const virtualRows = computed(() => {
         const rows = [];
@@ -575,9 +697,9 @@
                 const friends = Array.isArray(group.friends) ? group.friends : [];
                 if (friends.length) {
                     const items = friends.map((friend) => ({
-                        key: `f:${friend?.id ?? friend?.userId ?? friend?.displayName ?? Math.random()}`,
+                        key: `f:${getFriendIdentity(friend)}`,
                         friend,
-                        displayInstanceInfo: true
+                        displayInstanceInfo: displayInstanceInfo.value
                     }));
                     rows.push(...chunkCardItems(items, `g:${group.instanceId}`));
                 }
@@ -598,9 +720,9 @@
                 const friends = Array.isArray(group.friends) ? group.friends : [];
                 if (friends.length) {
                     const items = friends.map((friend) => ({
-                        key: `f:${friend?.id ?? friend?.userId ?? friend?.displayName ?? Math.random()}`,
+                        key: `f:${getFriendIdentity(friend)}`,
                         friend,
-                        displayInstanceInfo: false
+                        displayInstanceInfo: displayInstanceInfo.value
                     }));
                     rows.push(...chunkCardItems(items, `mg:${group.instanceId}`));
                 }
@@ -613,9 +735,9 @@
             const online = mergedOnlineEntries.value;
             if (online.length) {
                 const items = online.map((entry) => ({
-                    key: `e:${entry?.id ?? entry?.friend?.id ?? entry?.friend?.displayName ?? Math.random()}`,
+                    key: `e:${getEntryIdentity(entry)}`,
                     friend: entry.friend,
-                    displayInstanceInfo: true
+                    displayInstanceInfo: displayInstanceInfo.value
                 }));
                 rows.push(...chunkCardItems(items, 'o:merged'));
             }
@@ -623,12 +745,35 @@
             return rows;
         }
 
+        if (isFavoriteDivideByGroup.value) {
+            for (const group of vipFriendsDivideByGroup.value) {
+                const isCollapsed = collapsedGroups.has(group.key);
+                rows.push({
+                    type: 'group-header',
+                    key: `gh:${group.key}`,
+                    label: group.groupName,
+                    count: group.friends.length,
+                    groupKey: group.key,
+                    collapsed: isCollapsed
+                });
+                if (!isCollapsed) {
+                    const items = group.friends.map((friend) => ({
+                        key: `fg:${group.key}:${getFriendIdentity(friend)}`,
+                        friend,
+                        displayInstanceInfo: displayInstanceInfo.value
+                    }));
+                    rows.push(...chunkCardItems(items, `vg:${group.key}`));
+                }
+            }
+            return rows;
+        }
+
         const entries = filteredFriends.value;
         if (entries.length) {
             const items = entries.map((entry) => ({
-                key: `e:${entry?.id ?? entry?.friend?.id ?? entry?.friend?.displayName ?? Math.random()}`,
+                key: `e:${getEntryIdentity(entry)}`,
                 friend: entry.friend,
-                displayInstanceInfo: true
+                displayInstanceInfo: displayInstanceInfo.value
             }));
             rows.push(...chunkCardItems(items, 'r:all'));
         }
@@ -653,12 +798,15 @@
         if (row.type === 'header') {
             return 32;
         }
+        if (row.type === 'group-header') {
+            return 40;
+        }
         if (row.type === 'divider') {
             return 36;
         }
 
         const itemCount = Array.isArray(row.items) ? row.items.length : 0;
-        const { columns, gap } = getGridMetrics(itemCount, { matchMaxColumnWidth: true });
+        const { columns, gap } = computeGridLayout(itemCount, { matchMaxColumnWidth: true });
         const safeColumns = Math.max(1, columns || 1);
         const rows = Math.max(1, Math.ceil(itemCount / safeColumns));
         const scale = cardScale.value;
@@ -697,10 +845,7 @@
     const getRowCount = (row) => (row && row.type === 'header' ? row.count : 0);
 
     watch([searchTerm, activeSegment], () => {
-        nextTick(() => {
-            updateGridWidth();
-            virtualizer.value?.measure?.();
-        });
+        scheduleVirtualMeasure({ updateGridWidth: true });
     });
 
     watch(showSameInstance, (value) => {
@@ -711,19 +856,13 @@
             activeSegment.value = 'online';
         }
 
-        nextTick(() => {
-            updateGridWidth();
-            virtualizer.value?.measure?.();
-        });
+        scheduleVirtualMeasure({ updateGridWidth: true });
     });
 
     watch(
         () => filteredFriends.value.length,
         () => {
-            nextTick(() => {
-                updateGridWidth();
-                virtualizer.value?.measure?.();
-            });
+            scheduleVirtualMeasure({ updateGridWidth: true });
         }
     );
 
@@ -731,33 +870,23 @@
         if (!settingsReady.value) {
             return;
         }
-        nextTick(() => {
-            updateGridWidth();
-            virtualizer.value?.measure?.();
-        });
+        scheduleVirtualMeasure({ updateGridWidth: true });
     });
 
     watch(virtualRows, () => {
-        nextTick(() => {
-            virtualizer.value?.measure?.();
-        });
+        scheduleVirtualMeasure();
     });
 
     onMounted(() => {
         nextTick(() => {
             setupResizeHandling();
-            updateGridWidth();
-            virtualizer.value?.measure?.();
+            scheduleVirtualMeasure({ updateGridWidth: true });
         });
     });
 
-    onBeforeUnmount(() => {
-        if (cleanupResize) {
-            cleanupResize();
-            cleanupResize = undefined;
-        }
-    });
-
+    /**
+     *
+     */
     async function loadInitialSettings() {
         try {
             const [storedScale, storedSpacing, storedShowSameInstance] = await Promise.all([
@@ -785,8 +914,7 @@
             settingsReady.value = true;
             nextTick(() => {
                 setupResizeHandling();
-                updateGridWidth();
-                virtualizer.value?.measure?.();
+                scheduleVirtualMeasure({ updateGridWidth: true });
             });
         }
     }
@@ -814,7 +942,7 @@
         display: flex;
         gap: 20px;
         align-items: center;
-        padding: 6px 2px 0 2px;
+        padding: 8px 2px 0 2px;
     }
 
     .friend-view__tabs {
@@ -862,7 +990,7 @@
     }
 
     .friend-view__virtual-row--header {
-        padding: 4px 10px;
+        padding: 4px 8px;
         padding-bottom: calc(var(--friend-card-gap, 14px) - 4px);
     }
 
@@ -904,7 +1032,7 @@
     .friend-view__scale-control {
         display: flex;
         align-items: center;
-        gap: 10px;
+        gap: 8px;
         min-width: 160px;
     }
 
@@ -966,6 +1094,11 @@
 
     .friend-view__instance-count {
         font-size: 12px;
+    }
+
+    .friend-view__virtual-row--group-header {
+        padding: 2px;
+        padding-bottom: calc(var(--friend-card-gap, 14px) - 8px);
     }
 
     .friend-view__empty {

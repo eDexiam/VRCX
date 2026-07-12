@@ -2,21 +2,32 @@ import Location from '../../components/Location.vue';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import {
-    Tooltip,
-    TooltipContent,
-    TooltipTrigger
-} from '../../components/ui/tooltip';
-import { ArrowUpDown, FileText, Trash2, X } from 'lucide-vue-next';
+    ContextMenu,
+    ContextMenuContent,
+    ContextMenuItem,
+    ContextMenuSeparator,
+    ContextMenuTrigger
+} from '../../components/ui/context-menu';
+import { TooltipWrapper } from '../../components/ui/tooltip';
+import {
+    ArrowUpDown,
+    Copy,
+    ExternalLink,
+    FileText,
+    Trash2,
+    X
+} from 'lucide-vue-next';
 import { storeToRefs } from 'pinia';
 
-import { formatDateFilter, openExternalLink } from '../../shared/utils';
-import { i18n } from '../../plugin';
 import {
-    useInstanceStore,
-    useUiStore,
-    useUserStore,
-    useWorldStore
-} from '../../stores';
+    copyToClipboard,
+    formatDateFilter,
+    openExternalLink
+} from '../../shared/utils';
+import { i18n } from '../../plugins';
+import { useInstanceStore, useUiStore } from '../../stores';
+import { lookupUser } from '../../coordinators/userCoordinator';
+import { showWorldDialog } from '../../coordinators/worldCoordinator';
 
 const { t } = i18n.global;
 
@@ -28,8 +39,6 @@ const UNACTIONABLE_TYPES = new Set([
 ]);
 
 export const createColumns = ({ getCreatedAt, onDelete, onDeletePrompt }) => {
-    const { showWorldDialog } = useWorldStore();
-    const { lookupUser } = useUserStore();
     const { showPreviousInstancesInfoDialog } = useInstanceStore();
     const { shiftHeld } = storeToRefs(useUiStore());
 
@@ -47,9 +56,11 @@ export const createColumns = ({ getCreatedAt, onDelete, onDeletePrompt }) => {
             accessorFn: (row) => getCreatedAt(row),
             id: 'created_at',
             size: 140,
+            meta: { label: () => t('table.gameLog.date') },
             header: ({ column }) => (
                 <Button
                     variant="ghost"
+                    class="pl-0!"
                     onClick={() =>
                         column.toggleSorting(column.getIsSorted() === 'asc')
                     }
@@ -64,14 +75,9 @@ export const createColumns = ({ getCreatedAt, onDelete, onDeletePrompt }) => {
                 const longText = formatDateFilter(createdAt, 'long');
 
                 return (
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <span>{shortText}</span>
-                        </TooltipTrigger>
-                        <TooltipContent side="right">
-                            <span>{longText}</span>
-                        </TooltipContent>
-                    </Tooltip>
+                    <TooltipWrapper content={longText} side="right">
+                        <span>{shortText}</span>
+                    </TooltipWrapper>
                 );
             }
         },
@@ -79,6 +85,7 @@ export const createColumns = ({ getCreatedAt, onDelete, onDeletePrompt }) => {
             accessorKey: 'type',
             size: 150,
             header: () => t('table.gameLog.type'),
+            meta: { label: () => t('table.gameLog.type') },
             cell: ({ row }) => {
                 const original = row.original;
                 const label = t(`view.game_log.filters.${original.type}`);
@@ -103,6 +110,7 @@ export const createColumns = ({ getCreatedAt, onDelete, onDeletePrompt }) => {
             accessorKey: 'displayName',
             size: 200,
             header: () => t('table.gameLog.user'),
+            meta: { label: () => t('table.gameLog.user') },
             cell: ({ row }) => {
                 const original = row.original;
                 const isFriend = original.isFriend;
@@ -130,7 +138,8 @@ export const createColumns = ({ getCreatedAt, onDelete, onDeletePrompt }) => {
             enableSorting: false,
             minSize: 150,
             meta: {
-                stretch: true
+                stretch: true,
+                label: () => t('table.gameLog.detail')
             },
             cell: ({ row }) => {
                 const original = row.original;
@@ -141,6 +150,7 @@ export const createColumns = ({ getCreatedAt, onDelete, onDeletePrompt }) => {
                                 location={original.location}
                                 hint={original.worldName}
                                 grouphint={original.groupName}
+                                enableContextMenu
                             />
                         </div>
                     );
@@ -153,6 +163,7 @@ export const createColumns = ({ getCreatedAt, onDelete, onDeletePrompt }) => {
                                 location={original.instanceId}
                                 hint={original.worldName}
                                 grouphint={original.groupName}
+                                enableContextMenu
                             />
                         </div>
                     );
@@ -160,17 +171,41 @@ export const createColumns = ({ getCreatedAt, onDelete, onDeletePrompt }) => {
 
                 if (original.type === 'Event') {
                     return (
-                        <span class="block w-full min-w-0 truncate">
-                            {original.data}
-                        </span>
+                        <ContextMenu>
+                            <ContextMenuTrigger asChild>
+                                <TooltipWrapper
+                                    content={original.data}
+                                    side="bottom"
+                                >
+                                    <span class="block w-full min-w-0 truncate">
+                                        {original.data}
+                                    </span>
+                                </TooltipWrapper>
+                            </ContextMenuTrigger>
+                            <ContextMenuContent>
+                                <ContextMenuItem
+                                    onClick={() =>
+                                        copyToClipboard(original.data)
+                                    }
+                                >
+                                    <Copy class="size-4" />
+                                    {t('common.actions.copy')}
+                                </ContextMenuItem>
+                            </ContextMenuContent>
+                        </ContextMenu>
                     );
                 }
 
                 if (original.type === 'External') {
                     return (
-                        <span class="block w-full min-w-0 truncate">
-                            {original.message}
-                        </span>
+                        <TooltipWrapper
+                            content={original.message}
+                            side="bottom"
+                        >
+                            <span class="block w-full min-w-0 truncate">
+                                {original.message}
+                            </span>
+                        </TooltipWrapper>
                     );
                 }
 
@@ -179,24 +214,65 @@ export const createColumns = ({ getCreatedAt, onDelete, onDeletePrompt }) => {
                         original.videoId !== 'LSMedia' &&
                         original.videoId !== 'PopcornPalace';
                     const label = original.videoName || original.videoUrl;
+                    const tooltipText = original.videoId
+                        ? `${original.videoId}: ${label}`
+                        : label;
                     return (
-                        <span class="block w-full min-w-0 truncate cursor-pointer">
-                            {original.videoId ? (
-                                <span class="mr-1.5">{original.videoId}:</span>
-                            ) : null}
-                            {showLink ? (
-                                <span
-                                    class="cursor-pointer"
+                        <ContextMenu>
+                            <ContextMenuTrigger asChild>
+                                <TooltipWrapper
+                                    content={tooltipText}
+                                    side="bottom"
+                                >
+                                    <span class="block w-full min-w-0 truncate cursor-pointer">
+                                        {original.videoId ? (
+                                            <span class="mr-1.5">
+                                                {original.videoId}:
+                                            </span>
+                                        ) : null}
+                                        {showLink ? (
+                                            <span
+                                                class="cursor-pointer"
+                                                onClick={() =>
+                                                    openExternalLink(
+                                                        original.videoUrl
+                                                    )
+                                                }
+                                            >
+                                                {label}
+                                            </span>
+                                        ) : (
+                                            <span>{original.videoName}</span>
+                                        )}
+                                    </span>
+                                </TooltipWrapper>
+                            </ContextMenuTrigger>
+                            <ContextMenuContent>
+                                {showLink ? (
+                                    <>
+                                        <ContextMenuItem
+                                            onClick={() =>
+                                                openExternalLink(
+                                                    original.videoUrl
+                                                )
+                                            }
+                                        >
+                                            <ExternalLink class="size-4" />
+                                            {t('common.actions.open_link')}
+                                        </ContextMenuItem>
+                                        <ContextMenuSeparator />
+                                    </>
+                                ) : null}
+                                <ContextMenuItem
                                     onClick={() =>
-                                        openExternalLink(original.videoUrl)
+                                        copyToClipboard(original.videoUrl)
                                     }
                                 >
-                                    {label}
-                                </span>
-                            ) : (
-                                <span>{original.videoName}</span>
-                            )}
-                        </span>
+                                    <Copy class="size-4" />
+                                    {t('common.actions.copy')}
+                                </ContextMenuItem>
+                            </ContextMenuContent>
+                        </ContextMenu>
                     );
                 }
 
@@ -205,16 +281,46 @@ export const createColumns = ({ getCreatedAt, onDelete, onDeletePrompt }) => {
                     original.type === 'StringLoad'
                 ) {
                     return (
-                        <span class="block w-full min-w-0 truncate cursor-pointer">
-                            <span
-                                class="cursor-pointer"
-                                onClick={() =>
-                                    openExternalLink(original.resourceUrl)
-                                }
-                            >
-                                {original.resourceUrl}
-                            </span>
-                        </span>
+                        <ContextMenu>
+                            <ContextMenuTrigger asChild>
+                                <TooltipWrapper
+                                    content={original.resourceUrl}
+                                    side="bottom"
+                                >
+                                    <span class="block w-full min-w-0 truncate cursor-pointer">
+                                        <span
+                                            class="cursor-pointer"
+                                            onClick={() =>
+                                                openExternalLink(
+                                                    original.resourceUrl
+                                                )
+                                            }
+                                        >
+                                            {original.resourceUrl}
+                                        </span>
+                                    </span>
+                                </TooltipWrapper>
+                            </ContextMenuTrigger>
+                            <ContextMenuContent>
+                                <ContextMenuItem
+                                    onClick={() =>
+                                        openExternalLink(original.resourceUrl)
+                                    }
+                                >
+                                    <ExternalLink class="size-4" />
+                                    {t('common.actions.open_link')}
+                                </ContextMenuItem>
+                                <ContextMenuSeparator />
+                                <ContextMenuItem
+                                    onClick={() =>
+                                        copyToClipboard(original.resourceUrl)
+                                    }
+                                >
+                                    <Copy class="size-4" />
+                                    {t('common.actions.copy')}
+                                </ContextMenuItem>
+                            </ContextMenuContent>
+                        </ContextMenu>
                     );
                 }
 
@@ -227,16 +333,19 @@ export const createColumns = ({ getCreatedAt, onDelete, onDeletePrompt }) => {
                 }
 
                 return (
-                    <span class="block w-full min-w-0 truncate">
-                        {original.data}
-                    </span>
+                    <TooltipWrapper content={original.data} side="bottom">
+                        <span class="block w-full min-w-0 truncate">
+                            {original.data}
+                        </span>
+                    </TooltipWrapper>
                 );
             }
         },
         {
             id: 'action',
             meta: {
-                class: 'text-right'
+                class: 'text-right',
+                label: () => t('table.gameLog.action')
             },
             size: 90,
             minSize: 90,
@@ -257,7 +366,7 @@ export const createColumns = ({ getCreatedAt, onDelete, onDeletePrompt }) => {
                         {canDelete ? (
                             <button
                                 type="button"
-                                class="inline-flex h-6 items-center justify-center text-muted-foreground hover:text-foreground"
+                                class="inline-flex h-6 items-center justify-center text-muted-foreground hover:text-foreground cursor-pointer"
                                 onClick={() =>
                                     shiftHeld.value
                                         ? onDelete(original)
@@ -272,26 +381,22 @@ export const createColumns = ({ getCreatedAt, onDelete, onDeletePrompt }) => {
                             </button>
                         ) : null}
                         {canShowPrevious ? (
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <button
-                                        type="button"
-                                        class="inline-flex h-6 items-center justify-center text-muted-foreground hover:text-foreground"
-                                        onClick={() =>
-                                            showPreviousInstancesInfoDialog(
-                                                original.location
-                                            )
-                                        }
-                                    >
-                                        <FileText class="h-4 w-4" />
-                                    </button>
-                                </TooltipTrigger>
-                                <TooltipContent side="top">
-                                    <span>
-                                        {t('dialog.previous_instances.info')}
-                                    </span>
-                                </TooltipContent>
-                            </Tooltip>
+                            <TooltipWrapper
+                                content={t('dialog.previous_instances.info')}
+                                side="top"
+                            >
+                                <button
+                                    type="button"
+                                    class="inline-flex h-6 items-center justify-center text-muted-foreground hover:text-foreground cursor-pointer"
+                                    onClick={() =>
+                                        showPreviousInstancesInfoDialog(
+                                            original.location
+                                        )
+                                    }
+                                >
+                                    <FileText class="h-4 w-4" />
+                                </button>
+                            </TooltipWrapper>
                         ) : null}
                     </div>
                 );

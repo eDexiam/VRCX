@@ -11,27 +11,25 @@
             <template #label-gallery>
                 <span>
                     {{ t('dialog.gallery_icons.gallery') }}
-                    <span class="gallery-tab-count"> {{ galleryTable.length }}/64 </span>
+                    <span class="text-xs ml-[5px]"> {{ galleryTable.length }}/64 </span>
                 </span>
             </template>
             <template #label-icons>
                 <span>
                     {{ t('dialog.gallery_icons.icons') }}
-                    <span class="gallery-tab-count"> {{ VRCPlusIconsTable.length }}/64 </span>
+                    <span class="text-xs ml-[5px]"> {{ VRCPlusIconsTable.length }}/64 </span>
                 </span>
             </template>
             <template #label-emojis>
                 <span>
                     {{ t('dialog.gallery_icons.emojis') }}
-                    <span class="gallery-tab-count">
-                        {{ emojiTable.length }}/{{ cachedConfigTyped.maxUserEmoji }}
-                    </span>
+                    <span class="text-xs ml-[5px]"> {{ emojiTable.length }}/{{ cachedConfigTyped.maxUserEmoji }} </span>
                 </span>
             </template>
             <template #label-stickers>
                 <span>
                     {{ t('dialog.gallery_icons.stickers') }}
-                    <span class="gallery-tab-count">
+                    <span class="text-xs ml-[5px]">
                         {{ stickerTable.length }}/{{ cachedConfigTyped.maxUserStickers }}
                     </span>
                 </span>
@@ -39,28 +37,25 @@
             <template #label-prints>
                 <span>
                     {{ t('dialog.gallery_icons.prints') }}
-                    <span class="gallery-tab-count"> {{ printTable.length }}/64 </span>
+                    <span class="text-xs ml-[5px]"> {{ printTable.length }}/64 </span>
                 </span>
             </template>
             <template #label-inventory>
                 <span>
                     {{ t('dialog.gallery_icons.inventory') }}
-                    <span class="gallery-tab-count">
+                    <span class="text-xs ml-[5px]">
                         {{ inventoryTable.length }}
                     </span>
                 </span>
             </template>
             <template #gallery>
-                <div>
+                <div @dragover.prevent @drop.prevent="handleDropGallery">
                     <input
                         id="GalleryUploadButton"
                         type="file"
                         accept="image/*"
                         @change="onFileChangeGallery"
                         style="display: none" />
-                    <span>{{ t('dialog.gallery_icons.recommended_image_size') }}: 1200x900px (4:3)</span>
-                    <br />
-                    <br />
                     <ButtonGroup>
                         <Button variant="outline" size="sm" @click="refreshGalleryTable">
                             <RefreshCw />
@@ -83,57 +78,64 @@
                             {{ t('dialog.gallery_icons.clear') }}
                         </Button>
                     </ButtonGroup>
-                    <br />
-                    <div
-                        class="x-friend-item"
-                        v-for="image in galleryTable"
-                        :key="image.id"
-                        style="display: inline-block; margin-top: 10px; width: unset; cursor: default">
-                        <template v-if="image.versions && image.versions.length > 0">
+                    <ItemGroup
+                        class="grid gap-3 mt-3"
+                        style="grid-template-columns: repeat(auto-fill, minmax(180px, 1fr))">
+                        <Item
+                            v-for="image in galleryTable"
+                            :key="image.id"
+                            variant="outline"
+                            size="sm"
+                            class="p-0 x-hover-card hover:bg-accent hover:shadow-sm"
+                            :class="compareCurrentProfilePic(image.id) ? 'x-highlight-ring' : ''"
+                            as-child>
                             <div
-                                class="h-[200px] w-[200px] rounded-[20px] overflow-hidden"
-                                v-if="image.versions[image.versions.length - 1].file.url"
-                                @click="setProfilePicOverride(image.id)"
-                                :class="compareCurrentProfilePic(image.id) ? 'cursor-default' : 'cursor-pointer'">
-                                <img
-                                    class="h-full w-full rounded-[15px] object-cover"
-                                    :src="image.versions[image.versions.length - 1].file.url"
-                                    loading="lazy" />
-                            </div>
-                            <div class="float-right" style="margin-top: 5px">
-                                <Button
-                                    class="rounded-full mr-2"
-                                    size="icon-sm"
-                                    variant="outline"
+                                v-if="
+                                    image.versions &&
+                                    image.versions.length > 0 &&
+                                    image.versions[image.versions.length - 1].file.url
+                                "
+                                class="overflow-hidden rounded-[inherit]">
+                                <ItemHeader
+                                    class="cursor-pointer"
                                     @click="
                                         showFullscreenImageDialog(image.versions[image.versions.length - 1].file.url)
                                     ">
-                                    <Maximize2 />
-                                </Button>
-                                <Button
-                                    class="rounded-full"
-                                    size="icon-sm"
-                                    variant="outline"
-                                    @click="deleteGalleryImage(image.id)">
-                                    <Trash2 />
-                                </Button>
+                                    <img
+                                        :src="image.versions[image.versions.length - 1].file.url"
+                                        loading="lazy"
+                                        class="aspect-[4/3] w-full rounded-t-md object-cover" />
+                                </ItemHeader>
+                                <ItemFooter class="p-2 gap-1">
+                                    <Button
+                                        size="icon-sm"
+                                        variant="ghost"
+                                        class="rounded-full text-destructive"
+                                        @click="deleteGalleryImage(image.id)">
+                                        <Trash2 />
+                                    </Button>
+                                    <Button
+                                        size="icon-sm"
+                                        class="rounded-full"
+                                        :variant="compareCurrentProfilePic(image.id) ? 'default' : 'ghost'"
+                                        @click="setProfilePicOverride(image.id)">
+                                        <Check />
+                                    </Button>
+                                </ItemFooter>
                             </div>
-                        </template>
-                    </div>
+                        </Item>
+                    </ItemGroup>
                 </div>
             </template>
 
             <template #icons>
-                <div>
+                <div @dragover.prevent @drop.prevent="handleDropIcon">
                     <input
                         id="VRCPlusIconUploadButton"
                         type="file"
                         accept="image/*"
                         @change="onFileChangeVRCPlusIcon"
                         style="display: none" />
-                    <span>{{ t('dialog.gallery_icons.recommended_image_size') }}: 2048x2048px (1:1)</span>
-                    <br />
-                    <br />
                     <ButtonGroup>
                         <Button variant="outline" size="sm" @click="refreshVRCPlusIconsTable">
                             <RefreshCw />
@@ -156,211 +158,210 @@
                             {{ t('dialog.gallery_icons.clear') }}
                         </Button>
                     </ButtonGroup>
-                    <br />
-                    <div
-                        class="x-friend-item"
-                        v-for="image in VRCPlusIconsTable"
-                        :key="image.id"
-                        style="display: inline-block; margin-top: 10px; width: unset; cursor: default">
-                        <template v-if="image.versions && image.versions.length > 0"
-                            ><div
-                                class="h-[200px] w-[200px] rounded-[20px] overflow-hidden"
-                                v-if="image.versions[image.versions.length - 1].file.url"
-                                @click="setVRCPlusIcon(image.id)"
-                                :class="compareCurrentVRCPlusIcon(image.id) ? 'cursor-default' : 'cursor-pointer'">
-                                <img
-                                    class="h-full w-full rounded-[15px] object-cover"
-                                    :src="image.versions[image.versions.length - 1].file.url"
-                                    loading="lazy" />
-                            </div>
-                            <div class="float-right" style="margin-top: 5px">
-                                <Button
-                                    class="rounded-full mr-2"
-                                    size="icon-sm"
-                                    variant="outline"
+                    <ItemGroup
+                        class="grid gap-3 mt-3"
+                        style="grid-template-columns: repeat(auto-fill, minmax(160px, 1fr))">
+                        <Item
+                            v-for="image in VRCPlusIconsTable"
+                            :key="image.id"
+                            variant="outline"
+                            size="sm"
+                            class="p-0 x-hover-card hover:bg-accent hover:shadow-sm"
+                            :class="compareCurrentVRCPlusIcon(image.id) ? 'x-highlight-ring' : ''"
+                            as-child>
+                            <div
+                                v-if="
+                                    image.versions &&
+                                    image.versions.length > 0 &&
+                                    image.versions[image.versions.length - 1].file.url
+                                "
+                                class="overflow-hidden rounded-[inherit]">
+                                <ItemHeader
+                                    class="cursor-pointer"
                                     @click="
                                         showFullscreenImageDialog(image.versions[image.versions.length - 1].file.url)
                                     ">
-                                    <Maximize2 />
-                                </Button>
-                                <Button
-                                    class="rounded-full"
-                                    size="icon-sm"
-                                    variant="outline"
-                                    @click="deleteVRCPlusIcon(image.id)"
-                                    ><Trash2
-                                /></Button></div
-                        ></template>
-                    </div>
+                                    <img
+                                        :src="image.versions[image.versions.length - 1].file.url"
+                                        loading="lazy"
+                                        class="aspect-square w-full rounded-t-md object-cover" />
+                                </ItemHeader>
+                                <ItemFooter class="p-2 gap-1">
+                                    <Button
+                                        size="icon-sm"
+                                        variant="ghost"
+                                        class="rounded-full text-destructive"
+                                        @click="deleteVRCPlusIcon(image.id)">
+                                        <Trash2 />
+                                    </Button>
+                                    <Button
+                                        size="icon-sm"
+                                        class="rounded-full"
+                                        :variant="compareCurrentVRCPlusIcon(image.id) ? 'default' : 'ghost'"
+                                        @click="setVRCPlusIcon(image.id)">
+                                        <Check />
+                                    </Button>
+                                </ItemFooter>
+                            </div>
+                        </Item>
+                    </ItemGroup>
                 </div>
             </template>
 
             <template #emojis>
-                <div>
+                <div @dragover.prevent @drop.prevent="handleDropEmoji">
                     <input
                         id="EmojiUploadButton"
                         type="file"
                         accept="image/*"
                         @change="onFileChangeEmoji"
                         style="display: none" />
-                    <span>{{ t('dialog.gallery_icons.recommended_image_size') }}: 1024x1024px (1:1)</span>
-                    <br />
-                    <br />
-                    <div>
-                        <ButtonGroup style="margin-right: 10px">
-                            <Button variant="outline" size="sm" @click="refreshEmojiTable">
-                                <RefreshCw />
-                                {{ t('dialog.gallery_icons.refresh') }}
-                            </Button>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                :disabled="!isLocalUserVrcPlusSupporter || isUploading"
-                                @click="displayEmojiUpload">
-                                <Upload />
-                                {{ t('dialog.gallery_icons.upload') }}
-                            </Button>
-                        </ButtonGroup>
-                        <br />
-                        <br />
-                        <VirtualCombobox
-                            v-model="emojiAnimationStyle"
-                            :groups="emojiStylePickerGroups"
-                            :placeholder="t('dialog.gallery_icons.emoji_animation_styles')"
-                            :search-placeholder="t('dialog.gallery_icons.emoji_animation_styles')"
-                            :clearable="false"
-                            :close-on-select="true">
-                            <template #item="{ item, selected }">
-                                <div class="flex w-full items-center gap-2">
-                                    <div class="h-10 w-10 shrink-0 overflow-hidden rounded-sm bg-black/5">
-                                        <img
-                                            class="h-full w-full object-cover"
-                                            :src="`${emojiAnimationStyleUrl}${item.fileName}`"
-                                            loading="lazy" />
-                                    </div>
-                                    <span class="truncate text-sm" v-text="item.label"></span>
-                                    <span v-if="selected" class="ml-auto opacity-70">✓</span>
-                                </div>
-                            </template>
-                        </VirtualCombobox>
-                        <label class="inline-flex items-center gap-2">
-                            <Checkbox v-model="emojiAnimType" />
-                            <span>{{ t('dialog.gallery_icons.emoji_animation_type') }}</span>
-                        </label>
-                        <template v-if="emojiAnimType">
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                class="mr-3"
-                                @click="openExternalLink('https://vrcemoji.com')">
+                    <div class="flex flex-col gap-2">
+                        <div class="flex items-center gap-2">
+                            <ButtonGroup>
+                                <Button variant="outline" size="sm" @click="refreshEmojiTable">
+                                    <RefreshCw />
+                                    {{ t('dialog.gallery_icons.refresh') }}
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    :disabled="!isLocalUserVrcPlusSupporter || isUploading"
+                                    @click="displayEmojiUpload">
+                                    <Upload />
+                                    {{ t('dialog.gallery_icons.upload') }}
+                                </Button>
+                            </ButtonGroup>
+                            <div class="flex-1 min-w-0 max-w-120">
+                                <VirtualCombobox
+                                    v-model="emojiAnimationStyle"
+                                    :groups="emojiStylePickerGroups"
+                                    :placeholder="t('dialog.gallery_icons.emoji_animation_styles')"
+                                    :search-placeholder="t('dialog.gallery_icons.emoji_animation_styles')"
+                                    :clearable="false"
+                                    :close-on-select="true">
+                                    <template #item="{ item, selected }">
+                                        <div class="flex w-full items-center gap-2">
+                                            <div class="h-10 w-10 shrink-0 overflow-hidden rounded-sm bg-black/5">
+                                                <img
+                                                    class="h-full w-full object-cover"
+                                                    :src="`${emojiAnimationStyleUrl}${item.fileName}`"
+                                                    loading="lazy" />
+                                            </div>
+                                            <span class="truncate text-sm" v-text="item.label"></span>
+                                            <span v-if="selected" class="ml-auto opacity-70">✓</span>
+                                        </div>
+                                    </template>
+                                </VirtualCombobox>
+                            </div>
+                            <label class="inline-flex items-center gap-2">
+                                <Checkbox v-model="emojiAnimType" />
+                                <span>{{ t('dialog.gallery_icons.emoji_animation_type') }}</span>
+                            </label>
+                        </div>
+                        <div v-if="emojiAnimType" class="flex items-center gap-2">
+                            <Button size="sm" variant="outline" @click="openExternalLink('https://vrcemoji.com')">
                                 {{ t('dialog.gallery_icons.create_animated_emoji') }}
                             </Button>
-                            <span style="margin-right: 10px">{{ t('dialog.gallery_icons.emoji_animation_fps') }}</span>
+                            <span class="text-sm">{{ t('dialog.gallery_icons.emoji_animation_fps') }}</span>
                             <NumberField
                                 v-model="emojiAnimFps"
                                 :min="1"
                                 :max="64"
                                 :step="1"
                                 :format-options="{ maximumFractionDigits: 0 }"
-                                class="mr-2.5 w-28">
+                                class="w-28">
                                 <NumberFieldContent>
                                     <NumberFieldDecrement />
                                     <NumberFieldInput />
                                     <NumberFieldIncrement />
                                 </NumberFieldContent>
                             </NumberField>
-                            <span style="margin-right: 10px">{{
-                                t('dialog.gallery_icons.emoji_animation_frame_count')
-                            }}</span>
+                            <span class="text-sm">{{ t('dialog.gallery_icons.emoji_animation_frame_count') }}</span>
                             <NumberField
                                 v-model="emojiAnimFrameCount"
                                 :min="2"
                                 :max="64"
                                 :step="1"
                                 :format-options="{ maximumFractionDigits: 0 }"
-                                class="mr-2.5 w-28">
+                                class="w-28">
                                 <NumberFieldContent>
                                     <NumberFieldDecrement />
                                     <NumberFieldInput />
                                     <NumberFieldIncrement />
                                 </NumberFieldContent>
                             </NumberField>
-                            <label class="inline-flex items-center gap-2" style="margin-left: 10px; margin-right: 10px">
+                            <label class="inline-flex items-center gap-2">
                                 <Checkbox v-model="emojiAnimLoopPingPong" />
                                 <span>{{ t('dialog.gallery_icons.emoji_loop_pingpong') }}</span>
                             </label>
-                            <br />
-                            <br />
-                            <span>{{ t('dialog.gallery_icons.flipbook_info') }}</span>
-                        </template>
+                        </div>
+                        <span v-if="emojiAnimType" class="basis-full text-sm text-muted-foreground">{{
+                            t('dialog.gallery_icons.flipbook_info')
+                        }}</span>
                     </div>
-                    <br />
-                    <div
-                        class="x-friend-item"
-                        v-for="image in emojiTable"
-                        :key="image.id"
-                        style="display: inline-block; margin-top: 10px; width: unset; cursor: default">
-                        <template v-if="image.versions && image.versions.length > 0">
+                    <ItemGroup
+                        class="grid gap-3 mt-3"
+                        style="grid-template-columns: repeat(auto-fill, minmax(160px, 1fr))">
+                        <Item
+                            v-for="image in emojiTable"
+                            :key="image.id"
+                            variant="outline"
+                            size="sm"
+                            class="p-0 x-hover-card hover:bg-accent hover:shadow-sm"
+                            as-child>
                             <div
-                                class="h-[200px] w-[200px] rounded-[20px] overflow-hidden cursor-pointer"
-                                v-if="image.versions[image.versions.length - 1].file.url"
-                                @click="
-                                    showFullscreenImageDialog(
-                                        image.versions[image.versions.length - 1].file.url,
-                                        getEmojiFileName(image)
-                                    )
-                                ">
-                                <Emoji
-                                    :imageUrl="image.versions[image.versions.length - 1].file.url"
-                                    :size="200"></Emoji>
-                            </div>
-                            <div style="display: inline-block; margin: 5px">
-                                <span v-if="image.loopStyle === 'pingpong'">
-                                    <RefreshCw style="margin-right: 5px" />
-                                </span>
-                                <span style="margin-right: 5px">{{ image.animationStyle }}</span>
-                                <span v-if="image.framesOverTime" style="margin-right: 5px"
-                                    >{{ image.framesOverTime }}fps</span
-                                >
-                                <span v-if="image.frames" style="margin-right: 5px">{{ image.frames }}frames</span>
-                                <br />
-                            </div>
-                            <div class="float-right" style="margin-top: 5px">
-                                <Button
-                                    class="rounded-full mr-2"
-                                    size="icon-sm"
-                                    variant="outline"
+                                v-if="
+                                    image.versions &&
+                                    image.versions.length > 0 &&
+                                    image.versions[image.versions.length - 1].file.url
+                                "
+                                class="overflow-hidden">
+                                <ItemHeader
+                                    class="cursor-pointer"
                                     @click="
                                         showFullscreenImageDialog(
                                             image.versions[image.versions.length - 1].file.url,
                                             getEmojiFileName(image)
                                         )
-                                    "
-                                    ><Maximize2
-                                /></Button>
-                                <Button
-                                    class="rounded-full mr-2"
-                                    size="icon-sm"
-                                    variant="outline"
-                                    @click="deleteEmoji(image.id)">
-                                    <Trash2
-                                /></Button></div
-                        ></template>
-                    </div>
+                                    ">
+                                    <Emoji
+                                        :imageUrl="image.versions[image.versions.length - 1].file.url"
+                                        class="aspect-square w-full rounded-t-md" />
+                                </ItemHeader>
+                                <ItemContent class="min-w-0 px-2.5 pt-1.5 pb-0">
+                                    <ItemDescription class="text-xs flex items-center gap-1 flex-wrap">
+                                        <span v-if="image.loopStyle === 'pingpong'">
+                                            <RefreshCw class="size-3" />
+                                        </span>
+                                        <span>{{ image.animationStyle }}</span>
+                                        <span v-if="image.framesOverTime">{{ image.framesOverTime }}fps</span>
+                                        <span v-if="image.frames">{{ image.frames }}frames</span>
+                                    </ItemDescription>
+                                </ItemContent>
+                                <ItemFooter class="p-2 gap-1">
+                                    <Button
+                                        size="icon-sm"
+                                        variant="ghost"
+                                        class="rounded-full text-destructive"
+                                        @click="deleteEmoji(image.id)">
+                                        <Trash2 />
+                                    </Button>
+                                </ItemFooter>
+                            </div>
+                        </Item>
+                    </ItemGroup>
                 </div>
             </template>
 
             <template #stickers>
-                <div>
+                <div @dragover.prevent @drop.prevent="handleDropSticker">
                     <input
                         id="StickerUploadButton"
                         type="file"
                         accept="image/*"
                         @change="onFileChangeSticker"
                         style="display: none" />
-                    <span>{{ t('dialog.gallery_icons.recommended_image_size') }}: 1024x1024px (1:1)</span>
-                    <br />
-                    <br />
                     <ButtonGroup>
                         <Button variant="outline" size="sm" @click="refreshStickerTable">
                             <RefreshCw />
@@ -375,55 +376,56 @@
                             {{ t('dialog.gallery_icons.upload') }}
                         </Button>
                     </ButtonGroup>
-                    <br />
-                    <div
-                        class="x-friend-item"
-                        v-for="image in stickerTable"
-                        :key="image.id"
-                        style="display: inline-block; margin-top: 10px; width: unset; cursor: default">
-                        <template v-if="image.versions && image.versions.length > 0">
+                    <ItemGroup
+                        class="grid gap-3 mt-3"
+                        style="grid-template-columns: repeat(auto-fill, minmax(160px, 1fr))">
+                        <Item
+                            v-for="image in stickerTable"
+                            :key="image.id"
+                            variant="outline"
+                            size="sm"
+                            class="p-0 x-hover-card hover:bg-accent hover:shadow-sm"
+                            as-child>
                             <div
-                                class="h-[200px] w-[200px] rounded-[20px] overflow-hidden cursor-pointer"
-                                v-if="image.versions[image.versions.length - 1].file.url"
-                                @click="showFullscreenImageDialog(image.versions[image.versions.length - 1].file.url)">
-                                <img
-                                    class="h-full w-full rounded-[15px] object-cover"
-                                    :src="image.versions[image.versions.length - 1].file.url"
-                                    loading="lazy" />
-                            </div>
-                            <div class="float-right" style="margin-top: 5px">
-                                <Button
-                                    class="rounded-full mr-2"
-                                    size="icon-sm"
-                                    variant="outline"
+                                v-if="
+                                    image.versions &&
+                                    image.versions.length > 0 &&
+                                    image.versions[image.versions.length - 1].file.url
+                                "
+                                class="overflow-hidden">
+                                <ItemHeader
+                                    class="cursor-pointer"
                                     @click="
                                         showFullscreenImageDialog(image.versions[image.versions.length - 1].file.url)
-                                    "
-                                    ><Maximize2
-                                /></Button>
-                                <Button
-                                    class="rounded-full"
-                                    size="icon-sm"
-                                    variant="outline"
-                                    @click="deleteSticker(image.id)"
-                                    ><Trash2
-                                /></Button></div
-                        ></template>
-                    </div>
+                                    ">
+                                    <img
+                                        :src="image.versions[image.versions.length - 1].file.url"
+                                        loading="lazy"
+                                        class="aspect-square w-full rounded-t-md object-cover" />
+                                </ItemHeader>
+                                <ItemFooter class="p-2 gap-1">
+                                    <Button
+                                        size="icon-sm"
+                                        variant="ghost"
+                                        class="rounded-full text-destructive"
+                                        @click="deleteSticker(image.id)">
+                                        <Trash2 />
+                                    </Button>
+                                </ItemFooter>
+                            </div>
+                        </Item>
+                    </ItemGroup>
                 </div>
             </template>
 
             <template #prints>
-                <div>
+                <div @dragover.prevent @drop.prevent="handleDropPrint">
                     <input
                         id="PrintUploadButton"
                         type="file"
                         accept="image/*"
                         @change="onFileChangePrint"
                         style="display: none" />
-                    <span>{{ t('dialog.gallery_icons.recommended_image_size') }}: 1920x1080px (16:9)</span>
-                    <br />
-                    <br />
                     <div style="display: flex; align-items: center">
                         <ButtonGroup>
                             <Button variant="outline" size="sm" @click="refreshPrintTable">
@@ -443,73 +445,73 @@
                             v-model="printUploadNote"
                             :rows="1"
                             :maxlength="32"
-                            style="margin-left: 10px; width: 300px"
+                            style="margin-left: 8px; width: 300px"
                             :placeholder="t('dialog.gallery_icons.note')"
                             input-class="resize-none min-h-0" />
-                        <label class="inline-flex items-center gap-2" style="margin-left: 10px; margin-right: 10px">
+                        <label class="inline-flex items-center gap-2" style="margin-left: 8px; margin-right: 8px">
                             <Checkbox v-model="printCropBorder" />
                             <span>{{ t('dialog.gallery_icons.crop_print_border') }}</span>
                         </label>
                     </div>
-                    <br />
-                    <div
-                        class="x-friend-item"
-                        v-for="image in printTable"
-                        :key="image.id"
-                        style="display: inline-block; margin-top: 10px; width: unset; cursor: default">
-                        <div
-                            class="h-[200px] w-[200px] rounded-[20px] overflow-hidden cursor-pointer"
-                            @click="showFullscreenImageDialog(image.files.image, getPrintFileName(image))">
-                            <img
-                                class="h-full w-full rounded-[15px] object-cover"
-                                :src="image.files.image"
-                                loading="lazy" />
-                        </div>
-                        <div style="margin-top: 5px; width: 208px">
-                            <span class="block truncate" v-if="image.note" v-text="image.note"></span>
-                            <span v-else class="block">&nbsp;</span>
-                            <Location
-                                class="block truncate"
-                                v-if="image.worldId"
-                                :location="image.worldId"
-                                :hint="image.worldName" />
-                            <span v-else class="block">&nbsp;</span>
-                            <DisplayName
-                                class="block truncate gallery-meta"
-                                v-if="image.authorId"
-                                :userid="image.authorId"
-                                :hint="image.authorName" />
-                            <span v-else class="gallery-meta">&nbsp;</span>
-                            <span v-if="image.createdAt" class="block truncate gallery-meta gallery-meta--small">
-                                {{ formatDateFilter(image.createdAt, 'long') }}
-                            </span>
-                            <span v-else class="block">&nbsp;</span>
-                        </div>
-                        <div class="float-right">
-                            <Button
-                                class="rounded-full mr-2"
-                                size="icon-sm"
-                                variant="outline"
-                                @click="showFullscreenImageDialog(image.files.image, getPrintFileName(image))">
-                                <Maximize2
-                            /></Button>
-                            <Button
-                                class="rounded-full"
-                                size="icon-sm"
-                                variant="outline"
-                                @click="deletePrint(image.id)">
-                                <Trash2
-                            /></Button>
-                        </div>
-                    </div>
+                    <ItemGroup
+                        class="grid gap-3 mt-3"
+                        style="grid-template-columns: repeat(auto-fill, minmax(200px, 1fr))">
+                        <Item
+                            v-for="image in printTable"
+                            :key="image.id"
+                            variant="outline"
+                            size="sm"
+                            class="p-0 x-hover-card hover:bg-accent hover:shadow-sm"
+                            as-child>
+                            <div class="overflow-hidden">
+                                <ItemHeader
+                                    class="cursor-pointer"
+                                    @click="showFullscreenImageDialog(image.files.image, getPrintFileName(image))">
+                                    <img
+                                        :src="image.files.image"
+                                        loading="lazy"
+                                        class="aspect-[16/9] w-full rounded-t-md object-cover" />
+                                </ItemHeader>
+                                <ItemContent class="min-w-0 px-2.5 pt-1.5 pb-0">
+                                    <ItemTitle v-if="image.note" class="truncate text-sm">
+                                        {{ image.note }}
+                                    </ItemTitle>
+                                    <ItemDescription class="text-xs truncate">
+                                        <Location
+                                            v-if="image.worldId"
+                                            :location="image.worldId"
+                                            :hint="image.worldName" />
+                                        <span v-else>&nbsp;</span>
+                                    </ItemDescription>
+                                    <ItemDescription class="text-xs truncate font-mono">
+                                        <DisplayName
+                                            v-if="image.authorId"
+                                            :userid="image.authorId"
+                                            :hint="image.authorName" />
+                                        <span v-else>&nbsp;</span>
+                                    </ItemDescription>
+                                    <ItemDescription v-if="image.createdAt" class="text-[11px] truncate font-mono">
+                                        {{ formatDateFilter(image.createdAt, 'long') }}
+                                    </ItemDescription>
+                                </ItemContent>
+                                <ItemFooter class="p-2 gap-1">
+                                    <Button
+                                        size="icon-sm"
+                                        variant="ghost"
+                                        class="rounded-full text-destructive"
+                                        @click="deletePrint(image.id)">
+                                        <Trash2 />
+                                    </Button>
+                                </ItemFooter>
+                            </div>
+                        </Item>
+                    </ItemGroup>
                 </div>
             </template>
 
             <template #inventory>
                 <div>
-                    <br />
-                    <br />
-                    <div style="display: flex; align-items: center">
+                    <div class="flex items-center">
                         <ButtonGroup>
                             <Button variant="outline" size="sm" @click="getInventory">
                                 <RefreshCw />
@@ -521,49 +523,73 @@
                             </Button>
                         </ButtonGroup>
                     </div>
-                    <br />
-                    <div
-                        class="x-friend-item"
-                        v-for="item in inventoryTable"
-                        :key="item.id"
-                        style="display: inline-block; margin-top: 10px; width: unset; cursor: default">
-                        <div class="h-[200px] w-[200px] rounded-[20px] overflow-hidden cursor-default">
-                            <img
-                                class="h-full w-full rounded-[15px] object-cover"
-                                :src="item.imageUrl"
-                                loading="lazy" />
-                        </div>
-                        <div style="margin-top: 5px; width: 208px">
-                            <span class="block truncate" v-text="item.name"></span>
-                            <span v-if="item.description" class="block truncate" v-text="item.description"></span>
-                            <span v-else class="block">&nbsp;</span>
-                            <span class="block truncate gallery-meta gallery-meta--small">
-                                {{ formatDateFilter(item.created_at, 'long') }}
-                            </span>
-                            <span v-if="item.itemType === 'prop'">{{ t('dialog.gallery_icons.item') }}</span>
-                            <span v-else-if="item.itemType === 'sticker'">{{ t('dialog.gallery_icons.sticker') }}</span>
-                            <span v-else-if="item.itemType === 'droneskin'">{{
-                                t('dialog.gallery_icons.drone_skin')
-                            }}</span>
-                            <span v-else-if="item.itemType === 'emoji'">{{ t('dialog.gallery_icons.emoji') }}</span>
-                            <span v-else v-text="item.itemTypeLabel"></span>
-                        </div>
-                        <Button
+                    <ItemGroup
+                        class="grid gap-3 mt-3"
+                        style="grid-template-columns: repeat(auto-fill, minmax(180px, 1fr))">
+                        <Item
+                            v-for="item in inventoryTable"
+                            :key="item.id"
+                            variant="outline"
                             size="sm"
-                            v-if="item.itemType === 'bundle'"
-                            @click="consumeInventoryBundle(item.id)"
-                            class="float-right">
-                            {{ t('dialog.gallery_icons.consume_bundle') }}
-                        </Button>
-                    </div>
+                            class="p-0 x-hover-card hover:bg-accent hover:shadow-sm"
+                            as-child>
+                            <div class="overflow-hidden">
+                                <ItemHeader class="cursor-pointer" @click="showFullscreenImageDialog(item.imageUrl)">
+                                    <img
+                                        :src="item.imageUrl"
+                                        loading="lazy"
+                                        class="aspect-square w-full rounded-t-md object-cover" />
+                                </ItemHeader>
+                                <ItemContent class="min-w-0 px-2.5 pt-1.5 pb-0">
+                                    <ItemTitle class="truncate text-sm">
+                                        {{ item.name }}
+                                    </ItemTitle>
+                                    <ItemDescription v-if="item.description" class="text-xs truncate">
+                                        {{ item.description }}
+                                    </ItemDescription>
+                                    <ItemDescription class="text-[11px] truncate font-mono">
+                                        {{ formatDateFilter(item.created_at, 'long') }}
+                                    </ItemDescription>
+                                    <ItemDescription class="text-xs">
+                                        <span v-if="item.itemType === 'prop'">{{
+                                            t('dialog.gallery_icons.item')
+                                        }}</span>
+                                        <span v-else-if="item.itemType === 'sticker'">{{
+                                            t('dialog.gallery_icons.sticker')
+                                        }}</span>
+                                        <span v-else-if="item.itemType === 'droneskin'">{{
+                                            t('dialog.gallery_icons.drone_skin')
+                                        }}</span>
+                                        <span v-else-if="item.itemType === 'emoji'">{{
+                                            t('dialog.gallery_icons.emoji')
+                                        }}</span>
+                                        <span v-else v-text="item.itemTypeLabel"></span>
+                                    </ItemDescription>
+                                </ItemContent>
+                                <ItemFooter v-if="item.itemType === 'bundle'" class="p-2">
+                                    <Button size="sm" @click="consumeInventoryBundle(item.id)">
+                                        {{ t('dialog.gallery_icons.consume_bundle') }}
+                                    </Button>
+                                </ItemFooter>
+                            </div>
+                        </Item>
+                    </ItemGroup>
                 </div>
             </template>
         </TabsUnderline>
+
+        <ImageCropDialog
+            :open="cropDialogOpen"
+            :title="cropDialogTitle"
+            :aspect-ratio="cropDialogAspectRatio"
+            :file="cropDialogFile"
+            @update:open="cropDialogOpen = $event"
+            @confirm="onCropConfirm" />
     </div>
 </template>
 
 <script setup>
-    import { ArrowLeft, Gift, Maximize2, RefreshCw, Trash2, Upload, X } from 'lucide-vue-next';
+    import { ArrowLeft, Check, Gift, RefreshCw, Trash2, Upload, X } from 'lucide-vue-next';
     import {
         NumberField,
         NumberFieldContent,
@@ -578,6 +604,15 @@
     import { InputGroupTextareaField } from '@/components/ui/input-group';
     import { TabsUnderline } from '@/components/ui/tabs';
     import { VirtualCombobox } from '@/components/ui/virtual-combobox';
+    import {
+        Item,
+        ItemContent,
+        ItemDescription,
+        ItemFooter,
+        ItemGroup,
+        ItemHeader,
+        ItemTitle
+    } from '@/components/ui/item';
     import { storeToRefs } from 'pinia';
     import { toast } from 'vue-sonner';
     import { useI18n } from 'vue-i18n';
@@ -592,11 +627,13 @@
     } from '../../shared/utils';
     import { inventoryRequest, miscRequest, userRequest, vrcPlusIconRequest, vrcPlusImageRequest } from '../../api';
     import { useAdvancedSettingsStore, useAuthStore, useGalleryStore, useModalStore, useUserStore } from '../../stores';
+    import { readFileAsBase64, withUploadTimeout } from '../../shared/utils/imageUpload';
+    import { handleImageUploadInput } from '../../coordinators/imageUploadCoordinator';
     import { emojiAnimationStyleList, emojiAnimationStyleUrl } from '../../shared/constants';
-    import { AppDebug } from '../../service/appConfig';
-    import { handleImageUploadInput } from '../../shared/utils/imageUpload';
+    import { AppDebug } from '../../services/appConfig';
 
     import Emoji from '../../components/Emoji.vue';
+    import ImageCropDialog from '../../components/dialogs/ImageCropDialog.vue';
 
     const { t } = useI18n();
     const router = useRouter();
@@ -663,6 +700,12 @@
     const pendingUploads = ref(0);
     const isUploading = computed(() => pendingUploads.value > 0);
 
+    const cropDialogOpen = ref(false);
+    const cropDialogTitle = ref('');
+    const cropDialogAspectRatio = ref(4 / 3);
+    const cropDialogFile = ref(null);
+    const cropDialogUploadHandler = ref(null);
+
     onMounted(() => {
         galleryDialogVisible.value = true;
         loadGalleryData();
@@ -672,69 +715,184 @@
         galleryDialogVisible.value = false;
     });
 
+    /**
+     *
+     */
     function startUpload() {
         pendingUploads.value += 1;
     }
 
+    /**
+     *
+     */
     function finishUpload() {
         pendingUploads.value = Math.max(0, pendingUploads.value - 1);
     }
 
+    /**
+     *
+     */
     function goBack() {
         galleryDialogVisible.value = false;
         router.push({ name: 'tools' });
     }
 
-    function onFileChangeGallery(e) {
+    /**
+     *
+     * @param {string} id
+     */
+    function triggerFileInput(id) {
+        document.getElementById(id)?.click();
+    }
+
+    /**
+     *
+     * @param {Array<{ id: string }>} array
+     * @param {string} itemId
+     */
+    function removeItemById(array, itemId) {
+        const { length } = array;
+        for (let i = 0; i < length; ++i) {
+            if (itemId === array[i].id) {
+                array.splice(i, 1);
+                break;
+            }
+        }
+    }
+
+    /**
+     *
+     * @param file
+     * @param title
+     * @param aspectRatio
+     * @param handler
+     */
+    function openCropDialog(file, title, aspectRatio, handler) {
+        cropDialogTitle.value = title;
+        cropDialogAspectRatio.value = aspectRatio;
+        cropDialogFile.value = file;
+        cropDialogUploadHandler.value = handler;
+        cropDialogOpen.value = true;
+    }
+
+    /**
+     *
+     * @param blob
+     */
+    async function onCropConfirm(blob) {
+        if (!cropDialogUploadHandler.value) {
+            return;
+        }
+        const handler = cropDialogUploadHandler.value;
+        cropDialogUploadHandler.value = null;
+        cropDialogFile.value = null;
+        try {
+            await handler(blob);
+        } finally {
+            cropDialogOpen.value = false;
+        }
+    }
+
+    /**
+     *
+     * @param {string} fileId
+     * @param {Array<{ id: string }>} array
+     */
+    function deleteFileAndRemove(fileId, array) {
+        miscRequest.deleteFile(fileId).then((args) => {
+            removeItemById(array, args.fileId);
+            return args;
+        });
+    }
+
+    /**
+     *
+     * @param {string} currentUrl
+     * @param {string} fileId
+     * @returns {boolean}
+     */
+    function isCurrentFile(currentUrl, fileId) {
+        return fileId === extractFileId(currentUrl);
+    }
+
+    /**
+     *
+     * @param {Event} e
+     * @param {{
+     *   inputSelector: string,
+     *   aspectRatio: number,
+     *   beforeCrop?: (file: File) => void,
+     *   upload: (payload: { file: File, blob: Blob, base64Body: string }) => Promise<void>,
+     *   errorMessage?: string
+     * }} options
+     */
+    function openImageUploadFlow(
+        e,
+        { inputSelector, aspectRatio, beforeCrop, upload, errorMessage = 'Failed to upload' }
+    ) {
         const { file, clearInput } = handleImageUploadInput(e, {
-            inputSelector: '#GalleryUploadButton',
+            inputSelector,
             tooLargeMessage: () => t('message.file.too_large'),
             invalidTypeMessage: () => t('message.file.not_image')
         });
         if (!file) {
             return;
         }
-        startUpload();
-        const r = new FileReader();
-        const handleReaderError = () => finishUpload();
-        r.onerror = handleReaderError;
-        r.onabort = handleReaderError;
-        r.onload = function () {
-            try {
-                const base64Body = btoa(r.result.toString());
-                const uploadPromise = vrcPlusImageRequest.uploadGalleryImage(base64Body).then((args) => {
-                    handleGalleryImageAdd(args);
-                    return args;
-                });
-                toast.promise(uploadPromise, {
-                    loading: t('message.upload.loading'),
-                    success: t('message.upload.success'),
-                    error: t('message.upload.error')
-                });
-                uploadPromise
-                    .catch((error) => {
-                        console.error('Failed to upload', error);
-                    })
-                    .finally(() => finishUpload());
-            } catch (error) {
-                finishUpload();
-                console.error('Failed to process image', error);
-            }
-        };
-        try {
-            r.readAsBinaryString(file);
-        } catch (error) {
-            clearInput();
-            finishUpload();
-            console.error('Failed to read file', error);
-        }
+        beforeCrop?.(file);
         clearInput();
+        openCropDialog(file, t('dialog.change_content_image.upload'), aspectRatio, async (blob) => {
+            startUpload();
+            try {
+                await withUploadTimeout(
+                    (async () => {
+                        const base64Body = await readFileAsBase64(blob);
+                        await upload({
+                            file,
+                            blob,
+                            base64Body
+                        });
+                    })()
+                );
+                toast.success(t('message.upload.success'));
+            } catch (error) {
+                console.error(errorMessage, error);
+                toast.error(t('message.upload.error'));
+            } finally {
+                finishUpload();
+            }
+        });
     }
 
+    async function uploadGalleryImage(base64Body) {
+        const args = await vrcPlusImageRequest.uploadGalleryImage(base64Body);
+        handleGalleryImageAdd(args);
+    }
+
+    /**
+     *
+     * @param e
+     */
+    function onFileChangeGallery(e) {
+        openImageUploadFlow(e, {
+            inputSelector: '#GalleryUploadButton',
+            aspectRatio: 4 / 3,
+            upload: async ({ base64Body }) => {
+                await uploadGalleryImage(base64Body);
+            }
+        });
+    }
+
+    /**
+     *
+     */
     function displayGalleryUpload() {
-        document.getElementById('GalleryUploadButton').click();
+        triggerFileInput('GalleryUploadButton');
     }
 
+    /**
+     *
+     * @param fileId
+     */
     function setProfilePicOverride(fileId) {
         if (!isLocalUserVrcPlusSupporter.value) {
             toast.error(t('message.vrcplus.required'));
@@ -752,86 +910,59 @@
                 profilePicOverride
             })
             .then((args) => {
-                toast.success('Profile picture changed');
+                toast.success(t('message.gallery.profile_pic_changed'));
                 return args;
             });
     }
 
+    /**
+     *
+     * @param fileId
+     */
     function compareCurrentProfilePic(fileId) {
-        const currentProfilePicOverride = extractFileId(currentUser.value.profilePicOverride);
-        if (fileId === currentProfilePicOverride) {
-            return true;
-        }
-        return false;
+        return isCurrentFile(currentUser.value.profilePicOverride, fileId);
     }
 
+    /**
+     *
+     * @param fileId
+     */
     function deleteGalleryImage(fileId) {
-        miscRequest.deleteFile(fileId).then((args) => {
-            const array = galleryTable.value;
-            const { length } = array;
-            for (let i = 0; i < length; ++i) {
-                if (args.fileId === array[i].id) {
-                    array.splice(i, 1);
-                    break;
-                }
-            }
-
-            return args;
-        });
+        deleteFileAndRemove(fileId, galleryTable.value);
     }
 
+    async function uploadVRCPlusIcon(base64Body) {
+        const args = await vrcPlusIconRequest.uploadVRCPlusIcon(base64Body);
+        if (VRCPlusIconsTable.value.length > 0) {
+            VRCPlusIconsTable.value.unshift(args.json);
+        }
+    }
+    /**
+     *
+     * @param e
+     */
     function onFileChangeVRCPlusIcon(e) {
-        const { file, clearInput } = handleImageUploadInput(e, {
+        openImageUploadFlow(e, {
             inputSelector: '#VRCPlusIconUploadButton',
-            tooLargeMessage: () => t('message.file.too_large'),
-            invalidTypeMessage: () => t('message.file.not_image')
-        });
-        if (!file) {
-            return;
-        }
-        startUpload();
-        const r = new FileReader();
-        const handleReaderError = () => finishUpload();
-        r.onerror = handleReaderError;
-        r.onabort = handleReaderError;
-        r.onload = function () {
-            try {
-                const base64Body = btoa(r.result.toString());
-                const uploadPromise = vrcPlusIconRequest.uploadVRCPlusIcon(base64Body).then((args) => {
-                    if (Object.keys(VRCPlusIconsTable.value).length !== 0) {
-                        VRCPlusIconsTable.value.unshift(args.json);
-                    }
-                    return args;
-                });
-                toast.promise(uploadPromise, {
-                    loading: t('message.upload.loading'),
-                    success: t('message.upload.success'),
-                    error: t('message.upload.error')
-                });
-                uploadPromise
-                    .catch((error) => {
-                        console.error('Failed to upload VRC+ icon', error);
-                    })
-                    .finally(() => finishUpload());
-            } catch (error) {
-                finishUpload();
-                console.error('Failed to process upload', error);
+            aspectRatio: 1 / 1,
+            errorMessage: 'Failed to upload VRC+ icon',
+            upload: async ({ base64Body }) => {
+                await uploadVRCPlusIcon(base64Body);
             }
-        };
-        try {
-            r.readAsBinaryString(file);
-        } catch (error) {
-            clearInput();
-            finishUpload();
-            console.error('Failed to read file', error);
-        }
-        clearInput();
+        });
     }
 
+    /**
+     *
+     */
     function displayVRCPlusIconUpload() {
-        document.getElementById('VRCPlusIconUploadButton').click();
+        triggerFileInput('VRCPlusIconUploadButton');
     }
 
+    /**
+     *
+     * @param fileId
+     */
     function setVRCPlusIcon(fileId) {
         if (!isLocalUserVrcPlusSupporter.value) {
             toast.error(t('message.vrcplus.required'));
@@ -849,33 +980,31 @@
                 userIcon
             })
             .then((args) => {
-                toast.success('Icon changed');
+                toast.success(t('message.gallery.profile_icon_changed'));
                 return args;
             });
     }
 
+    /**
+     *
+     * @param userIcon
+     */
     function compareCurrentVRCPlusIcon(userIcon) {
-        const currentUserIcon = extractFileId(currentUser.value.userIcon);
-        if (userIcon === currentUserIcon) {
-            return true;
-        }
-        return false;
+        return isCurrentFile(currentUser.value.userIcon, userIcon);
     }
 
+    /**
+     *
+     * @param fileId
+     */
     function deleteVRCPlusIcon(fileId) {
-        miscRequest.deleteFile(fileId).then((args) => {
-            const array = VRCPlusIconsTable.value;
-            const { length } = array;
-            for (let i = 0; i < length; ++i) {
-                if (args.fileId === array[i].id) {
-                    array.splice(i, 1);
-                    break;
-                }
-            }
-            return args;
-        });
+        deleteFileAndRemove(fileId, VRCPlusIconsTable.value);
     }
 
+    /**
+     *
+     * @param fileName
+     */
     function parseEmojiFileName(fileName) {
         // remove file extension
         fileName = fileName.replace(/\.[^/.]+$/, '');
@@ -899,232 +1028,206 @@
         }
     }
 
+    async function uploadEmoji(base64Body) {
+        const params = {
+            tag: emojiAnimType.value ? 'emojianimated' : 'emoji',
+            animationStyle: emojiAnimationStyle.value.toLowerCase(),
+            maskTag: 'square'
+        };
+        if (emojiAnimType.value) {
+            params.frames = emojiAnimFrameCount.value;
+            params.framesOverTime = emojiAnimFps.value;
+        }
+        if (emojiAnimLoopPingPong.value) {
+            params.loopStyle = 'pingpong';
+        }
+        const args = await vrcPlusImageRequest.uploadEmoji(base64Body, params);
+        if (emojiTable.value.length > 0) {
+            emojiTable.value.unshift(args.json);
+        }
+    }
+
+    /**
+     *
+     * @param e
+     */
     function onFileChangeEmoji(e) {
-        const { file, clearInput } = handleImageUploadInput(e, {
+        openImageUploadFlow(e, {
             inputSelector: '#EmojiUploadButton',
-            tooLargeMessage: () => t('message.file.too_large'),
-            invalidTypeMessage: () => t('message.file.not_image')
-        });
-        if (!file) {
-            return;
-        }
-        startUpload();
-        // set Emoji settings from fileName
-        parseEmojiFileName(file.name);
-        const r = new FileReader();
-        const handleReaderError = () => finishUpload();
-        r.onerror = handleReaderError;
-        r.onabort = handleReaderError;
-        r.onload = function () {
-            try {
-                const params = {
-                    tag: emojiAnimType.value ? 'emojianimated' : 'emoji',
-                    animationStyle: emojiAnimationStyle.value.toLowerCase(),
-                    maskTag: 'square'
-                };
-                if (emojiAnimType.value) {
-                    params.frames = emojiAnimFrameCount.value;
-                    params.framesOverTime = emojiAnimFps.value;
-                }
-                if (emojiAnimLoopPingPong.value) {
-                    params.loopStyle = 'pingpong';
-                }
-                const base64Body = btoa(r.result.toString());
-                const uploadPromise = vrcPlusImageRequest.uploadEmoji(base64Body, params).then((args) => {
-                    if (Object.keys(emojiTable.value).length !== 0) {
-                        emojiTable.value.unshift(args.json);
-                    }
-                    return args;
-                });
-                toast.promise(uploadPromise, {
-                    loading: t('message.upload.loading'),
-                    success: t('message.upload.success'),
-                    error: t('message.upload.error')
-                });
-                uploadPromise
-                    .catch((error) => {
-                        console.error('Failed to upload', error);
-                    })
-                    .finally(() => finishUpload());
-            } catch (error) {
-                finishUpload();
-                console.error('Failed to process upload', error);
+            aspectRatio: 1 / 1,
+            beforeCrop: (file) => {
+                // set Emoji settings from fileName
+                parseEmojiFileName(file.name);
+            },
+            upload: async ({ base64Body }) => {
+                await uploadEmoji(base64Body);
             }
-        };
-        try {
-            r.readAsBinaryString(file);
-        } catch (error) {
-            clearInput();
-            finishUpload();
-            console.error('Failed to read file', error);
-        }
-        clearInput();
+        });
     }
 
+    /**
+     *
+     */
     function displayEmojiUpload() {
-        document.getElementById('EmojiUploadButton').click();
+        triggerFileInput('EmojiUploadButton');
     }
 
+    /**
+     *
+     * @param fileId
+     */
     function deleteEmoji(fileId) {
-        miscRequest.deleteFile(fileId).then((args) => {
-            const array = emojiTable.value;
-            const { length } = array;
-            for (let i = 0; i < length; ++i) {
-                if (args.fileId === array[i].id) {
-                    array.splice(i, 1);
-                    break;
-                }
-            }
-            return args;
-        });
+        deleteFileAndRemove(fileId, emojiTable.value);
     }
 
+    async function uploadSticker(base64Body) {
+        const params = {
+            tag: 'sticker',
+            maskTag: 'square'
+        };
+        const args = await vrcPlusImageRequest.uploadSticker(base64Body, params);
+        handleStickerAdd(args);
+    }
+
+    /**
+     *
+     * @param e
+     */
     function onFileChangeSticker(e) {
-        const { file, clearInput } = handleImageUploadInput(e, {
+        openImageUploadFlow(e, {
             inputSelector: '#StickerUploadButton',
-            tooLargeMessage: () => t('message.file.too_large'),
-            invalidTypeMessage: () => t('message.file.not_image')
-        });
-        if (!file) {
-            return;
-        }
-        startUpload();
-        const r = new FileReader();
-        const handleReaderError = () => finishUpload();
-        r.onerror = handleReaderError;
-        r.onabort = handleReaderError;
-        r.onload = function () {
-            try {
-                const params = {
-                    tag: 'sticker',
-                    maskTag: 'square'
-                };
-                const base64Body = btoa(r.result.toString());
-                const uploadPromise = vrcPlusImageRequest.uploadSticker(base64Body, params).then((args) => {
-                    handleStickerAdd(args);
-                    return args;
-                });
-                toast.promise(uploadPromise, {
-                    loading: t('message.upload.loading'),
-                    success: t('message.upload.success'),
-                    error: t('message.upload.error')
-                });
-                uploadPromise
-                    .catch((error) => {
-                        console.error('Failed to upload', error);
-                    })
-                    .finally(() => finishUpload());
-            } catch (error) {
-                finishUpload();
-                console.error('Failed to process upload', error);
+            aspectRatio: 1 / 1,
+            upload: async ({ base64Body }) => {
+                await uploadSticker(base64Body);
             }
-        };
-        try {
-            r.readAsBinaryString(file);
-        } catch (error) {
-            clearInput();
-            finishUpload();
-            console.error('Failed to read file', error);
-        }
-        clearInput();
+        });
     }
 
+    /**
+     *
+     */
     function displayStickerUpload() {
-        document.getElementById('StickerUploadButton').click();
+        triggerFileInput('StickerUploadButton');
     }
 
+    /**
+     *
+     * @param fileId
+     */
     function deleteSticker(fileId) {
-        miscRequest.deleteFile(fileId).then((args) => {
-            const array = stickerTable.value;
-            const { length } = array;
-            for (let i = 0; i < length; ++i) {
-                if (args.fileId === array[i].id) {
-                    array.splice(i, 1);
-                    break;
-                }
-            }
-
-            return args;
-        });
+        deleteFileAndRemove(fileId, stickerTable.value);
     }
 
-    function onFileChangePrint(e) {
-        const { file, clearInput } = handleImageUploadInput(e, {
-            inputSelector: '#PrintUploadButton',
-            tooLargeMessage: () => t('message.file.too_large'),
-            invalidTypeMessage: () => t('message.file.not_image')
-        });
-        if (!file) {
-            return;
-        }
-        startUpload();
-        const r = new FileReader();
-        const handleReaderError = () => finishUpload();
-        r.onerror = handleReaderError;
-        r.onabort = handleReaderError;
-        r.onload = function () {
-            try {
-                const date = new Date();
-                // why the fuck isn't this UTC
-                date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
-                const timestamp = date.toISOString().slice(0, 19);
-                const params = {
-                    note: printUploadNote.value,
-                    // worldId: '',
-                    timestamp
-                };
-                const base64Body = btoa(r.result.toString());
-                const cropWhiteBorder = printCropBorder.value;
-                const uploadPromise = vrcPlusImageRequest
-                    .uploadPrint(base64Body, cropWhiteBorder, params)
-                    .then((args) => {
-                        if (Object.keys(printTable.value).length !== 0) {
-                            printTable.value.unshift(args.json);
-                        }
-                        return args;
-                    });
-                toast.promise(uploadPromise, {
-                    loading: t('message.upload.loading'),
-                    success: t('message.upload.success'),
-                    error: t('message.upload.error')
-                });
-                uploadPromise
-                    .catch((error) => {
-                        console.error('Failed to upload', error);
-                    })
-                    .finally(() => finishUpload());
-            } catch (error) {
-                finishUpload();
-                console.error('Failed to process upload', error);
-            }
+    async function uploadPrint(base64Body, date) {
+        const timestamp = date.toISOString().slice(0, 19);
+        const params = {
+            note: printUploadNote.value,
+            // worldId: '',
+            timestamp
         };
-        try {
-            r.readAsBinaryString(file);
-        } catch (error) {
-            clearInput();
-            finishUpload();
-            console.error('Failed to read file', error);
+        const cropWhiteBorder = printCropBorder.value;
+        const args = await vrcPlusImageRequest.uploadPrint(base64Body, cropWhiteBorder, params);
+        if (printTable.value.length > 0) {
+            printTable.value.unshift(args.json);
         }
-        clearInput();
     }
 
+    /**
+     *
+     * @param e
+     */
+    function onFileChangePrint(e) {
+        openImageUploadFlow(e, {
+            inputSelector: '#PrintUploadButton',
+            aspectRatio: 16 / 9,
+            upload: async ({ base64Body }) => {
+                // why the fuck isn't this UTC
+                const date = new Date();
+                date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+                await uploadPrint(base64Body, date);
+            }
+        });
+    }
+
+    /**
+     *
+     */
     function displayPrintUpload() {
-        document.getElementById('PrintUploadButton').click();
+        triggerFileInput('PrintUploadButton');
     }
 
+    /**
+     *
+     * @param printId
+     */
     function deletePrint(printId) {
         vrcPlusImageRequest.deletePrint(printId).then((args) => {
-            const array = printTable.value;
-            const { length } = array;
-            for (let i = 0; i < length; ++i) {
-                if (args.printId === array[i].id) {
-                    array.splice(i, 1);
-                    break;
-                }
-            }
+            removeItemById(printTable.value, args.printId);
         });
     }
 
+    async function handleDropGallery(event) {
+        event.preventDefault();
+        for (const file of event.dataTransfer.files) {
+            const b64str = await readFileToBase64Str(file);
+            await uploadGalleryImage(b64str);
+        }
+    }
+
+    async function handleDropIcon(event) {
+        event.preventDefault();
+        for (const file of event.dataTransfer.files) {
+            const b64str = await readFileToBase64Str(file);
+            await uploadVRCPlusIcon(b64str);
+        }
+    }
+
+    async function handleDropEmoji(event) {
+        event.preventDefault();
+        for (const file of event.dataTransfer.files) {
+            const b64str = await readFileToBase64Str(file);
+            await uploadEmoji(b64str);
+        }
+    }
+
+    async function handleDropSticker(event) {
+        event.preventDefault();
+        for (const file of event.dataTransfer.files) {
+            const b64str = await readFileToBase64Str(file);
+            await uploadSticker(b64str);
+        }
+    }
+
+    async function handleDropPrint(event) {
+        event.preventDefault();
+        for (const file of event.dataTransfer.files) {
+            const b64str = await readFileToBase64Str(file);
+            const fileDate = file.lastModifiedDate ?? new Date();
+            await uploadPrint(b64str, fileDate);
+        }
+    }
+
+    function readFileAsDataUrlAsync(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+    }
+
+    async function readFileToBase64Str(file) {
+        if (!file || !file.type.startsWith('image/')) {
+            throw new Error(`unrecognized image format: ${file.type}`);
+        }
+        const b64uri = await readFileAsDataUrlAsync(file);
+        return b64uri.split(',', 2)[1]; // strip data:...;base64,
+    }
+
+    /**
+     *
+     * @param inventoryId
+     */
     async function consumeInventoryBundle(inventoryId) {
         try {
             await inventoryRequest.consumeInventoryBundle({
@@ -1149,6 +1252,9 @@
         // inventoryItemsCreated: 0
     }
 
+    /**
+     *
+     */
     async function redeemReward() {
         modalStore
             .prompt({
@@ -1177,19 +1283,3 @@
             .catch(() => {});
     }
 </script>
-
-<style scoped>
-    .gallery-tab-count {
-        font-size: 12px;
-        margin-left: 5px;
-    }
-
-    .gallery-meta {
-        font-family: monospace;
-        display: block;
-    }
-
-    .gallery-meta--small {
-        font-size: 11px;
-    }
-</style>

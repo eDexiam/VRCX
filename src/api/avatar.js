@@ -1,5 +1,7 @@
-import { request } from '../service/request';
+import { patchAndRefetchActiveQuery, queryKeys } from '../queries';
+import { request } from '../services/request';
 import { useUserStore } from '../stores';
+import { applyCurrentUser } from '../coordinators/userCoordinator';
 
 const avatarReq = {
     /**
@@ -46,6 +48,15 @@ const avatarReq = {
                 json,
                 params
             };
+            patchAndRefetchActiveQuery({
+                queryKey: queryKeys.avatar(params.id),
+                nextData: args
+            }).catch((err) => {
+                console.error(
+                    'Failed to refresh avatar query after mutation:',
+                    err
+                );
+            });
             return args;
         });
     },
@@ -55,7 +66,6 @@ const avatarReq = {
      * @returns {Promise<{json: any, params}>}
      */
     selectAvatar(params) {
-        const userStore = useUserStore();
         return request(`avatars/${params.avatarId}/select`, {
             method: 'PUT',
             params
@@ -64,17 +74,29 @@ const avatarReq = {
                 json,
                 params
             };
-            userStore.applyCurrentUser(json);
+            const ref = applyCurrentUser(json);
+            patchAndRefetchActiveQuery({
+                queryKey: queryKeys.user(ref.id),
+                nextData: {
+                    json,
+                    params: { userId: ref.id },
+                    ref
+                }
+            }).catch((err) => {
+                console.error(
+                    'Failed to refresh current user query after avatar select:',
+                    err
+                );
+            });
             return args;
         });
     },
 
     /**
      * @param {{ avatarId: string }} params
-     * @return { Promise<{json: any, params}> }
+     * @returns { Promise<{json: any, params}> }
      */
     selectFallbackAvatar(params) {
-        const userStore = useUserStore();
         return request(`avatars/${params.avatarId}/selectfallback`, {
             method: 'PUT',
             params
@@ -83,14 +105,27 @@ const avatarReq = {
                 json,
                 params
             };
-            userStore.applyCurrentUser(json);
+            const ref = applyCurrentUser(json);
+            patchAndRefetchActiveQuery({
+                queryKey: queryKeys.user(ref.id),
+                nextData: {
+                    json,
+                    params: { userId: ref.id },
+                    ref
+                }
+            }).catch((err) => {
+                console.error(
+                    'Failed to refresh current user query after fallback avatar select:',
+                    err
+                );
+            });
             return args;
         });
     },
 
     /**
      * @param {{ avatarId: string }} params
-     * @return { Promise<{json: any, params}> }
+     * @returns { Promise<{json: any, params}> }
      */
     deleteAvatar(params) {
         return request(`avatars/${params.avatarId}`, {
@@ -193,6 +228,8 @@ const avatarReq = {
 
     /**
      * @param {{ imageData: string, avatarId: string }}
+     * @param imageData
+     * @param avatarId
      * @returns {Promise<{json: any, params}>}
      */
     uploadAvatarGalleryImage(imageData, avatarId) {
@@ -224,6 +261,23 @@ const avatarReq = {
         };
         return request('files/order', {
             method: 'PUT',
+            params
+        }).then((json) => {
+            const args = {
+                json,
+                params
+            };
+            return args;
+        });
+    },
+
+    /**
+     * @param {{n: number, offset: number}} params
+     * @returns {Promise<{json: any, params}>}
+     */
+    getLicensedAvatars(params) {
+        return request('avatars/licensed', {
+            method: 'GET',
             params
         }).then((json) => {
             const args = {

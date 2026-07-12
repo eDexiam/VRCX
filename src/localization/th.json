@@ -45,6 +45,10 @@
                 "devEndpoint": "Dev Endpoint",
                 "endpoint": "Endpoint",
                 "websocket": "WebSocket"
+            },
+            "language_detect": {
+                "title": "ตรวจพบภาษา",
+                "description": "ภาษาของระบบของคุณดูเหมือนจะเป็น {language} คุณต้องการเปลี่ยนไปใช้หรือไม่?"
             }
         },
         "feed": {
@@ -113,9 +117,7 @@
             },
             "group": {
                 "header": "กลุ่ม"
-            },
-            "prev_page": "ก่อนหน้า",
-            "next_page": "ถัดไป"
+            }
         },
         "favorite": {
             "worlds": {
@@ -1657,13 +1659,6 @@
                 "success": "เปลี่ยนวิดีโอพรีวิว YouTube ของโลกแล้ว"
             }
         },
-        "change_table_size": {
-            "header": "ขนาดตารางสูงสุด",
-            "description": "จำกัดจำนวนรายการที่โหลดจากฐานข้อมูลไปยังหน้า UI, ขนาดตารางที่ใหญ่ขึ้นจะส่งผลต่อการใช้ RAM และประสิทธิภาพ",
-            "table_max_size": "ขนาดตารางสูงสุด",
-            "cancel": "ยกเลิก",
-            "save": "บันทึก"
-        },
         "photon_lobby_timeout": {
             "header": "เกณฑ์การหมดเวลาของผู้ใช้",
             "description": "ป้อนจำนวนวินาที (ค่าเริ่มต้น: 3)",
@@ -1698,6 +1693,13 @@
             "description": "ป้อนที่อยู่และพอร์ตของพร็อกซีเซิร์ฟเวอร์",
             "close": "ปิด",
             "restart": "รีสตาร์ท"
+        },
+        "table_entries_settings": {
+            "header": "ขนาดตารางสูงสุด",
+            "description": "จำกัดจำนวนรายการที่โหลดจากฐานข้อมูลไปยังหน้า UI, ขนาดตารางที่ใหญ่ขึ้นจะส่งผลต่อการใช้ RAM และประสิทธิภาพ",
+            "table_max_entries": "ขนาดตารางสูงสุด",
+            "cancel": "ยกเลิก",
+            "save": "บันทึก"
         }
     },
     "message": {

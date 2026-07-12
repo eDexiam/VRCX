@@ -2,7 +2,7 @@ import { ArrowRight, Download } from 'lucide-vue-next';
 
 import Location from '@/components/Location.vue';
 import { TooltipWrapper } from '@/components/ui/tooltip';
-import { i18n } from '@/plugin';
+import { i18n } from '@/plugins';
 import { formatDateFilter, statusClass } from '@/shared/utils';
 
 const { t } = i18n.global;
@@ -27,7 +27,15 @@ const avatarStatusClass = (status) => {
     return null;
 };
 
-function DetailCell({ row, isPrevious, onShowAvatar, onShowGroup, onShowWorld, onShowUser, onShowImage }) {
+function DetailCell({
+    row,
+    isPrevious,
+    onShowAvatar,
+    onShowGroup,
+    onShowWorld,
+    onShowUser,
+    onShowImage
+}) {
     const r = row;
     if (!r) return null;
 

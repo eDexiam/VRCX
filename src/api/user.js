@@ -1,5 +1,7 @@
-import { request } from '../service/request';
+import { patchAndRefetchActiveQuery, queryKeys } from '../queries';
+import { request } from '../services/request';
 import { useUserStore } from '../stores';
+import { applyUser, applyCurrentUser } from '../coordinators/userCoordinator';
 
 /**
  * @returns {string}
@@ -15,7 +17,6 @@ const userReq = {
      * @type {import('../types/api/user').GetUser}
      */
     getUser(params) {
-        const userStore = useUserStore();
         return request(`users/${params.userId}`, {
             method: 'GET'
         }).then((json) => {
@@ -28,36 +29,9 @@ const userReq = {
             const args = {
                 json,
                 params,
-                ref: userStore.applyUser(json)
+                ref: applyUser(json)
             };
             return args;
-        });
-    },
-
-    /**
-     * Fetch user from cache if they're in it. Otherwise, calls API.
-     * @type {import('../types/api/user').GetCachedUser}
-     */
-    getCachedUser(params) {
-        const userStore = useUserStore();
-        return new Promise((resolve, reject) => {
-            const ref = userStore.cachedUsers.get(params.userId);
-            if (typeof ref === 'undefined') {
-                userReq
-                    .getUser(params)
-                    .then((args) => {
-                        args.ref = userStore.applyUser(args.json);
-                        resolve(args);
-                    })
-                    .catch(reject);
-            } else {
-                resolve({
-                    cache: true,
-                    json: ref,
-                    params,
-                    ref
-                });
-            }
         });
     },
 
@@ -82,7 +56,6 @@ const userReq = {
      * @returns {Promise<{json: any, params: {tags: string[]}}>}
      */
     addUserTags(params) {
-        const userStore = useUserStore();
         return request(`users/${getCurrentUserId()}/addTags`, {
             method: 'POST',
             params
@@ -91,7 +64,7 @@ const userReq = {
                 json,
                 params
             };
-            userStore.applyCurrentUser(json);
+            applyCurrentUser(json);
             return args;
         });
     },
@@ -101,7 +74,6 @@ const userReq = {
      * @returns {Promise<{json: any, params: {tags: string[]}}>}
      */
     removeUserTags(params) {
-        const userStore = useUserStore();
         return request(`users/${getCurrentUserId()}/removeTags`, {
             method: 'POST',
             params
@@ -110,7 +82,7 @@ const userReq = {
                 json,
                 params
             };
-            userStore.applyCurrentUser(json);
+            applyCurrentUser(json);
             return args;
         });
     },
@@ -139,7 +111,6 @@ const userReq = {
      * @type {import('../types/api/user').GetCurrentUser}
      */
     saveCurrentUser(params) {
-        const userStore = useUserStore();
         return request(`users/${getCurrentUserId()}`, {
             method: 'PUT',
             params
@@ -147,8 +118,17 @@ const userReq = {
             const args = {
                 json,
                 params,
-                ref: userStore.applyCurrentUser(json)
+                ref: applyCurrentUser(json)
             };
+            patchAndRefetchActiveQuery({
+                queryKey: queryKeys.user(args.ref.id),
+                nextData: args
+            }).catch((err) => {
+                console.error(
+                    'Failed to refresh user query after mutation:',
+                    err
+                );
+            });
             return args;
         });
     },

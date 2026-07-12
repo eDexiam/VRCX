@@ -29,6 +29,7 @@ declare global {
         gameLogService: any;
         crypto: any;
         sqliteService: any;
+        isVrOverlay: boolean;
         interopApi: {
             callDotNetMethod: (
                 className: any,
@@ -53,28 +54,31 @@ declare global {
                     event: any,
                     position: { x: number; y: number }
                 ) => void
-            ) => void;
+            ) => () => void;
             onWindowSizeChanged: (
                 Function: (
                     event: any,
                     size: { width: number; height: number }
                 ) => void
-            ) => void;
+            ) => () => void;
             onWindowStateChange: (
                 Function: (event: any, state: { windowState: any }) => void
-            ) => void;
-            onBrowserFocus: (Function: (event: any) => void) => void;
+            ) => () => void;
+            onBrowserFocus: (Function: (event: any) => void) => () => void;
             restartApp: () => Promise<void>;
             getOverlayWindow: () => Promise<boolean>;
             updateVr: (
-                active: bool,
-                hmdOverlay: bool,
-                wristOverlay: bool,
-                menuButton: bool,
-                overlayHand: int
+                active: boolean,
+                hmdOverlay: boolean,
+                wristOverlay: boolean,
+                menuButton: boolean,
+                overlayHand: number
             ) => Promise<void>;
             ipcRenderer: {
-                on(channel: String, func: (...args: unknown[]) => void);
+                on(
+                    channel: String,
+                    func: (...args: unknown[]) => void
+                ): (() => void) | undefined;
             };
         };
     }
@@ -87,6 +91,7 @@ declare global {
         debugGameLog: boolean;
         debugWebRequests: boolean;
         debugFriendState: boolean;
+        debugRecompute: boolean;
         debugIPC: boolean;
         debugVrcPlus: boolean;
         errorNoty: any;

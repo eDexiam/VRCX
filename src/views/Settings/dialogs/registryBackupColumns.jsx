@@ -2,7 +2,7 @@ import { Download, RotateCcw, Trash2 } from 'lucide-vue-next';
 
 import { Button } from '@/components/ui/button';
 import { TooltipWrapper } from '@/components/ui/tooltip';
-import { i18n } from '@/plugin';
+import { i18n } from '@/plugins';
 import { formatDateFilter } from '@/shared/utils';
 
 const { t } = i18n.global;
@@ -27,7 +27,7 @@ export const createColumns = ({ onRestore, onSaveToFile, onDelete }) => [
         },
         header: ({ column }) => (
             <button
-                class="inline-flex items-center"
+                class="inline-flex items-center cursor-pointer"
                 onClick={() => {
                     const sorted = column.getIsSorted();
                     column.toggleSorting(sorted === 'asc');

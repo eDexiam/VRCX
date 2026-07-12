@@ -1,10 +1,11 @@
 import { createApp } from 'vue';
 
-import { i18n } from '../plugin/i18n';
-import { initPlugins } from '../plugin';
+import { i18n } from '../plugins/i18n';
+import { initPlugins } from '../plugins';
 
 import Vr from './Vr.vue';
 
+window.isVrOverlay = true;
 await initPlugins(true);
 
 const vr = createApp(Vr);

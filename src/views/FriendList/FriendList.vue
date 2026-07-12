@@ -1,11 +1,11 @@
 <template>
-    <div class="x-container" ref="friendsListRef">
-        <div>
+    <div class="x-container x-container--auto-height" ref="friendsListRef">
+        <div class="flex-1 min-h-0 flex flex-col">
             <DataTableLayout
                 class="min-w-0 w-full"
                 :table="table"
                 :loading="friendsListLoading"
-                :table-style="tableHeightStyle"
+                auto-height
                 :page-sizes="pageSizes"
                 :total-items="totalItems"
                 table-class="min-w-max w-max [&_tbody_tr]:cursor-pointer"
@@ -15,11 +15,22 @@
                     <div class="mb-2 flex items-center justify-between">
                         <div class="flex flex-none mr-2 items-center">
                             <TooltipWrapper side="bottom" :content="t('view.friend_list.favorites_only_tooltip')">
-                                <span class="inline-flex">
-                                    <Switch
-                                        v-model="friendsListSearchFilterVIP"
-                                        @update:modelValue="friendsListSearchChange" />
-                                </span>
+                                <div>
+                                    <Toggle
+                                        variant="outline"
+                                        size="sm"
+                                        :model-value="friendsListSearchFilterVIP"
+                                        :ariaLabel="t('view.friend_list.favorites_only_tooltip')"
+                                        @update:modelValue="
+                                            (v) => {
+                                                friendsListSearchFilterVIP = v;
+                                                friendsListSearchChange();
+                                            }
+                                        ">
+                                        <Star fill="currentColor" v-if="friendsListSearchFilterVIP" />
+                                        <Star v-else />
+                                    </Toggle>
+                                </div>
                             </TooltipWrapper>
                             <Select
                                 multiple
@@ -52,6 +63,7 @@
                                 :placeholder="t('view.friend_list.search_placeholder')"
                                 clearable
                                 class="w-[250px]"
+                                @input="scheduleFriendsListSearchChange"
                                 @change="friendsListSearchChange" />
                         </div>
                         <div class="flex items-center">
@@ -59,16 +71,32 @@
                                 <Button variant="outline" @click="showBulkUnfriendSelectionConfirm">
                                     {{ t('view.friend_list.bulk_unfriend_selection') }}
                                 </Button>
-                                <!-- el-button(size="small" @click="showBulkUnfriendAllConfirm" style="margin-right:5px") Bulk Unfriend All-->
+                                <!-- el-button(size="small" @click="showBulkUnfriendAllConfirm") Bulk Unfriend All-->
                             </div>
                             <div class="flex items-center mr-2">
                                 <span class="name mr-2 text-xs">{{ t('view.friend_list.bulk_unfriend') }}</span>
                                 <Switch
                                     v-model="friendsListBulkUnfriendMode"
+                                    :ariaLabel="t('view.friend_list.bulk_unfriend')"
                                     @update:modelValue="toggleFriendsListBulkUnfriendMode" />
                             </div>
                             <div class="flex items-center">
-                                <Button variant="outline" class="mr-2" @click="openChartsTab">
+                                <TooltipWrapper
+                                    v-if="isMutualFetching"
+                                    :content="t('view.friend_list.mutual_loading_hint')">
+                                    <span>
+                                        <Button variant="outline" class="mr-2" disabled>
+                                            <Loader2 class="h-4 w-4 animate-spin" />
+                                            {{ t('view.friend_list.load_mutual_friends') }}
+                                        </Button>
+                                    </span>
+                                </TooltipWrapper>
+                                <Button
+                                    v-else
+                                    variant="outline"
+                                    class="mr-2"
+                                    :disabled="isMutualOptOut"
+                                    @click="loadMutualFriends">
                                     {{ t('view.friend_list.load_mutual_friends') }}
                                 </Button>
 
@@ -89,12 +117,12 @@
                     <DialogHeader>
                         <DialogTitle>{{ t('view.friend_list.load_dialog_title') }}</DialogTitle>
                     </DialogHeader>
-                    <div style="margin-bottom: 10px" v-text="t('view.friend_list.load_dialog_message')"></div>
+                    <div style="margin-bottom: 8px" v-text="t('view.friend_list.load_dialog_message')"></div>
                     <div class="flex items-center gap-2">
                         <Progress :model-value="friendsListLoadingPercent" class="h-4 w-full" />
                         <span class="text-xs w-10 text-right">{{ friendsListLoadingPercent }}%</span>
                     </div>
-                    <div style="margin-top: 10px; text-align: right">
+                    <div style="margin-top: 8px; text-align: right">
                         <span>{{ friendsListLoadingCurrent }} / {{ friendsListLoadingTotal }}</span>
                     </div>
                     <DialogFooter>
@@ -111,32 +139,37 @@
 <script setup>
     import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
     import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-    import { computed, nextTick, ref, watch } from 'vue';
+    import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
     import { Button } from '@/components/ui/button';
     import { InputGroupField } from '@/components/ui/input-group';
     import { Progress } from '@/components/ui/progress';
+    import { Star } from 'lucide-vue-next';
     import { storeToRefs } from 'pinia';
     import { toast } from 'vue-sonner';
     import { useI18n } from 'vue-i18n';
     import { useRoute } from 'vue-router';
+    import { Loader2 } from 'lucide-vue-next';
 
     import {
         useAppearanceSettingsStore,
+        useChartsStore,
         useFriendStore,
         useModalStore,
         useSearchStore,
-        useUserStore,
-        useVrcxStore
+        useUserStore
     } from '../../stores';
     import { friendRequest, userRequest } from '../../api';
     import { DataTableLayout } from '../../components/ui/data-table';
     import { Switch } from '../../components/ui/switch';
+    import { Toggle } from '../../components/ui/toggle';
+    import { TooltipWrapper } from '../../components/ui/tooltip';
     import { createColumns } from './columns.jsx';
     import { localeIncludes } from '../../shared/utils';
-    import removeConfusables, { removeWhitespace } from '../../service/confusables';
-    import { router } from '../../plugin/router';
-    import { useDataTableScrollHeight } from '../../composables/useDataTableScrollHeight';
+    import removeConfusables, { removeWhitespace } from '../../services/confusables';
     import { useVrcxVueTable } from '../../lib/table/useVrcxVueTable';
+    import { showUserDialog } from '../../coordinators/userCoordinator';
+    import { confirmDeleteFriend, handleFriendDelete } from '../../coordinators/friendRelationshipCoordinator';
+    import { useUserDisplay } from '../../composables/useUserDisplay';
 
     const { t } = useI18n();
 
@@ -144,10 +177,14 @@
 
     const { friends, allFavoriteFriendIds } = storeToRefs(useFriendStore());
     const modalStore = useModalStore();
-    const { getAllUserStats, getAllUserMutualCount, confirmDeleteFriend, handleFriendDelete } = useFriendStore();
-    const { randomUserColours } = storeToRefs(useAppearanceSettingsStore());
-    const vrcxStore = useVrcxStore();
-    const { showUserDialog } = useUserStore();
+    const { getAllUserStats, getAllUserMutualCount, getAllUserMutualOptedOut } = useFriendStore();
+    const chartsStore = useChartsStore();
+    const isMutualFetching = computed(() => chartsStore.mutualGraphStatus.isFetching);
+    const isMutualOptOut = computed(() => Boolean(useUserStore().currentUser?.hasSharedConnectionsOptOut));
+    const appearanceSettingsStore = useAppearanceSettingsStore();
+    const { randomUserColours } = storeToRefs(appearanceSettingsStore);
+    const { userImage } = useUserDisplay();
+
     const { stringComparer, friendsListSearch } = storeToRefs(useSearchStore());
 
     const friendsListSearchFilters = ref([]);
@@ -159,8 +196,7 @@
     const friendsListSearchFilterVIP = ref(false);
     const selectedFriends = ref(new Set());
     const friendsListDisplayData = ref([]);
-    const pageSizes = [50, 100, 250, 500];
-    const pageSize = ref(100);
+    const pageSizes = computed(() => appearanceSettingsStore.tablePageSizes);
     const defaultSorting = [{ id: 'friendNumber', desc: true }];
 
     // const initialColumnPinning = {
@@ -174,18 +210,21 @@
     });
 
     const friendsListRef = ref(null);
-    const { tableStyle: tableHeightStyle } = useDataTableScrollHeight(friendsListRef, {
-        offset: 30,
-        toolbarHeight: 54,
-        paginationHeight: 52
-    });
+    const friendSearchCache = new Map();
+    const FRIEND_LIST_SEARCH_DEBOUNCE_MS = 150;
+    const FRIEND_STATS_REFRESH_INTERVAL_MS = 30000;
+    let friendsListSearchTimer = 0;
+    let friendStatsRefreshInFlight = null;
+    let lastFriendStatsRefreshAt = 0;
+    let lastFriendStatsRefreshKey = '';
 
     const friendsListColumns = computed(() =>
         createColumns({
             randomUserColours,
             selectedFriends,
             onToggleFriendSelection: toggleFriendSelection,
-            onConfirmDeleteFriend: confirmDeleteFriend
+            onConfirmDeleteFriend: confirmDeleteFriend,
+            userImage
         })
     );
 
@@ -201,18 +240,20 @@
         initialSorting: defaultSorting,
         initialPagination: {
             pageIndex: 0,
-            pageSize: pageSize.value
+            pageSize: appearanceSettingsStore.tablePageSize
         }
     });
 
     const totalItems = computed(() => {
-        const length = table.getFilteredRowModel().rows.length;
-        const max = vrcxStore.maxTableSize;
-        return length > max ? max : length;
+        return table.getFilteredRowModel().rows.length;
     });
 
     const handlePageSizeChange = (size) => {
-        pageSize.value = size;
+        pagination.value = {
+            ...pagination.value,
+            pageIndex: 0,
+            pageSize: size
+        };
     };
 
     const handleRowClick = (row) => {
@@ -242,24 +283,13 @@
         { immediate: true }
     );
 
-    watch(pageSize, (size) => {
-        if (pagination.value.pageSize === size) {
-            return;
-        }
-        pagination.value = {
-            ...pagination.value,
-            pageIndex: 0,
-            pageSize: size
-        };
-        table.setPageSize(size);
-    });
-
     const route = useRoute();
 
     watch(
         () => route.path,
         () => {
-            nextTick(() => friendsListSearchChange());
+            refreshFriendStats();
+            nextTick(() => applyFriendsListSearchChange());
         },
         { immediate: true }
     );
@@ -267,14 +297,119 @@
     watch(
         () => friends.value.size,
         () => {
-            friendsListSearchChange();
+            friendSearchCache.clear();
+            refreshFriendStats({ force: true });
+            applyFriendsListSearchChange();
         }
     );
 
+    onBeforeUnmount(() => {
+        if (friendsListSearchTimer) {
+            clearTimeout(friendsListSearchTimer);
+        }
+    });
+
+    function getFriendStatsRefreshKey() {
+        return Array.from(friends.value.keys()).sort().join('\u0000');
+    }
+
+    async function refreshFriendStats({ force = false } = {}) {
+        const friendStatsRefreshKey = getFriendStatsRefreshKey();
+        if (!friendStatsRefreshKey) {
+            return;
+        }
+        const now = Date.now();
+        const isStillFresh =
+            friendStatsRefreshKey === lastFriendStatsRefreshKey &&
+            now - lastFriendStatsRefreshAt < FRIEND_STATS_REFRESH_INTERVAL_MS;
+        if (!force && (friendStatsRefreshInFlight || isStillFresh)) {
+            return friendStatsRefreshInFlight;
+        }
+        friendStatsRefreshInFlight = Promise.allSettled([
+            getAllUserStats(),
+            getAllUserMutualCount(),
+            getAllUserMutualOptedOut()
+        ])
+            .then((results) => {
+                if (results.every((result) => result.status === 'fulfilled')) {
+                    lastFriendStatsRefreshAt = Date.now();
+                    lastFriendStatsRefreshKey = friendStatsRefreshKey;
+                }
+                return results;
+            })
+            .finally(() => {
+                friendStatsRefreshInFlight = null;
+            });
+        return friendStatsRefreshInFlight;
+    }
+
+    /**
+     *
+     */
+    function scheduleFriendsListSearchChange() {
+        if (friendsListSearchTimer) {
+            clearTimeout(friendsListSearchTimer);
+        }
+        friendsListSearchTimer = setTimeout(() => {
+            friendsListSearchTimer = 0;
+            applyFriendsListSearchChange();
+        }, FRIEND_LIST_SEARCH_DEBOUNCE_MS);
+    }
+
+    /**
+     *
+     */
     function friendsListSearchChange() {
+        if (friendsListSearchTimer) {
+            clearTimeout(friendsListSearchTimer);
+            friendsListSearchTimer = 0;
+        }
+        applyFriendsListSearchChange();
+    }
+
+    /**
+     *
+     * @param {object} ctx
+     * @returns {object | null}
+     */
+    function getFriendSearchEntry(ctx) {
+        if (!ctx?.ref?.id) {
+            return null;
+        }
+        const signature = [
+            ctx.memo ?? '',
+            ctx.ref.displayName ?? '',
+            ctx.ref.note ?? '',
+            ctx.ref.bio ?? '',
+            ctx.ref.statusDescription ?? '',
+            ctx.ref.$trustLevel ?? ''
+        ].join('\u0000');
+        const cached = friendSearchCache.get(ctx.id);
+        if (cached?.signature === signature) {
+            return cached;
+        }
+        const entry = {
+            signature,
+            bio: ctx.ref.bio ?? '',
+            displayName: ctx.ref.displayName ?? '',
+            memo: ctx.memo ?? '',
+            normalizedDisplayName: removeConfusables(ctx.ref.displayName ?? ''),
+            note: ctx.ref.note ?? '',
+            rank: String(ctx.ref.$trustLevel ?? '').toUpperCase(),
+            status: ctx.ref.statusDescription ?? ''
+        };
+        friendSearchCache.set(ctx.id, entry);
+        return entry;
+    }
+
+    /**
+     *
+     */
+    function applyFriendsListSearchChange() {
         friendsListLoading.value = true;
         let query = '';
         let cleanedQuery = '';
+        let upperQuery = '';
         friendsListDisplayData.value = [];
         let filters = friendsListSearchFilters.value.length
             ? [...friendsListSearchFilters.value]
@@ -283,39 +418,40 @@
         if (friendsListSearch.value) {
             query = friendsListSearch.value;
             cleanedQuery = removeWhitespace(query);
+            upperQuery = query.toUpperCase();
         }
         for (const ctx of friends.value.values()) {
             if (!ctx.ref) continue;
             if (friendsListSearchFilterVIP.value && !allFavoriteFriendIds.value.has(ctx.id)) continue;
             if (query) {
                 let match = false;
-                if (!match && filters.includes('Display Name') && ctx.ref.displayName) {
+                const searchEntry = getFriendSearchEntry(ctx);
+                if (!searchEntry) continue;
+                if (!match && filters.includes('Display Name') && searchEntry.displayName) {
                     match =
-                        localeIncludes(ctx.ref.displayName, cleanedQuery, stringComparer.value) ||
-                        localeIncludes(removeConfusables(ctx.ref.displayName), cleanedQuery, stringComparer.value);
+                        localeIncludes(searchEntry.displayName, cleanedQuery, stringComparer.value) ||
+                        localeIncludes(searchEntry.normalizedDisplayName, cleanedQuery, stringComparer.value);
                 }
-                if (!match && filters.includes('Memo') && ctx.memo) {
-                    match = localeIncludes(ctx.memo, query, stringComparer.value);
+                if (!match && filters.includes('Memo') && searchEntry.memo) {
+                    match = localeIncludes(searchEntry.memo, query, stringComparer.value);
                 }
-                if (!match && filters.includes('Note') && ctx.ref.note) {
-                    match = localeIncludes(ctx.ref.note, query, stringComparer.value);
+                if (!match && filters.includes('Note') && searchEntry.note) {
+                    match = localeIncludes(searchEntry.note, query, stringComparer.value);
                 }
-                if (!match && filters.includes('Bio') && ctx.ref.bio) {
-                    match = localeIncludes(ctx.ref.bio, query, stringComparer.value);
+                if (!match && filters.includes('Bio') && searchEntry.bio) {
+                    match = localeIncludes(searchEntry.bio, query, stringComparer.value);
                 }
-                if (!match && filters.includes('Status') && ctx.ref.statusDescription) {
-                    match = localeIncludes(ctx.ref.statusDescription, query, stringComparer.value);
+                if (!match && filters.includes('Status') && searchEntry.status) {
+                    match = localeIncludes(searchEntry.status, query, stringComparer.value);
                 }
                 if (!match && filters.includes('Rank')) {
-                    match = String(ctx.ref.$trustLevel).toUpperCase().includes(query.toUpperCase());
+                    match = searchEntry.rank.includes(upperQuery);
                 }
                 if (!match) continue;
             }
             results.push(ctx.ref);
         }
         friendsListDisplayData.value = results;
-        getAllUserStats();
-        getAllUserMutualCount();
         table.setPageIndex(0);
         table.setSorting([...defaultSorting]);
         sorting.value = [...defaultSorting];
@@ -324,6 +460,10 @@
         });
     }
 
+    /**
+     *
+     * @param id
+     */
     function toggleFriendSelection(id) {
         if (selectedFriends.value.has(id)) {
             selectedFriends.value.delete(id);
@@ -332,12 +472,18 @@
         }
     }
 
+    /**
+     *
+     */
     function toggleFriendsListBulkUnfriendMode() {
         if (!friendsListBulkUnfriendMode.value) {
             selectedFriends.value.clear();
         }
     }
 
+    /**
+     *
+     */
     function showBulkUnfriendSelectionConfirm() {
         const pending = friendsListDisplayData.value
             .filter((item) => selectedFriends.value.has(item.id))
@@ -358,6 +504,9 @@
             .catch(() => {});
     }
 
+    /**
+     *
+     */
     async function bulkUnfriendSelection() {
         if (!selectedFriends.value.size) return;
         const selectedFriendsCount = selectedFriends.value.size;
@@ -375,6 +524,9 @@
         selectedFriends.value.clear();
     }
 
+    /**
+     *
+     */
     async function friendsListLoadUsers() {
         const toFetch = Array.from(friends.value.values())
             .filter((ctx) => ctx.ref && !ctx.ref.date_joined)
@@ -410,31 +562,39 @@
         }
     }
 
+    /**
+     *
+     */
     function cancelFriendsListLoad() {
         friendsListLoading.value = false;
         friendsListLoadDialogVisible.value = false;
     }
 
+    /**
+     *
+     * @param val
+     */
     function selectFriendsListRow(val) {
         if (!val) return;
         if (!val.id) emit('lookup-user', val);
         else showUserDialog(val.id);
     }
 
-    function openChartsTab() {
-        router.push({ name: 'charts' });
+    /**
+     *
+     */
+    async function loadMutualFriends() {
+        if (isMutualFetching.value) return;
+        await chartsStore.fetchMutualGraph();
+        await Promise.allSettled([getAllUserMutualCount(), getAllUserMutualOptedOut()]);
     }
 
+    /**
+     *
+     * @param value
+     */
     function handleFriendListFilterChange(value) {
         friendsListSearchFilters.value = Array.isArray(value) ? value : [];
         friendsListSearchChange();
     }
 </script>
-
-<style scoped>
-    .friends-list-avatar {
-        object-fit: cover;
-        height: 22px;
-        width: 22px;
-    }
-</style>

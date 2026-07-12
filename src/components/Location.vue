@@ -1,32 +1,72 @@
 <template>
-    <div class="cursor-pointer">
-        <div v-if="!text" class="transparent">-</div>
-        <div v-show="text" class="flex items-center">
-            <div v-if="region" :class="['flags', 'mr-1.5', 'shrink-0', region]"></div>
-            <TooltipWrapper :content="tooltipContent" :disabled="tooltipDisabled" :delay-duration="300" side="top">
-                <div
-                    :class="locationClasses"
-                    class="inline-flex min-w-0 flex-nowrap items-center overflow-hidden truncate"
-                    @click="handleShowWorldDialog">
-                    <Spinner v-if="isTraveling" class="mr-1 shrink-0" />
-                    <span class="min-w-0 flex-1 truncate">
-                        <span>{{ text }}</span>
-                        <span v-if="showInstanceIdInLocation && instanceName" class="ml-1">{{
-                            ` · #${instanceName}`
-                        }}</span>
-                        <span v-if="groupName" class="ml-0.5 cursor-pointer" @click.stop="handleShowGroupDialog">
-                            ({{ groupName }})
-                        </span>
-                    </span>
+    <component :is="enableContextMenu ? ContextMenu : Passthrough">
+        <component :is="enableContextMenu ? ContextMenuTrigger : Passthrough" as-child>
+            <div class="cursor-pointer" v-bind="$attrs">
+                <div v-if="!text" class="text-transparent">-</div>
+                <div v-show="text" class="flex items-center gap-2">
+                    <template v-if="isAgeRestricted">
+                        <TooltipWrapper
+                            :content="t('dialog.user.info.instance_age_restricted_tooltip')"
+                            :delay-duration="300"
+                            side="top">
+                            <div class="inline-flex items-center gap-1 text-muted-foreground">
+                                <Lock class="size-3.5 shrink-0" />
+                                <span>{{ t('dialog.user.info.instance_age_restricted') }}</span>
+                            </div>
+                        </TooltipWrapper>
+                    </template>
+                    <template v-else>
+                        <div v-if="region" :class="cn('flags shrink-0', region)"></div>
+                        <TooltipWrapper
+                            :content="tooltipContent"
+                            :disabled="tooltipDisabled"
+                            :delay-duration="300"
+                            side="top">
+                            <div
+                                :class="locationClasses"
+                                class="inline-flex min-w-0 flex-nowrap items-center overflow-hidden truncate"
+                                @click="handleShowWorldDialog">
+                                <Spinner v-if="isTraveling" class="mr-1 shrink-0" />
+                                <span class="min-w-0 flex-1 truncate">
+                                    <span>{{ text }}</span>
+                                    <span v-if="showInstanceIdInLocation && instanceName" class="ml-1">{{
+                                        ` · #${instanceName}`
+                                    }}</span>
+                                    <span
+                                        v-if="groupName"
+                                        class="ml-0.5 cursor-pointer"
+                                        @click.stop="handleShowGroupDialog">
+                                        ({{ groupName }})
+                                    </span>
+                                </span>
+                            </div>
+                        </TooltipWrapper>
+                        <div v-if="closedAt">
+                            <TooltipWrapper side="top">
+                                <template #content>
+                                    {{ t('dialog.user.info.instance_closed_at') }}:
+                                    {{ formatDateFilter(closedAt, 'long') }}
+                                </template>
+                                <AlertTriangle class="text-orange-500 my-auto" />
+                            </TooltipWrapper>
+                        </div>
+                        <Lock v-if="strict" class="text-muted-foreground" />
+                    </template>
                 </div>
-            </TooltipWrapper>
-
-            <TooltipWrapper v-if="isClosed" :content="closedTooltip" :disabled="disableTooltip">
-                <AlertTriangle class="inline-block ml-2 text-muted-foreground shrink-0" />
-            </TooltipWrapper>
-            <Lock v-if="strict" class="inline-block ml-2 text-muted-foreground shrink-0" />
-        </div>
-    </div>
+            </div>
+        </component>
+        <ContextMenuContent v-if="enableContextMenu && parsedLocation.isRealInstance && parsedLocation.worldId">
+            <WorldActionMenuItems
+                :can-open-instance-in-game="canOpenInstanceInGame"
+                :show-share="true"
+                :show-previous-instances="true"
+                @view-details="handleShowWorldDialog"
+                @share="handleShareLocation"
+                @new-instance="handleNewInstance"
+                @self-invite="handleNewInstanceSelfInvite"
+                @show-previous-instances="handleShowPreviousInstances" />
+        </ContextMenuContent>
+    </component>
 </template>
 
 <script setup>
@@ -35,26 +75,48 @@
     import { storeToRefs } from 'pinia';
     import { useI18n } from 'vue-i18n';
 
+    import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from './ui/context-menu';
+
+    import {
+        getGroupName,
+        getLocationText,
+        getWorldName,
+        copyToClipboard,
+        formatDateFilter,
+        parseLocation,
+        resolveRegion,
+        translateAccessType
+    } from '../shared/utils';
     import {
         useAppearanceSettingsStore,
-        useGroupStore,
         useInstanceStore,
+        useInviteStore,
         useSearchStore,
         useWorldStore
     } from '../stores';
-    import { getGroupName, getWorldName, parseLocation } from '../shared/utils';
+    import { showGroupDialog } from '../coordinators/groupCoordinator';
+    import { showWorldDialog } from '../coordinators/worldCoordinator';
+    import { runNewInstanceSelfInviteFlow } from '../coordinators/inviteCoordinator';
     import { Spinner } from './ui/spinner';
+    import WorldActionMenuItems from './WorldActionMenuItems.vue';
     import { accessTypeLocaleKeyMap } from '../shared/constants';
+    import { cn } from '@/lib/utils';
+
+    defineOptions({
+        inheritAttrs: false
+    });
+
+    const Passthrough = (_, { slots }) => slots.default?.();
 
     const { t } = useI18n();
 
-    const { cachedWorlds, showWorldDialog } = useWorldStore();
-    const { showGroupDialog } = useGroupStore();
+    const { cachedWorlds } = useWorldStore();
     const { showPreviousInstancesInfoDialog } = useInstanceStore();
     const { verifyShortName } = useSearchStore();
     const { cachedInstances } = useInstanceStore();
     const { lastInstanceApplied } = storeToRefs(useInstanceStore());
-    const { showInstanceIdInLocation } = storeToRefs(useAppearanceSettingsStore());
+    const { canOpenInstanceInGame } = useInviteStore();
+    const { showInstanceIdInLocation, isAgeGatedInstancesVisible } = storeToRefs(useAppearanceSettingsStore());
 
     const props = defineProps({
         location: String,
@@ -78,17 +140,25 @@
         isOpenPreviousInstanceInfoDialog: {
             type: Boolean,
             default: false
+        },
+        enableContextMenu: {
+            type: Boolean,
+            default: false
         }
     });
 
     const text = ref('');
     const region = ref('');
     const strict = ref(false);
+    const ageGate = ref(false);
     const isTraveling = ref(false);
+    const parsedLocation = ref({ isRealInstance: false, worldId: '', tag: '', shortName: '' });
     const groupName = ref('');
-    const isClosed = ref(false);
+    const closedAt = ref('');
     const instanceName = ref('');
+    const instanceRef = ref(null);
 
+    const isAgeRestricted = computed(() => !isAgeGatedInstancesVisible.value && ageGate.value);
     const isLocationLink = computed(() => props.link && props.location !== 'private' && props.location !== 'offline');
     const locationClasses = computed(() => [
         'x-location',
@@ -100,7 +170,6 @@
     const tooltipDisabled = computed(
         () => props.disableTooltip || !instanceName.value || showInstanceIdInLocation.value
     );
-    const closedTooltip = computed(() => t('dialog.user.info.instance_closed'));
 
     let isDisposed = false;
     onBeforeUnmount(() => {
@@ -118,6 +187,9 @@
         }
     );
 
+    /**
+     *
+     */
     function currentInstanceId() {
         if (typeof props.traveling !== 'undefined' && props.location === 'traveling') {
             return props.traveling;
@@ -125,16 +197,23 @@
         return props.location;
     }
 
+    /**
+     *
+     */
     function resetState() {
         text.value = '';
         region.value = '';
         strict.value = false;
+        ageGate.value = false;
         isTraveling.value = false;
         groupName.value = '';
-        isClosed.value = false;
+        closedAt.value = '';
         instanceName.value = '';
     }
 
+    /**
+     *
+     */
     function parse() {
         if (isDisposed) {
             return;
@@ -147,8 +226,10 @@
             isTraveling.value = true;
         }
         const L = parseLocation(instanceId);
+        parsedLocation.value = L;
         setText(L);
         instanceName.value = L.instanceName;
+        closedAt.value = '';
         if (!L.isRealInstance) {
             return;
         }
@@ -157,22 +238,32 @@
         updateGroupName(L, instanceId);
         updateRegion(L);
         strict.value = L.strict;
+        ageGate.value = L.ageGate;
     }
 
+    /**
+     * @param L
+     */
     function applyInstanceRef(L) {
-        const instanceRef = cachedInstances.get(L.tag);
-        if (typeof instanceRef === 'undefined') {
+        const cachedInstanceRef = cachedInstances.get(L.tag);
+        if (typeof cachedInstanceRef === 'undefined') {
             return;
         }
-        if (instanceRef.displayName) {
+        instanceRef.value = cachedInstanceRef;
+        if (cachedInstanceRef.displayName) {
             setText(L);
-            instanceName.value = instanceRef.displayName;
+            instanceName.value = cachedInstanceRef.displayName;
         }
-        if (instanceRef.closedAt) {
-            isClosed.value = true;
+        if (cachedInstanceRef.closedAt) {
+            closedAt.value = cachedInstanceRef.closedAt;
         }
     }
 
+    /**
+     *
+     * @param L
+     * @param instanceId
+     */
     function updateGroupName(L, instanceId) {
         if (props.grouphint) {
             groupName.value = props.grouphint;
@@ -189,68 +280,55 @@
         });
     }
 
+    /**
+     *
+     * @param L
+     */
     function updateRegion(L) {
-        region.value = '';
-        if (!L.isOffline && !L.isPrivate && !L.isTraveling) {
-            region.value = L.region;
-            if (!L.region && L.instanceId) {
-                region.value = 'us';
-            }
-        }
+        region.value = resolveRegion(L);
     }
 
+    /**
+     *
+     * @param accessTypeName
+     */
+    function getAccessTypeLabel(accessTypeName) {
+        return translateAccessType(accessTypeName, t, accessTypeLocaleKeyMap);
+    }
+
+    /**
+     *
+     * @param L
+     */
     function setText(L) {
-        const accessTypeLabel = translateAccessType(L.accessTypeName);
+        const accessTypeLabel = getAccessTypeLabel(L.accessTypeName);
+        const cachedRef = L.worldId ? cachedWorlds.get(L.worldId) : undefined;
+        const worldName = typeof cachedRef !== 'undefined' ? cachedRef.name : undefined;
 
-        if (L.isOffline) {
-            text.value = t('location.offline');
-        } else if (L.isPrivate) {
-            text.value = t('location.private');
-        } else if (L.isTraveling) {
-            text.value = t('location.traveling');
-        } else if (typeof props.hint === 'string' && props.hint !== '') {
-            if (L.instanceId) {
-                text.value = `${props.hint} · ${accessTypeLabel}`;
-            } else {
-                text.value = props.hint;
-            }
-        } else if (L.worldId) {
-            if (L.instanceId) {
-                text.value = `${L.worldId} · ${accessTypeLabel}`;
-            } else {
-                text.value = L.worldId;
-            }
-            const ref = cachedWorlds.get(L.worldId);
-            if (typeof ref === 'undefined') {
-                getWorldName(L.worldId).then((name) => {
-                    if (!isDisposed && name && currentInstanceId() === L.tag) {
-                        if (L.instanceId) {
-                            text.value = `${name} · ${translateAccessType(L.accessTypeName)}`;
-                        } else {
-                            text.value = name;
-                        }
-                    }
-                });
-            } else if (L.instanceId) {
-                text.value = `${ref.name} · ${accessTypeLabel}`;
-            } else {
-                text.value = ref.name;
-            }
+        text.value = getLocationText(L, {
+            hint: props.hint,
+            worldName,
+            accessTypeLabel,
+            t
+        });
+
+        if (L.worldId && typeof cachedRef === 'undefined') {
+            getWorldName(L.worldId).then((name) => {
+                if (!isDisposed && name && currentInstanceId() === L.tag) {
+                    text.value = getLocationText(L, {
+                        hint: props.hint,
+                        worldName: name,
+                        accessTypeLabel: getAccessTypeLabel(L.accessTypeName),
+                        t
+                    });
+                }
+            });
         }
     }
 
-    function translateAccessType(accessTypeNameRaw) {
-        const key = accessTypeLocaleKeyMap[accessTypeNameRaw];
-        if (!key) {
-            return accessTypeNameRaw;
-        }
-        if (accessTypeNameRaw === 'groupPublic' || accessTypeNameRaw === 'groupPlus') {
-            const groupKey = accessTypeLocaleKeyMap['group'];
-            return t(groupKey) + ' ' + t(key);
-        }
-        return t(key);
-    }
-
+    /**
+     *
+     */
     function handleShowWorldDialog() {
         if (props.link) {
             let instanceId = currentInstanceId();
@@ -266,6 +344,9 @@
         }
     }
 
+    /**
+     *
+     */
     function handleShowGroupDialog() {
         let location = currentInstanceId();
         if (!location) {
@@ -277,10 +358,40 @@
         }
         showGroupDialog(L.groupId);
     }
-</script>
 
-<style scoped>
-    .transparent {
-        color: transparent;
+    /**
+     *
+     */
+    function handleShareLocation() {
+        const L = parsedLocation.value;
+        if (!L.worldId) return;
+        copyToClipboard(`https://vrchat.com/home/world/${L.worldId}`, t('message.world.url_copied'));
     }
-</style>
+
+    /**
+     *
+     */
+    function handleNewInstance() {
+        const L = parsedLocation.value;
+        if (!L.worldId) return;
+        showWorldDialog(L.tag, L.shortName);
+    }
+
+    /**
+     *
+     */
+    function handleNewInstanceSelfInvite() {
+        const L = parsedLocation.value;
+        if (!L.worldId) return;
+        runNewInstanceSelfInviteFlow(L.worldId);
+    }
+
+    /**
+     *
+     */
+    function handleShowPreviousInstances() {
+        const instanceId = currentInstanceId();
+        if (!instanceId) return;
+        showPreviousInstancesInfoDialog(instanceId);
+    }
+</script>

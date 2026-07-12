@@ -2,11 +2,17 @@ import { Trash2 } from 'lucide-vue-next';
 
 import { Button } from '@/components/ui/button';
 import { InputGroupTextareaField } from '@/components/ui/input-group';
-import { i18n } from '@/plugin';
+import { i18n } from '@/plugins';
 
 const { t } = i18n.global;
 
-export const createColumns = ({ userImage, userImageFull, onShowFullscreenImage, onShowUser, onRemove }) => [
+export const createColumns = ({
+    userImage,
+    userImageFull,
+    onShowFullscreenImage,
+    onShowUser,
+    onRemove
+}) => [
     {
         id: 'image',
         header: () => t('table.import.image'),

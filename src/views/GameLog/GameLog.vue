@@ -1,83 +1,165 @@
 <template>
-    <div class="x-container" ref="gameLogRef">
-        <DataTableLayout
-            :table="table"
-            :loading="gameLogTable.loading"
-            :table-style="tableHeightStyle"
-            :page-sizes="pageSizes"
-            :total-items="totalItems"
-            :on-page-size-change="handlePageSizeChange">
-            <template #toolbar>
-                <div style="margin: 0 0 10px; display: flex; align-items: center">
-                    <div style="flex: none; margin-right: 10px; display: flex; align-items: center">
-                        <TooltipWrapper side="bottom" :content="t('view.feed.favorites_only_tooltip')">
-                            <span class="inline-flex">
-                                <Switch v-model="gameLogTable.vip" @update:modelValue="gameLogTableLookup" />
-                            </span>
+    <div class="x-container x-container--auto-height" ref="gameLogRef">
+        <template v-if="sessionsViewMode === 'sessions'">
+            <GameLogSessions>
+                <template #leading>
+                    <ToggleGroup
+                        type="single"
+                        variant="outline"
+                        size="sm"
+                        :model-value="sessionsViewMode"
+                        @update:model-value="handleViewModeChange"
+                        class="shrink-0">
+                        <TooltipWrapper side="bottom" :content="t('view.game_log.sessions.switch_to_sessions')">
+                            <ToggleGroupItem
+                                value="sessions"
+                                class="px-2"
+                                :class="sessionsViewMode === 'sessions' && 'bg-accent text-accent-foreground'"
+                                :ariaLabel="t('view.game_log.sessions.switch_to_sessions')">
+                                <Logs class="size-4" />
+                            </ToggleGroupItem>
                         </TooltipWrapper>
+                        <TooltipWrapper side="bottom" :content="t('view.game_log.sessions.switch_to_table')">
+                            <ToggleGroupItem
+                                value="table"
+                                class="px-2"
+                                :class="sessionsViewMode === 'table' && 'bg-accent text-accent-foreground'"
+                                :ariaLabel="t('view.game_log.sessions.switch_to_table')">
+                                <Table2 class="size-4" />
+                            </ToggleGroupItem>
+                        </TooltipWrapper>
+                    </ToggleGroup>
+                </template>
+            </GameLogSessions>
+        </template>
+
+        <template v-else>
+            <DataTableLayout
+                :table="table"
+                :loading="gameLogTable.loading"
+                auto-height
+                :page-sizes="pageSizes"
+                :total-items="totalItems"
+                :on-page-size-change="handlePageSizeChange">
+                <template #toolbar>
+                    <div class="mt-0 mx-0 mb-2" style="display: flex; align-items: center">
+                        <div class="mr-2" style="flex: none; display: flex; align-items: center">
+                            <ToggleGroup
+                                type="single"
+                                variant="outline"
+                                size="sm"
+                                :model-value="sessionsViewMode"
+                                @update:model-value="handleViewModeChange"
+                                class="mr-2">
+                                <TooltipWrapper side="bottom" :content="t('view.game_log.sessions.switch_to_sessions')">
+                                    <ToggleGroupItem
+                                        value="sessions"
+                                        class="px-2"
+                                        :class="sessionsViewMode === 'sessions' && 'bg-accent text-accent-foreground'"
+                                        :ariaLabel="t('view.game_log.sessions.switch_to_sessions')">
+                                        <Logs class="size-4" />
+                                    </ToggleGroupItem>
+                                </TooltipWrapper>
+                                <TooltipWrapper side="bottom" :content="t('view.game_log.sessions.switch_to_table')">
+                                    <ToggleGroupItem
+                                        value="table"
+                                        class="px-2"
+                                        :class="sessionsViewMode === 'table' && 'bg-accent text-accent-foreground'"
+                                        :ariaLabel="t('view.game_log.sessions.switch_to_table')">
+                                        <Table2 class="size-4" />
+                                    </ToggleGroupItem>
+                                </TooltipWrapper>
+                            </ToggleGroup>
+                            <TooltipWrapper side="bottom" :content="t('view.feed.favorites_only_tooltip')">
+                                <div>
+                                    <Toggle
+                                        variant="outline"
+                                        size="sm"
+                                        :model-value="gameLogTable.vip"
+                                        :ariaLabel="t('view.feed.favorites_only_tooltip')"
+                                        @update:modelValue="
+                                            (v) => {
+                                                gameLogTable.vip = v;
+                                                gameLogTableLookup();
+                                            }
+                                        ">
+                                        <Star fill="currentColor" v-if="gameLogTable.vip" />
+                                        <Star v-else />
+                                    </Toggle>
+                                </div>
+                            </TooltipWrapper>
+                        </div>
+                        <Select
+                            multiple
+                            :model-value="Array.isArray(gameLogTable.filter) ? gameLogTable.filter : []"
+                            @update:modelValue="handleGameLogFilterChange">
+                            <SelectTrigger class="w-full" style="flex: 1">
+                                <SelectValue :placeholder="t('view.game_log.filter_placeholder')" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectGroup>
+                                    <SelectItem
+                                        v-for="type in [
+                                            'Location',
+                                            'OnPlayerJoined',
+                                            'OnPlayerLeft',
+                                            'VideoPlay',
+                                            'Event',
+                                            'External',
+                                            'StringLoad',
+                                            'ImageLoad'
+                                        ]"
+                                        :key="type"
+                                        :value="type">
+                                        {{ t('view.game_log.filters.' + type) }}
+                                    </SelectItem>
+                                </SelectGroup>
+                            </SelectContent>
+                        </Select>
+                        <InputGroupField
+                            class="ml-2"
+                            v-model="gameLogTable.search"
+                            :placeholder="t('view.game_log.search_placeholder')"
+                            clearable
+                            style="flex: 0.4"
+                            @keyup.enter="gameLogTableLookup"
+                            @change="gameLogTableLookup" />
                     </div>
-                    <Select
-                        multiple
-                        :model-value="Array.isArray(gameLogTable.filter) ? gameLogTable.filter : []"
-                        @update:modelValue="handleGameLogFilterChange">
-                        <SelectTrigger class="w-full" style="flex: 1">
-                            <SelectValue :placeholder="t('view.game_log.filter_placeholder')" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectGroup>
-                                <SelectItem
-                                    v-for="type in [
-                                        'Location',
-                                        'OnPlayerJoined',
-                                        'OnPlayerLeft',
-                                        'VideoPlay',
-                                        'Event',
-                                        'External',
-                                        'StringLoad',
-                                        'ImageLoad'
-                                    ]"
-                                    :key="type"
-                                    :value="type">
-                                    {{ t('view.game_log.filters.' + type) }}
-                                </SelectItem>
-                            </SelectGroup>
-                        </SelectContent>
-                    </Select>
-                    <InputGroupField
-                        v-model="gameLogTable.search"
-                        :placeholder="t('view.game_log.search_placeholder')"
-                        clearable
-                        style="flex: 0.4; margin-left: 10px"
-                        @keyup.enter="gameLogTableLookup"
-                        @change="gameLogTableLookup" />
-                </div>
-            </template>
-        </DataTableLayout>
+                </template>
+            </DataTableLayout>
+        </template>
     </div>
 </template>
 
 <script setup>
     import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-    import { computed, ref, watch } from 'vue';
-    import { Switch } from '@/components/ui/switch';
+    import { computed, ref } from 'vue';
+    import { Logs, Star, Table2 } from 'lucide-vue-next';
+    import { Toggle } from '@/components/ui/toggle';
+    import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
     import { storeToRefs } from 'pinia';
     import { useI18n } from 'vue-i18n';
 
     import { useAppearanceSettingsStore, useGameLogStore, useModalStore, useVrcxStore } from '../../stores';
     import { DataTableLayout } from '../../components/ui/data-table';
     import { InputGroupField } from '../../components/ui/input-group';
+    import { TooltipWrapper } from '../../components/ui/tooltip';
     import { createColumns } from './columns.jsx';
-    import { database } from '../../service/database';
+    import { database } from '../../services/database';
     import { removeFromArray } from '../../shared/utils';
-    import { useDataTableScrollHeight } from '../../composables/useDataTableScrollHeight';
     import { useVrcxVueTable } from '../../lib/table/useVrcxVueTable';
+    import GameLogSessions from './components/GameLogSessions.vue';
 
-    const { gameLogTableLookup } = useGameLogStore();
-    const { gameLogTable, gameLogTableData } = storeToRefs(useGameLogStore());
+    const { gameLogTableLookup, setSessionsViewMode } = useGameLogStore();
+    const { gameLogTable, gameLogTableData, sessionsViewMode } = storeToRefs(useGameLogStore());
     const appearanceSettingsStore = useAppearanceSettingsStore();
     const vrcxStore = useVrcxStore();
     const modalStore = useModalStore();
 
+    /**
+     *
+     * @param row
+     */
     function getGameLogCreatedAt(row) {
         if (typeof row?.created_at === 'string' && row.created_at.length > 0) {
             return row.created_at;
@@ -94,22 +176,25 @@
     const { t } = useI18n();
 
     const gameLogRef = ref(null);
-    const { tableStyle: tableHeightStyle } = useDataTableScrollHeight(gameLogRef, {
-        offset: 30,
-        toolbarHeight: 54,
-        paginationHeight: 52
-    });
 
+    /**
+     *
+     * @param row
+     */
     function deleteGameLogEntryPrompt(row) {
         modalStore
             .confirm({
                 description: t('confirm.delete_log'),
-                title: 'Confirm'
+                title: t('common.actions.confirm')
             })
             .then(({ ok }) => ok && deleteGameLogEntry(row))
             .catch(() => {});
     }
 
+    /**
+     *
+     * @param row
+     */
     function deleteGameLogEntry(row) {
         removeFromArray(gameLogTableData.value, row);
         database.deleteGameLogEntry(row);
@@ -121,18 +206,23 @@
         onDeletePrompt: deleteGameLogEntryPrompt
     });
 
+    /**
+     *
+     * @param value
+     */
     function handleGameLogFilterChange(value) {
         gameLogTable.value.filter = Array.isArray(value) ? value : [];
         gameLogTableLookup();
     }
 
     const pageSizes = computed(() => appearanceSettingsStore.tablePageSizes);
-    const pageSize = computed(() =>
-        gameLogTable.value.pageSizeLinked ? appearanceSettingsStore.tablePageSize : gameLogTable.value.pageSize
-    );
 
+    /**
+     *
+     * @param row
+     */
     function getGameLogRowId(row) {
-        if (row?.rowId != null) return `row:${row.rowId}`;
+        if (row?.rowId != null) return `row:${row.rowId}:${row?.type ?? ''}`;
 
         const type = row?.type ?? '';
         const createdAt = row?.created_at ?? row?.createdAt ?? row?.dt ?? '';
@@ -140,7 +230,7 @@
         const displayName = row?.displayName ?? '';
         const location = row?.location ?? '';
 
-        return `${type}:${createdAt}:${userId}:${displayName}:${location}`;
+        return `${type}:${createdAt}:${userId}:${displayName}:${location}:${Date.now()}`;
     }
 
     const { table, pagination } = useVrcxVueTable({
@@ -153,7 +243,7 @@
         initialSorting: [],
         initialPagination: {
             pageIndex: 0,
-            pageSize: pageSize.value
+            pageSize: appearanceSettingsStore.tablePageSize
         },
         tableOptions: {
             autoResetPageIndex: false
@@ -167,22 +257,19 @@
     });
 
     const handlePageSizeChange = (size) => {
-        if (gameLogTable.value.pageSizeLinked) {
-            appearanceSettingsStore.setTablePageSize(size);
-        } else {
-            gameLogTable.value.pageSize = size;
-        }
-    };
-
-    watch(pageSize, (size) => {
-        if (pagination.value.pageSize === size) {
-            return;
-        }
         pagination.value = {
             ...pagination.value,
             pageIndex: 0,
             pageSize: size
         };
-        table.setPageSize(size);
-    });
+    };
+
+    /**
+     * @param {'sessions'|'table'|undefined} mode
+     */
+    function handleViewModeChange(mode) {
+        if (mode === 'sessions' || mode === 'table') {
+            setSessionsViewMode(mode);
+        }
+    }
 </script>

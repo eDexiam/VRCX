@@ -107,14 +107,15 @@
     import { formatDateFilter, getGroupName, replaceBioSymbols } from '../../../shared/utils';
     import { Switch } from '../../../components/ui/switch';
     import { groupRequest } from '../../../api';
-    import { processBulk } from '../../../service/request';
+    import { processBulk } from '../../../services/request';
     import { useGroupStore } from '../../../stores';
+    import { showGroupDialog } from '@/coordinators/groupCoordinator';
 
     import GroupCalendarEventCard from '../components/GroupCalendarEventCard.vue';
     import GroupCalendarMonth from '../components/GroupCalendarMonth.vue';
-    import configRepository from '../../../service/config';
+    import configRepository from '../../../services/config';
 
-    const { applyGroupEvent, showGroupDialog } = useGroupStore();
+    const { applyGroupEvent } = useGroupStore();
 
     const { t } = useI18n();
 
@@ -142,6 +143,9 @@
         showFeaturedEvents.value = await configRepository.getBool('VRCX_groupCalendarShowFeaturedEvents', false);
     });
 
+    /**
+     *
+     */
     function toggleFeaturedEvents() {
         configRepository.setBool('VRCX_groupCalendarShowFeaturedEvents', showFeaturedEvents.value);
         updateCalenderData();
@@ -171,6 +175,9 @@
         }
     );
 
+    /**
+     *
+     */
     async function updateCalenderData() {
         isLoading.value = true;
         let fetchPromises = [getCalendarData(), getFollowingCalendarData()];
@@ -332,17 +339,24 @@
     // Use a stable key for calendar maps (independent of locale/appearance date formatting).
     const formatDateKey = (date) => dayjs(date).format('YYYY-MM-DD');
 
+    /**
+     *
+     * @param groupId
+     */
     async function getGroupNameFromCache(groupId) {
         if (!groupNamesCache.has(groupId)) {
             groupNamesCache.set(groupId, await getGroupName(groupId));
         }
     }
 
+    /**
+     *
+     */
     async function getCalendarData() {
         calendar.value = [];
         try {
             await processBulk({
-                fn: groupRequest.getGroupCalendars,
+                fn: (bulkParams) => groupRequest.getGroupCalendars(bulkParams),
                 N: -1,
                 params: {
                     n: 100,
@@ -364,11 +378,14 @@
         }
     }
 
+    /**
+     *
+     */
     async function getFollowingCalendarData() {
         followingCalendar.value = [];
         try {
             await processBulk({
-                fn: groupRequest.getFollowingGroupCalendars,
+                fn: (bulkParams) => groupRequest.getFollowingGroupCalendars(bulkParams),
                 N: -1,
                 params: {
                     n: 100,
@@ -388,11 +405,14 @@
         }
     }
 
+    /**
+     *
+     */
     async function getFeaturedCalendarData() {
         featuredCalendar.value = [];
         try {
             await processBulk({
-                fn: groupRequest.getFeaturedGroupCalendars,
+                fn: (bulkParams) => groupRequest.getFeaturedGroupCalendars(bulkParams),
                 N: -1,
                 params: {
                     n: 100,
@@ -412,6 +432,10 @@
         }
     }
 
+    /**
+     *
+     * @param updatedEvent
+     */
     function updateFollowingCalendarData(updatedEvent) {
         const index = followingCalendar.value.findIndex((item) => item.id === updatedEvent.id);
         if (index !== -1) {
@@ -422,14 +446,25 @@
         }
     }
 
+    /**
+     *
+     * @param eventId
+     */
     function isEventFollowing(eventId) {
         return followingCalendar.value.some((item) => item.id === eventId);
     }
 
+    /**
+     *
+     */
     function toggleViewMode() {
         viewMode.value = viewMode.value === 'timeline' ? 'grid' : 'timeline';
     }
 
+    /**
+     *
+     * @param groupId
+     */
     function toggleGroup(groupId) {
         groupCollapsed.value = {
             ...groupCollapsed.value,
@@ -437,6 +472,9 @@
         };
     }
 
+    /**
+     *
+     */
     function closeDialog() {
         emit('close');
     }
@@ -453,8 +491,8 @@
                     min-width: 200px;
                     padding-left: 4px;
                     padding-right: 16px;
-                    margin-left: 10px;
-                    margin-right: 6px;
+                    margin-left: 8px;
+                    margin-right: 8px;
                     overflow: auto;
                     height: 50vh;
 
@@ -465,7 +503,7 @@
                     }
 
                     .timeline-group {
-                        padding: 0 20px 6px 10px;
+                        padding: 0 20px 8px 8px;
                     }
 
                     .timeline-timestamp {
@@ -500,7 +538,7 @@
                             display: flex;
                             align-items: center;
                             justify-content: center;
-                            border-radius: 8px;
+                            border-radius: var(--radius-xl);
                             font-size: 18px;
                             position: relative;
 
@@ -513,7 +551,7 @@
                                 right: 2px;
                                 min-width: 16px;
                                 height: 16px;
-                                border-radius: 8px;
+                                border-radius: var(--radius-xl);
                                 display: flex;
                                 align-items: center;
                                 justify-content: center;
@@ -545,10 +583,10 @@
         display: flex;
         justify-content: flex-end;
         align-items: center;
-        margin-top: 10px;
+        margin-top: 8px;
         .featured-switch-text {
             font-size: 13px;
-            margin-right: 5px;
+            margin-right: 6px;
         }
     }
 
@@ -589,10 +627,10 @@
                     .group-header {
                         font-size: 16px;
                         font-weight: bold;
-                        padding: 4px 12px 10px 12px;
+                        padding: 4px 12px 8px 12px;
                         cursor: pointer;
-                        border-radius: 4px;
-                        margin: 0 -12px 10px -12px;
+                        border-radius: var(--radius-md);
+                        margin: 0 -12px 8px -12px;
                         display: flex;
                         align-items: center;
 

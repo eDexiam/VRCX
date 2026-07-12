@@ -23,7 +23,7 @@ namespace VRCX
                 hash = (hash * 33) ^ c;
             return key + "_h" + hash;
         }
-        
+
         private static int FindMatchingBracket(string content, int openBracketIndex)
         {
             int depth = 0;
@@ -64,7 +64,7 @@ namespace VRCX
 
             string blockContent = vdfContent.Substring(blockStart, blockEnd - blockStart);
 
-            var keyValuePattern = new Regex("\"(\\d+)\"\\s*\\{[^}]*\"name\"\\s*\"([^\"]+)\"", 
+            var keyValuePattern = new Regex("\"(\\d+)\"\\s*\\{[^}]*\"name\"\\s*\"([^\"]+)\"",
                 RegexOptions.Multiline);
 
             var matches = keyValuePattern.Matches(blockContent);
@@ -107,14 +107,14 @@ namespace VRCX
         {
             if (string.IsNullOrEmpty(output))
                 return null;
-            
+
             var lines = output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
-                .Where(line => 
-                    !string.IsNullOrWhiteSpace(line) && 
-                    !line.Contains("fixme:") && 
+                .Where(line =>
+                    !string.IsNullOrWhiteSpace(line) &&
+                    !line.Contains("fixme:") &&
                     !line.Contains("wine:"))
                 .ToArray();
-        
+
             foreach (var line in lines)
             {
                 var parts = line.Split(new[] { '\t', ' ' }, StringSplitOptions.RemoveEmptyEntries)
@@ -128,7 +128,7 @@ namespace VRCX
                     switch (valueType)
                     {
                         case "REG_BINARY":
-                            try 
+                            try
                             {
                                 // Treat the value as a plain hex string and decode it to ASCII
                                 var hexValues = Enumerable.Range(0, value.Length / 2)
@@ -156,7 +156,7 @@ namespace VRCX
 
             return null;
         }
-        
+
         private string ParseWineRegOutputEx(string output, string keyName)
         {
             var lines = output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
@@ -226,7 +226,7 @@ namespace VRCX
             }
 
             logger.Error($"Key not found: {keyName}");
-        
+
             return null;
         }
 
@@ -240,21 +240,12 @@ namespace VRCX
             }
 
             string steamPath = _steamPath;
-            string steamAppsCommonPath = Path.Join(steamPath, "steamapps", "common");
-            string compatabilityToolsPath = Path.Join(steamPath, "compatibilitytools.d");
-            string protonPath = Path.Join(steamAppsCommonPath, compatTool);
-            string compatToolPath = Path.Join(compatabilityToolsPath, compatTool);
             string winePath = "";
-            if (Directory.Exists(compatToolPath))
-            {
-                winePath = Path.Join(compatToolPath, "files", "bin", "wine");
-                if (!File.Exists(winePath))
-                {
-                    Console.WriteLine("Wine not found in CompatTool path");
-                    return null;
-                }
-            }
-            else if (Directory.Exists(protonPath))
+
+            // A Proton install in a Steam library uses a different layout than a
+            // registered compat tool, so check it on its own.
+            string protonPath = Path.Join(steamPath, "steamapps", "common", compatTool);
+            if (Directory.Exists(protonPath))
             {
                 winePath = Path.Join(protonPath, "dist", "bin", "wine");
                 if (!File.Exists(winePath))
@@ -263,24 +254,38 @@ namespace VRCX
                     return null;
                 }
             }
-            else if (Directory.Exists(compatabilityToolsPath))
+            else
             {
-                var dirs = Directory.GetDirectories(compatabilityToolsPath);
-                foreach (var dir in dirs)
+                // Search every compatibilitytools.d Steam looks in, in its
+                // documented order.
+                // https://github.com/ValveSoftware/steam-for-linux/issues/6310#issuecomment-511630263
+                // STEAM_EXTRA_COMPAT_TOOLS_PATHS entries can be a tool directory
+                // themselves rather than a parent of one, so check both forms.
+                var roots = new List<string>
                 {
-                    if (dir.Contains(compatTool))
+                    "/usr/share/steam/compatibilitytools.d",
+                    "/usr/local/share/steam/compatibilitytools.d",
+                };
+                var extraPaths = Environment.GetEnvironmentVariable("STEAM_EXTRA_COMPAT_TOOLS_PATHS");
+                if (!string.IsNullOrEmpty(extraPaths))
+                    roots.AddRange(extraPaths.Split(':', StringSplitOptions.RemoveEmptyEntries));
+                roots.Add(Path.Join(steamPath, "compatibilitytools.d"));
+
+                foreach (var root in roots)
+                {
+                    var candidates = new List<string> { root, Path.Join(root, compatTool) };
+                    if (Directory.Exists(root))
+                        candidates.AddRange(Directory.GetDirectories(root, $"*{compatTool}*"));
+
+                    foreach (var candidate in candidates)
                     {
-                        winePath = Path.Join(dir, "files", "bin", "wine");
+                        winePath = Path.Join(candidate, "files", "bin", "wine");
                         if (File.Exists(winePath))
-                        {
                             break;
-                        }
+                        winePath = "";
                     }
-                }
-                if (!File.Exists(winePath))
-                {
-                    Console.WriteLine("Wine not found in CompatTool path");
-                    return null;
+                    if (winePath != "")
+                        break;
                 }
             }
 
@@ -322,7 +327,7 @@ namespace VRCX
                 logger.Info("VRC Wine path was not found");
                 return null;
             }
-            
+
             string wineRegCommand = $"\"{winePath}\" reg {command}";
             ProcessStartInfo processStartInfo = GetWineProcessStartInfo(winePath, winePrefix, wineRegCommand);
             using var process = Process.Start(processStartInfo);
@@ -330,11 +335,9 @@ namespace VRCX
             string error = process.StandardError.ReadToEnd();
             process.WaitForExit();
 
-            if (!string.IsNullOrEmpty(error) && 
-                !error.Contains("wineserver: using server-side synchronization.") && 
-                !error.Contains("fixme:wineusb:query_id"))
+            if (process.ExitCode != 0)
             {
-                logger.Error($"Wine reg command error: {error}");
+                logger.Error($"Wine reg command failed (exit {process.ExitCode}): {error}");
                 return null;
             }
 
@@ -408,7 +411,7 @@ namespace VRCX
                 if (keyFound && !valueFound && valueName != null)
                 {
                     var insertIndex = headerEndIndex + 2;
-                    while (insertIndex < updatedLines.Count && 
+                    while (insertIndex < updatedLines.Count &&
                            (updatedLines[insertIndex].StartsWith("#") || updatedLines[insertIndex].StartsWith("@")))
                     {
                         insertIndex++;
@@ -425,7 +428,7 @@ namespace VRCX
                 {
                     valueName = AddHashToKeyName(valueName);
                 }
-                
+
                 foreach (var line in lines)
                 {
                     if (line.Contains(valueName))
@@ -464,7 +467,7 @@ namespace VRCX
 
         public override object GetVRChatRegistryKey(string key)
         {
-            try 
+            try
             {
                 key = AddHashToKeyName(key);
                 string regCommand = $"query \"HKEY_CURRENT_USER\\SOFTWARE\\VRChat\\VRChat\" /v \"{key}\"";
@@ -487,13 +490,13 @@ namespace VRCX
                 return null;
             }
         }
-        
+
         public override string GetVRChatRegistryKeyString(string key)
         {
             // for electron
             return GetVRChatRegistryKey(key)?.ToString();
         }
-        
+
         // TODO: check this
         public async Task SetVRChatRegistryKeyAsync(string key, object value, int typeInt)
         {
@@ -512,7 +515,7 @@ namespace VRCX
                 case RegistryValueKind.Binary:
                     if (value is JsonElement jsonElement)
                     {
-                        
+
                         if (jsonElement.ValueKind == JsonValueKind.String)
                         {
                             byte[] byteArray = Encoding.UTF8.GetBytes(jsonElement.GetString());
@@ -554,7 +557,7 @@ namespace VRCX
                         return false;
                     }
                     break;
-                
+
                 case RegistryValueKind.DWord:
                     if (value is int intValue)
                     {
@@ -617,9 +620,9 @@ namespace VRCX
                 throw new Exception("Failed to get VRC registry data");
 
             var lines = queryResult.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
-                .Where(line => 
-                    !string.IsNullOrWhiteSpace(line) && 
-                    !line.Contains("fixme:") && 
+                .Where(line =>
+                    !string.IsNullOrWhiteSpace(line) &&
+                    !line.Contains("fixme:") &&
                     !line.Contains("wine:"))
                 .ToArray();
 
@@ -636,11 +639,11 @@ namespace VRCX
                         keyName = keyName.Substring(0, index);
                     var valueType = parts[parts.Length - 2];
                     var value = parts[parts.Length - 1];
-                    
+
                     switch (valueType)
                     {
                         case "REG_BINARY":
-                            try 
+                            try
                             {
                                 // Treat the value as a plain hex string and decode it to ASCII
                                 var hexValues = Enumerable.Range(0, value.Length / 2)
@@ -740,7 +743,7 @@ namespace VRCX
                     if (addResult == null)
                         continue;
                 }
-                else 
+                else
                 {
                     // This slows down the recovery process but using async can be problematic
                     if (data.ValueKind == JsonValueKind.Number)
@@ -750,7 +753,7 @@ namespace VRCX
                             SetVRChatRegistryKey(item.Key, intValue, type);
                             continue;
                         }
-                        
+
                         throw new Exception("Unknown number type: " + item.Key);
                     }
 
@@ -785,7 +788,7 @@ namespace VRCX
         {
             if (!File.Exists(filepath))
                 return string.Empty;
-            
+
             var json = File.ReadAllText(filepath);
             return json;
         }

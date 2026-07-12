@@ -2,13 +2,17 @@
     <TooltipProvider>
         <MacOSTitleBar></MacOSTitleBar>
 
-        <div id="x-app" class="x-app" :class="{ 'with-macos-titlebar': isMacOS }">
+        <div
+            id="x-app"
+            class="flex w-screen h-screen overflow-hidden cursor-default [&>.x-container]:pt-[15px]"
+            :class="{ 'pt-7': isMacOS }">
             <RouterView></RouterView>
             <Toaster position="top-center" :theme="theme"></Toaster>
 
             <AlertDialogModal></AlertDialogModal>
             <PromptDialogModal></PromptDialogModal>
             <OtpDialogModal></OtpDialogModal>
+            <DatabaseUpgradeDialog></DatabaseUpgradeDialog>
 
             <VRCXUpdateDialog></VRCXUpdateDialog>
         </div>
@@ -19,19 +23,25 @@
 <script setup>
     import { computed, onBeforeMount, onMounted } from 'vue';
 
+    import { addGameLogEvent, getGameLogTable } from './coordinators/gameLogCoordinator';
+    import {
+        runCheckVRChatDebugLoggingFlow,
+        runUpdateIsGameRunningFlow,
+        runUpdateIsHmdAfkFlow
+    } from './coordinators/gameCoordinator';
     import { Toaster } from './components/ui/sonner';
     import { TooltipProvider } from './components/ui/tooltip';
     import { createGlobalStores } from './stores';
-    import { initNoty } from './plugin/noty';
+    import { initNoty } from './plugins/noty';
 
     import AlertDialogModal from './components/ui/alert-dialog/AlertDialogModal.vue';
+    import DatabaseUpgradeDialog from './components/dialogs/DatabaseUpgradeDialog.vue';
     import MacOSTitleBar from './components/MacOSTitleBar.vue';
     import OtpDialogModal from './components/ui/dialog/OtpDialogModal.vue';
     import PromptDialogModal from './components/ui/dialog/PromptDialogModal.vue';
     import VRCXUpdateDialog from './components/dialogs/VRCXUpdateDialog.vue';
 
     import '@/styles/globals.css';
-    import '@/app.css';
 
     console.log(`isLinux: ${LINUX}`);
 
@@ -47,6 +57,10 @@
 
     if (typeof window !== 'undefined') {
         window.$pinia = store;
+        // Bridge: attach coordinator functions to store for C# IPC callbacks
+        store.game.updateIsGameRunning = runUpdateIsGameRunningFlow;
+        store.game.updateIsHmdAfk = runUpdateIsHmdAfkFlow;
+        store.gameLog.addGameLogEvent = addGameLogEvent;
     }
 
     onBeforeMount(() => {
@@ -54,17 +68,13 @@
     });
 
     onMounted(async () => {
-        store.gameLog.getGameLogTable();
-        await store.auth.migrateStoredUsers();
-        store.auth.autoLoginAfterMounted();
-        store.vrcx.checkAutoBackupRestoreVrcRegistry();
-        store.game.checkVRChatDebugLogging();
+        if (await store.vrcx.waitForDatabaseInit()) {
+            getGameLogTable();
+            await store.auth.migrateStoredUsers();
+            store.auth.autoLoginAfterMounted();
+            store.vrcx.checkAutoBackupRestoreVrcRegistry();
+        }
+
+        runCheckVRChatDebugLoggingFlow();
     });
 </script>
-
-<style scoped>
-    /* Add title bar spacing for macOS */
-    .x-app.with-macos-titlebar {
-        padding-top: 28px;
-    }
-</style>

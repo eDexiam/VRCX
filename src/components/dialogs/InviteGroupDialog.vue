@@ -9,7 +9,7 @@
                 <span>{{ t('dialog.invite_to_group.description') }}</span>
                 <br />
 
-                <div style="margin-top: 15px; width: 100%">
+                <div class="mt-4" style="width: 100%">
                     <VirtualCombobox
                         v-model="inviteGroupDialog.groupId"
                         :groups="groupPickerGroups"
@@ -20,12 +20,15 @@
                         :close-on-select="true"
                         :deselect-on-reselect="true">
                         <template #item="{ item, selected }">
-                            <div class="x-friend-item flex w-full items-center">
-                                <div class="avatar">
-                                    <img :src="item.iconUrl" loading="lazy" />
+                            <div class="flex w-full items-center p-1.5 text-[13px]">
+                                <div class="relative inline-block flex-none size-9 mr-2.5">
+                                    <img
+                                        class="size-full rounded-full object-cover"
+                                        :src="item.iconUrl"
+                                        loading="lazy" />
                                 </div>
-                                <div class="detail">
-                                    <span class="name" v-text="item.label"></span>
+                                <div class="flex-1 overflow-hidden">
+                                    <span class="block truncate font-medium leading-[18px]" v-text="item.label"></span>
                                 </div>
                                 <CheckIcon :class="['ml-auto size-4', selected ? 'opacity-100' : 'opacity-0']" />
                             </div>
@@ -33,7 +36,7 @@
                     </VirtualCombobox>
                 </div>
 
-                <div style="width: 100%; margin-top: 15px">
+                <div style="width: 100%; margin-top: 16px">
                     <VirtualCombobox
                         v-model="inviteGroupDialog.userIds"
                         :groups="friendPickerGroups"
@@ -43,14 +46,19 @@
                         :search-placeholder="t('dialog.invite_to_group.choose_friends_placeholder')"
                         :clearable="true">
                         <template #item="{ item, selected }">
-                            <div class="x-friend-item flex w-full items-center">
+                            <div class="flex w-full items-center p-1.5 text-[13px]">
                                 <template v-if="item.user">
-                                    <div class="avatar" :class="userStatusClass(item.user)">
-                                        <img :src="userImage(item.user)" loading="lazy" />
+                                    <div
+                                        class="relative inline-block flex-none size-9 mr-2.5"
+                                        :class="userStatusClass(item.user)">
+                                        <img
+                                            class="size-full rounded-full object-cover"
+                                            :src="userImage(item.user)"
+                                            loading="lazy" />
                                     </div>
-                                    <div class="detail">
+                                    <div class="flex-1 overflow-hidden">
                                         <span
-                                            class="name"
+                                            class="block truncate font-medium leading-[18px]"
                                             :style="{ color: item.user.$userColour }"
                                             v-text="item.user.displayName"></span>
                                     </div>
@@ -88,16 +96,18 @@
     import { toast } from 'vue-sonner';
     import { useI18n } from 'vue-i18n';
 
-    import { hasGroupPermission, userImage, userStatusClass } from '../../shared/utils';
+    import { hasGroupPermission } from '../../shared/utils';
+    import { useUserDisplay } from '../../composables/useUserDisplay';
     import { useFriendStore, useGroupStore, useModalStore } from '../../stores';
-    import { groupRequest, userRequest } from '../../api';
+    import { groupRequest, queryRequest } from '../../api';
     import { VirtualCombobox } from '../ui/virtual-combobox';
+    import { applyGroup } from '../../coordinators/groupCoordinator';
 
-    import configRepository from '../../service/config';
+    import configRepository from '../../services/config';
 
+    const { userImage, userStatusClass } = useUserDisplay();
     const { vipFriends, onlineFriends, activeFriends, offlineFriends } = storeToRefs(useFriendStore());
     const { currentUserGroups, inviteGroupDialog } = storeToRefs(useGroupStore());
-    const { applyGroup } = useGroupStore();
     const { t } = useI18n();
     const modalStore = useModalStore();
 
@@ -132,15 +142,43 @@
         }
     ]);
 
+    const friendSections = computed(() => [
+        {
+            key: 'vip',
+            label: t('side_panel.favorite'),
+            friends: vipFriends.value
+        },
+        {
+            key: 'online',
+            label: t('side_panel.online'),
+            friends: onlineFriends.value
+        },
+        {
+            key: 'active',
+            label: t('side_panel.active'),
+            friends: activeFriends.value
+        },
+        {
+            key: 'offline',
+            label: t('side_panel.offline'),
+            friends: offlineFriends.value
+        }
+    ]);
+
     const friendById = computed(() => {
         const map = new Map();
-        for (const friend of vipFriends.value) map.set(friend.id, friend);
-        for (const friend of onlineFriends.value) map.set(friend.id, friend);
-        for (const friend of activeFriends.value) map.set(friend.id, friend);
-        for (const friend of offlineFriends.value) map.set(friend.id, friend);
+        for (const section of friendSections.value) {
+            for (const friend of section.friends ?? []) {
+                map.set(friend.id, friend);
+            }
+        }
         return map;
     });
 
+    /**
+     *
+     * @param userId
+     */
     function resolveUserDisplayName(userId) {
         const D = inviteGroupDialog.value;
         if (D?.userObject?.id && D.userObject.id === userId) {
@@ -176,7 +214,7 @@
             });
         }
 
-        const addFriendGroup = (key, label, friends) => {
+        const addFriendGroup = ({ key, label, friends }) => {
             if (!friends?.length) return;
             groups.push({
                 key,
@@ -194,10 +232,7 @@
             });
         };
 
-        addFriendGroup('vip', t('side_panel.favorite'), vipFriends.value);
-        addFriendGroup('online', t('side_panel.online'), onlineFriends.value);
-        addFriendGroup('active', t('side_panel.active'), activeFriends.value);
-        addFriendGroup('offline', t('side_panel.offline'), offlineFriends.value);
+        friendSections.value.forEach(addFriendGroup);
 
         return groups;
     });
@@ -212,8 +247,8 @@
                 inviteGroupDialog.value.groupName = '';
                 return;
             }
-            groupRequest
-                .getCachedGroup({ groupId })
+            queryRequest
+                .fetch('group', { groupId })
                 .then((args) => {
                     inviteGroupDialog.value.groupName = args.ref.name;
                 })
@@ -224,11 +259,14 @@
         }
     );
 
+    /**
+     *
+     */
     function initDialog() {
         const D = inviteGroupDialog.value;
         if (D.groupId) {
-            groupRequest
-                .getCachedGroup({
+            queryRequest
+                .fetch('group', {
                     groupId: D.groupId
                 })
                 .then((args) => {
@@ -241,12 +279,15 @@
         }
 
         if (D.userId) {
-            userRequest.getCachedUser({ userId: D.userId }).then((args) => {
+            queryRequest.fetch('user.dialog', { userId: D.userId }).then((args) => {
                 D.userObject = args.ref;
                 D.userIds = [D.userId];
             });
         }
     }
+    /**
+     *
+     */
     function isAllowedToInviteToGroup() {
         const D = inviteGroupDialog.value;
         const groupId = D.groupId;
@@ -270,6 +311,9 @@
                 inviteGroupDialog.value.loading = false;
             });
     }
+    /**
+     *
+     */
     function sendGroupInvite() {
         modalStore
             .confirm({

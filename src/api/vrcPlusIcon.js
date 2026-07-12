@@ -1,4 +1,19 @@
-import { request } from '../service/request';
+import { queryClient } from '../queries';
+import { request } from '../services/request';
+
+/**
+ *
+ */
+function refetchActiveGalleryQueries() {
+    queryClient
+        .invalidateQueries({
+            queryKey: ['gallery'],
+            refetchType: 'active'
+        })
+        .catch((err) => {
+            console.error('Failed to refresh gallery queries:', err);
+        });
+}
 
 const VRCPlusIconsReq = {
     getFileList(params) {
@@ -22,6 +37,7 @@ const VRCPlusIconsReq = {
                 json,
                 fileId
             };
+            refetchActiveGalleryQueries();
             return args;
         });
     },
@@ -40,6 +56,7 @@ const VRCPlusIconsReq = {
                 json,
                 params
             };
+            refetchActiveGalleryQueries();
             return args;
         });
     }

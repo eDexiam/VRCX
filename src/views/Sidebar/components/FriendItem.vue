@@ -1,16 +1,27 @@
 <template>
-    <div class="x-friend-item hover:bg-muted/50" @click="showUserDialog(friend.id)">
+    <div
+        class="box-border flex items-center p-1.5 text-[13px] cursor-pointer hover:bg-muted/50 hover:rounded-lg"
+        @click="showUserDialog(friend.id)">
         <template v-if="friend.ref">
-            <div
-                class="avatar"
-                :class="isFriendActiveOrOffline ? undefined : userStatusClass(friend.ref, friend.pendingOffline)">
-                <img :src="userImage(friend.ref, true)" loading="lazy" />
+            <div class="relative inline-block flex-none size-9 mr-2.5" :class="friendStatusClass">
+                <Avatar class="size-full rounded-full">
+                    <AvatarImage :src="userImage(friend.ref, true)" class="object-cover" />
+                    <AvatarFallback>
+                        <User class="size-5 text-muted-foreground" />
+                    </AvatarFallback>
+                </Avatar>
             </div>
-            <div class="detail h-9 flex flex-col justify-between">
-                <span v-if="!hideNicknames && friend.$nickName" class="name" :style="{ color: friend.ref.$userColour }">
+            <div class="flex-1 overflow-hidden h-9 flex flex-col justify-between">
+                <span
+                    v-if="!hideNicknames && friend.$nickName"
+                    class="block truncate font-medium leading-[18px]"
+                    :style="{ color: friend.ref.$userColour }">
                     {{ friend.ref.displayName }} ({{ friend.$nickName }})
                 </span>
-                <span v-else class="name" :style="{ color: friend.ref.$userColour }"
+                <span
+                    v-else
+                    class="block truncate font-medium leading-[18px]"
+                    :style="{ color: friend.ref.$userColour }"
                     >{{ friend.ref.displayName
                     }}{{ isGroupByInstance && allFavoriteFriendIds.has(friend.id) ? ' ⭐' : '' }}</span
                 >
@@ -35,7 +46,7 @@
                     </template>
                     <Location
                         v-else
-                        class="extra block truncate text-xs"
+                        class="extra block truncate text-xs!"
                         :location="locationProp"
                         :traveling="travelingProp"
                         :link="false" />
@@ -44,27 +55,23 @@
         </template>
         <template v-else-if="!friend.ref && !isRefreshFriendsLoading">
             <span>{{ friend.name || friend.id }}</span>
-            <Button size="sm" variant="ghost" class="mr-1 w-6 h-6 text-xs" @click.stop="confirmDeleteFriend(friend.id)"
+            <Button
+                size="sm"
+                variant="ghost"
+                class="mr-1 w-6 h-6 text-xs"
+                :ariaLabel="t('common.actions.delete')"
+                @click.stop="confirmDeleteFriend(friend.id)"
                 ><Trash2 class="h-4 w-4" />
             </Button>
         </template>
-
-        <!-- <div v-else class="skeleton" aria-busy="true" aria-label="Loading">
-            <div>
-                <Skeleton class="h-10 w-10 rounded-full" />
-                <div>
-                    <Skeleton class="h-3.5 w-1/2" />
-                    <Skeleton class="mt-1.5 h-3 w-full" />
-                </div>
-            </div>
-        </div> -->
     </div>
 </template>
 
 <script setup>
+    import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+    import { Trash2, User } from 'lucide-vue-next';
     import { Button } from '@/components/ui/button';
     import { Spinner } from '@/components/ui/spinner';
-    import { Trash2 } from 'lucide-vue-next';
     import { computed } from 'vue';
     import { storeToRefs } from 'pinia';
     import { useI18n } from 'vue-i18n';
@@ -72,8 +79,12 @@
     import Location from '@/components/Location.vue';
     import Timer from '@/components/Timer.vue';
 
-    import { useAppearanceSettingsStore, useFriendStore, useUserStore } from '../../../stores';
-    import { userImage, userStatusClass } from '../../../shared/utils';
+    import { useAppearanceSettingsStore, useFriendStore } from '../../../stores';
+    import { useUserDisplay } from '../../../composables/useUserDisplay';
+
+    import '@/styles/status-icon.css';
+    import { showUserDialog } from '../../../coordinators/userCoordinator';
+    import { confirmDeleteFriend } from '../../../coordinators/friendRelationshipCoordinator';
 
     const props = defineProps({
         friend: { type: Object, required: true },
@@ -82,12 +93,17 @@
 
     const { hideNicknames } = storeToRefs(useAppearanceSettingsStore());
     const { isRefreshFriendsLoading, allFavoriteFriendIds } = storeToRefs(useFriendStore());
-    const { confirmDeleteFriend } = useFriendStore();
-    const { showUserDialog } = useUserStore();
+    const { userImage, userStatusClass } = useUserDisplay();
+
     const { t } = useI18n();
 
     const isFriendTraveling = computed(() => props.friend.ref?.location === 'traveling');
     const isFriendActiveOrOffline = computed(() => props.friend.state === 'active' || props.friend.state === 'offline');
+
+    const friendStatusClass = computed(() => {
+        return userStatusClass(props.friend.ref, props.friend.pendingOffline);
+    });
+
     const epoch = computed(() =>
         isFriendTraveling.value ? props.friend.ref?.$travelingToTime : props.friend.ref?.$location_at
     );

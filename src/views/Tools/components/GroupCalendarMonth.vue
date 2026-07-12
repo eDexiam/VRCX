@@ -16,8 +16,11 @@
     import { fromDate, getLocalTimeZone } from '@internationalized/date';
     import { CalendarRoot } from 'reka-ui';
     import { toDate } from 'reka-ui/date';
+    import { storeToRefs } from 'pinia';
 
     import dayjs from 'dayjs';
+
+    import { useAppearanceSettingsStore } from '../../../stores';
 
     const props = defineProps({
         modelValue: {
@@ -40,6 +43,7 @@
 
     const emit = defineEmits(['update:modelValue']);
 
+    const { weekStartsOn } = storeToRefs(useAppearanceSettingsStore());
     const timeZone = getLocalTimeZone();
 
     const internalValue = ref(fromDate(props.modelValue ?? new Date(), timeZone));
@@ -56,20 +60,36 @@
 
     const selectedDayKey = computed(() => dayjs(props.modelValue).format('YYYY-MM-DD'));
 
+    /**
+     *
+     * @param dateValue
+     */
     function toKey(dateValue) {
         return dayjs(toDate(dateValue, timeZone)).format('YYYY-MM-DD');
     }
 
+    /**
+     *
+     * @param dateValue
+     */
     function eventCountFor(dateValue) {
         const key = toKey(dateValue);
         return props.eventsByDate?.[key]?.length ?? 0;
     }
 
+    /**
+     *
+     * @param dateValue
+     */
     function hasFollowingFor(dateValue) {
         const key = toKey(dateValue);
         return Boolean(props.followingByDate?.[key]);
     }
 
+    /**
+     *
+     * @param next
+     */
     function onUpdateModelValue(next) {
         if (!next) return;
         internalValue.value = next;
@@ -78,6 +98,10 @@
         emit('update:modelValue', asDate);
     }
 
+    /**
+     *
+     * @param next
+     */
     function onUpdatePlaceholder(next) {
         if (!next) return;
         placeholder.value = next;
@@ -85,6 +109,10 @@
         emit('update:modelValue', toDate(next, timeZone));
     }
 
+    /**
+     *
+     * @param dateValue
+     */
     function dayLabel(dateValue) {
         return dayjs(toDate(dateValue, timeZone)).format('D');
     }
@@ -99,6 +127,7 @@
             :placeholder="placeholder"
             @update:placeholder="onUpdatePlaceholder"
             :prevent-deselect="true"
+            :week-starts-on="weekStartsOn"
             class="p-4">
             <CalendarHeader class="pt-0">
                 <nav class="flex items-center gap-1 absolute top-0 inset-x-0 justify-between">
@@ -178,7 +207,7 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        border-radius: 10px;
+        border-radius: var(--radius-lg);
         font-size: 18px;
         position: relative;
     }
@@ -189,13 +218,13 @@
         right: -4px;
         min-width: 14px;
         height: 16px;
-        border-radius: 9px;
+        border-radius: var(--radius-lg);
         display: flex;
         align-items: center;
         justify-content: center;
         font-size: 12px;
         z-index: 10;
-        padding: 0 5px;
+        padding: 0 6px;
         line-height: 14px;
     }
 
@@ -206,7 +235,7 @@
         transform: translateX(-50%);
         width: 6px;
         height: 6px;
-        border-radius: 9999px;
+        border-radius: var(--rounded-full);
         background-color: var(--group-calendar-event-dot, #ef4444);
         z-index: 5;
         pointer-events: none;

@@ -1,14 +1,14 @@
 <template>
-    <div class="x-container" ref="friendLogRef">
+    <div class="x-container x-container--auto-height" ref="friendLogRef">
         <DataTableLayout
             :table="table"
             :loading="friendLogTable.loading"
-            :table-style="tableHeightStyle"
+            auto-height
             :page-sizes="pageSizes"
             :total-items="totalItems"
             :on-page-size-change="handlePageSizeChange">
             <template #toolbar>
-                <div style="margin: 0 0 10px; display: flex; align-items: center">
+                <div class="mt-0 mx-0 mb-2" style="display: flex; align-items: center">
                     <Select
                         multiple
                         :model-value="
@@ -37,9 +37,10 @@
                         </SelectContent>
                     </Select>
                     <InputGroupField
+                        class="ml-2"
                         v-model="friendLogTable.filters[1].value"
                         :placeholder="t('view.friend_log.search_placeholder')"
-                        style="flex: 0.4; margin-left: 10px" />
+                        style="flex: 0.4" />
                 </div>
             </template>
         </DataTableLayout>
@@ -65,12 +66,11 @@
     import { DataTableLayout } from '../../components/ui/data-table';
     import { InputGroupField } from '../../components/ui/input-group';
     import { createColumns } from './columns.jsx';
-    import { database } from '../../service/database';
+    import { database } from '../../services/database';
     import { removeFromArray } from '../../shared/utils';
-    import { useDataTableScrollHeight } from '../../composables/useDataTableScrollHeight';
     import { useVrcxVueTable } from '../../lib/table/useVrcxVueTable';
 
-    import configRepository from '../../service/config';
+    import configRepository from '../../services/config';
 
     const appearanceSettingsStore = useAppearanceSettingsStore();
     const vrcxStore = useVrcxStore();
@@ -79,11 +79,6 @@
     const { friendLogTable } = storeToRefs(useFriendStore());
 
     const friendLogRef = ref(null);
-    const { tableStyle: tableHeightStyle } = useDataTableScrollHeight(friendLogRef, {
-        offset: 30,
-        toolbarHeight: 54,
-        paginationHeight: 52
-    });
 
     const friendLogDisplayData = computed(() => {
         const data = friendLogTable.value.data;
@@ -142,13 +137,24 @@
     );
 
     const { t } = useI18n();
+    /**
+     *
+     */
     function saveTableFilters() {
         configRepository.setString('VRCX_friendLogTableFilters', JSON.stringify(friendLogTable.value.filters[0].value));
     }
+    /**
+     *
+     * @param value
+     */
     function handleFriendLogFilterChange(value) {
         friendLogTable.value.filters[0].value = Array.isArray(value) ? value : [];
         saveTableFilters();
     }
+    /**
+     *
+     * @param row
+     */
     function deleteFriendLogPrompt(row) {
         modalStore
             .confirm({
@@ -158,9 +164,13 @@
             .then(({ ok }) => ok && deleteFriendLog(row))
             .catch(() => {});
     }
+    /**
+     *
+     * @param row
+     */
     function deleteFriendLog(row) {
         removeFromArray(friendLogTable.value.data, row);
-        database.deleteFriendLogHistory(row.rowId);
+        database.deleteFriendLogHistory(row);
     }
 
     const columns = createColumns({
@@ -169,9 +179,6 @@
     });
 
     const pageSizes = computed(() => appearanceSettingsStore.tablePageSizes);
-    const pageSize = computed(() =>
-        friendLogTable.value.pageSizeLinked ? appearanceSettingsStore.tablePageSize : friendLogTable.value.pageSize
-    );
 
     const { table, pagination } = useVrcxVueTable({
         persistKey: 'friendLog',
@@ -183,7 +190,7 @@
         initialSorting: [],
         initialPagination: {
             pageIndex: 0,
-            pageSize: pageSize.value
+            pageSize: appearanceSettingsStore.tablePageSize
         },
         tableOptions: {
             autoResetPageIndex: false
@@ -191,27 +198,14 @@
     });
 
     const totalItems = computed(() => {
-        const length = table.getFilteredRowModel().rows.length;
-        return length;
+        return table.getFilteredRowModel().rows.length;
     });
 
     const handlePageSizeChange = (size) => {
-        if (friendLogTable.value.pageSizeLinked) {
-            appearanceSettingsStore.setTablePageSize(size);
-        } else {
-            friendLogTable.value.pageSize = size;
-        }
-    };
-
-    watch(pageSize, (size) => {
-        if (pagination.value.pageSize === size) {
-            return;
-        }
         pagination.value = {
             ...pagination.value,
             pageIndex: 0,
             pageSize: size
         };
-        table.setPageSize(size);
-    });
+    };
 </script>

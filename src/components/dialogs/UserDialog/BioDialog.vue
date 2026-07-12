@@ -12,21 +12,29 @@
                     :rows="5"
                     :placeholder="t('dialog.bio.bio_placeholder')"
                     class="mb-2.5"
-                    show-count />
+                    show-count
+                    autosize />
 
                 <InputGroupAction
+                    class="mt-1.5"
                     v-for="(link, index) in bioDialog.bioLinks"
                     :key="index"
                     v-model="bioDialog.bioLinks[index]"
                     :maxlength="1000"
-                    show-count
-                    size="sm"
-                    style="margin-top: 5px">
+                    size="sm">
                     <template #leading>
-                        <img :src="getFaviconUrl(link)" style="width: 16px; height: 16px; vertical-align: middle" />
+                        <img
+                            v-if="link"
+                            :src="getFaviconUrl(link)"
+                            style="width: 16px; height: 16px; vertical-align: middle" />
+                        <div v-else style="width: 16px; height: 16px" />
                     </template>
                     <template #actions>
-                        <Button variant="ghost" size="icon-sm" @click="bioDialog.bioLinks.splice(index, 1)"
+                        <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            @click="bioDialog.bioLinks.splice(index, 1)"
+                            :ariaLabel="t('common.actions.delete')"
                             ><Trash2 class="size-4"
                         /></Button>
                     </template>
@@ -70,6 +78,9 @@
         }
     });
 
+    /**
+     *
+     */
     function saveBio() {
         const D = props.bioDialog;
         if (D.loading) {

@@ -1,3 +1,5 @@
+import { toolNavDefinitions } from './tools';
+
 const navDefinitions = [
     {
         key: 'feed',
@@ -84,6 +86,13 @@ const navDefinitions = [
         routeName: 'notification'
     },
     {
+        key: 'my-avatars',
+        icon: 'ri-contacts-book-3-line',
+        tooltip: 'nav_tooltip.my_avatars',
+        labelKey: 'nav_tooltip.my_avatars',
+        routeName: 'my-avatars'
+    },
+    {
         key: 'charts-instance',
         icon: 'ri-bar-chart-horizontal-line',
         tooltip: 'view.charts.instance_activity.header',
@@ -98,6 +107,13 @@ const navDefinitions = [
         routeName: 'charts-mutual'
     },
     {
+        key: 'charts-hot-worlds',
+        icon: 'ri-fire-line',
+        tooltip: 'view.charts.hot_worlds.tab_label',
+        labelKey: 'view.charts.hot_worlds.tab_label',
+        routeName: 'charts-hot-worlds'
+    },
+    {
         key: 'tools',
         icon: 'ri-tools-line',
         tooltip: 'nav_tooltip.tools',
@@ -110,7 +126,8 @@ const navDefinitions = [
         tooltip: 'prompt.direct_access_omni.header',
         labelKey: 'prompt.direct_access_omni.header',
         action: 'direct-access'
-    }
+    },
+    ...toolNavDefinitions
 ];
 
 export { navDefinitions };

@@ -1,6 +1,10 @@
-import { request } from '../service/request';
+import { queryClient, queryKeys } from '../queries';
+import { request } from '../services/request';
 import { useUserStore } from '../stores';
 
+/**
+ *
+ */
 function getCurrentUserId() {
     return useUserStore().currentUser.id;
 }
@@ -38,7 +42,7 @@ const miscReq = {
      *       reason: string,
      *       type: string
      * }} params
-     * @return { Promise<{json: any, params}> }
+     * @returns { Promise<{json: any, params}> }
      */
     reportUser(params) {
         return request(`feedback/${params.userId}/user`, {
@@ -63,7 +67,7 @@ const miscReq = {
      *       version: number,
      *       variant: string
      * }} params
-     * @return { Promise<{json: any, params}> }
+     * @returns { Promise<{json: any, params}> }
      */
     getFileAnalysis(params) {
         return request(
@@ -192,11 +196,16 @@ const miscReq = {
                 json,
                 fileId
             };
+            queryClient.removeQueries({
+                queryKey: queryKeys.file(fileId),
+                exact: true
+            });
             return args;
         });
     },
 
     /**
+     * @param params
      * @params {{
         userId: string,
         emojiId: string

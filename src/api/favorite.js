@@ -1,8 +1,31 @@
 import { useFavoriteStore, useUserStore } from '../stores';
-import { request } from '../service/request';
+import {
+    handleFavoriteAdd,
+    handleFavoriteDelete,
+    handleFavoriteGroupClear
+} from '../coordinators/favoriteCoordinator';
+import { queryClient } from '../queries';
+import { request } from '../services/request';
 
+/**
+ *
+ */
 function getCurrentUserId() {
     return useUserStore().currentUser.id;
+}
+
+/**
+ *
+ */
+function refetchActiveFavoriteQueries() {
+    queryClient
+        .invalidateQueries({
+            queryKey: ['favorite'],
+            refetchType: 'active'
+        })
+        .catch((err) => {
+            console.error('Failed to refresh favorite queries:', err);
+        });
 }
 
 const favoriteReq = {
@@ -45,14 +68,15 @@ const favoriteReq = {
                 json,
                 params
             };
-            useFavoriteStore().handleFavoriteAdd(args);
+            handleFavoriteAdd(args);
+            refetchActiveFavoriteQueries();
             return args;
         });
     },
 
     /**
      * @param {{ objectId: string }} params
-     * @return { Promise<{json: any, params}> }
+     * @returns { Promise<{json: any, params}> }
      */
     deleteFavorite(params) {
         return request(`favorites/${params.objectId}`, {
@@ -62,14 +86,15 @@ const favoriteReq = {
                 json,
                 params
             };
-            useFavoriteStore().handleFavoriteDelete(params.objectId);
+            handleFavoriteDelete(params.objectId);
+            refetchActiveFavoriteQueries();
             return args;
         });
     },
 
     /**
      * @param {{ n: number, offset: number, type: string }} params
-     * @return { Promise<{json: any, params}> }
+     * @returns { Promise<{json: any, params}> }
      */
     getFavoriteGroups(params) {
         return request('favorite/groups', {
@@ -87,7 +112,7 @@ const favoriteReq = {
     /**
      *
      * @param {{ type: string, group: string, displayName?: string, visibility?: string }} params group is a name
-     * @return { Promise<{json: any, params}> }
+     * @returns { Promise<{json: any, params}> }
      */
     saveFavoriteGroup(params) {
         return request(
@@ -101,6 +126,7 @@ const favoriteReq = {
                 json,
                 params
             };
+            refetchActiveFavoriteQueries();
             return args;
         });
     },
@@ -110,7 +136,7 @@ const favoriteReq = {
      *    type: string,
      *    group: string
      * }} params
-     * @return { Promise<{json: any, params}> }
+     * @returns { Promise<{json: any, params}> }
      */
     clearFavoriteGroup(params) {
         return request(
@@ -124,7 +150,8 @@ const favoriteReq = {
                 json,
                 params
             };
-            useFavoriteStore().handleFavoriteGroupClear(args);
+            handleFavoriteGroupClear(args);
+            refetchActiveFavoriteQueries();
             return args;
         });
     },

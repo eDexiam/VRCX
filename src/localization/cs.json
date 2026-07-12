@@ -43,6 +43,10 @@
                 "devEndpoint": "Dev Endpoint",
                 "endpoint": "Endpoint",
                 "websocket": "WebSocket"
+            },
+            "language_detect": {
+                "title": "Detekován jazyk",
+                "description": "Váš systémový jazyk je {language}. Chcete na něj přepnout?"
             }
         },
         "feed": {
@@ -90,9 +94,7 @@
             },
             "group": {
                 "header": "Skupina"
-            },
-            "prev_page": "Předchozí",
-            "next_page": "Další"
+            }
         },
         "favorite": {
             "worlds": {
@@ -1486,13 +1488,6 @@
                 "success": "World YouTube preview changed"
             }
         },
-        "change_table_size": {
-            "header": "Max Table Size",
-            "description": "Limit amount of entries loaded from database to UI pages, larger table sizes will impact RAM usage and performance",
-            "table_max_size": "Magimální velikost tabulky",
-            "cancel": "Cancel",
-            "save": "Save"
-        },
         "photon_lobby_timeout": {
             "header": "User Timeout Threshold",
             "description": "Enter amount of seconds (default: 3)",
@@ -1527,6 +1522,13 @@
             "description": "Enter proxy server address and port",
             "close": "Close",
             "restart": "Restart"
+        },
+        "table_entries_settings": {
+            "header": "Max Table Size",
+            "description": "Limit amount of entries loaded from database to UI pages, larger table sizes will impact RAM usage and performance",
+            "table_max_entries": "Magimální velikost tabulky",
+            "cancel": "Cancel",
+            "save": "Save"
         }
     },
     "message": {

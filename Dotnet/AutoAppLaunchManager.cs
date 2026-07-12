@@ -1,11 +1,14 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Timers;
+using Microsoft.Win32;
 using NLog;
 
 namespace VRCX
@@ -28,10 +31,11 @@ namespace VRCX
         public readonly string AppShortcutVR;
 
         private DateTime startTime = DateTime.Now;
-        private Dictionary<string, HashSet<int>> startedProcesses = new Dictionary<string, HashSet<int>>();
+        private Dictionary<string, HashSet<int>> startedProcesses = new();
         private readonly Timer childUpdateTimer;
         private int timerTicks = 0;
         private static readonly byte[] shortcutSignatureBytes = { 0x4C, 0x00, 0x00, 0x00 }; // signature for ShellLinkHeader
+        private static readonly byte[] urlShortcutHeader = "[{000214A0-0000-0000-C000-000000000046}]"u8.ToArray(); // .url file header
 
         private const uint TH32CS_SNAPPROCESS = 2;
 
@@ -102,11 +106,13 @@ namespace VRCX
             }
         }
 
+        [SupportedOSPlatform("windows")]
         private void OnProcessStarted(MonitoredProcess monitoredProcess)
         {
             if (!Enabled || !monitoredProcess.HasName(VRChatProcessName) || monitoredProcess.Process.StartTime < startTime)
                 return;
 
+            // Start auto start processes
             lock (startedProcesses)
             {
                 if (KillChildrenOnExit)
@@ -114,20 +120,26 @@ namespace VRCX
                 else
                     UpdateChildProcesses();
 
-                var shortcutFiles = FindShortcutFiles(AppShortcutDirectory);
-                shortcutFiles.AddRange(FindShortcutFiles(Program.AppApiInstance.IsSteamVRRunning() ? AppShortcutVR : AppShortcutDesktop));
+                var (shortcutFiles, steamIds) = FindShortcutFiles(AppShortcutDirectory);
+                var (platformShortcutFiles, platformSteamIds) = FindShortcutFiles(Program.AppApiInstance.IsSteamVRRunning() ? AppShortcutVR : AppShortcutDesktop);
+                shortcutFiles.AddRange(platformShortcutFiles);
+                steamIds.AddRange(platformSteamIds);
                 foreach (var file in shortcutFiles)
                 {
                     if (RunProcessOnce && IsProcessRunning(file))
                         continue;
-                    
+
                     if (IsChildProcessRunning(file))
                         continue;
-                    
+
                     StartChildProcess(file);
                 }
+                foreach (var steamId in steamIds)
+                {
+                    StartSteamGame(steamId);
+                }
 
-                if (shortcutFiles.Count == 0)
+                if (shortcutFiles.Count == 0 && steamIds.Count == 0)
                     return;
 
                 timerTicks = 0;
@@ -143,6 +155,7 @@ namespace VRCX
         {
             UpdateChildProcesses(); // Ensure the list contains all current child processes.
 
+            // Stop auto start processes
             Parallel.ForEach(startedProcesses.ToArray(), pair =>
             {
                 var processes = pair.Value;
@@ -177,7 +190,7 @@ namespace VRCX
             {
                 return pids;
             }
-            
+
             PROCESSENTRY32 procEntry = new PROCESSENTRY32();
             procEntry.dwSize = (uint)Marshal.SizeOf(typeof(PROCESSENTRY32));
 
@@ -291,7 +304,7 @@ namespace VRCX
         {
             return startedProcesses.ContainsKey(path);
         }
-        
+
         private bool IsProcessRunning(string filePath)
         {
             try
@@ -336,7 +349,7 @@ namespace VRCX
             {
                 timerTicks++;
 
-                if(timerTicks == 5)
+                if (timerTicks == 5)
                     childUpdateTimer.Interval = 60000;
             }
         }
@@ -346,22 +359,44 @@ namespace VRCX
         /// </summary>
         /// <param name="folderPath">The folder path.</param>
         /// <returns>An array of shortcut paths. If none, then empty.</returns>
-        private static List<string> FindShortcutFiles(string folderPath)
+        private static Tuple<List<string>, List<string>> FindShortcutFiles(string folderPath)
         {
-            DirectoryInfo directoryInfo = new DirectoryInfo(folderPath);
-            FileInfo[] files = directoryInfo.GetFiles();
-            List<string> ret = new List<string>();
+            var directoryInfo = new DirectoryInfo(folderPath);
+            var files = directoryInfo.GetFiles();
+            var shortcuts = new List<string>();
+            var steamIds = new List<string>();
 
-            foreach (FileInfo file in files)
+            foreach (var file in files)
             {
                 if (IsShortcutFile(file.FullName))
                 {
-                    ret.Add(file.FullName);
+                    shortcuts.Add(file.FullName);
+                    continue;
+                }
+                if (IsUrlShortcutFile(file.FullName))
+                {
+                    try
+                    {
+                        const string urlPrefix = "URL=steam://rungameid/";
+                        var lines = File.ReadAllLines(file.FullName);
+                        var urlLine = lines.FirstOrDefault(l => l.StartsWith(urlPrefix));
+                        if (urlLine == null)
+                            continue;
+
+                        var appId = urlLine[urlPrefix.Length..].Trim();
+                        steamIds.Add(appId);
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.Error(ex, "Error reading shortcut file: {0}", file.FullName);
+                    }
                 }
             }
 
-            return ret;
+            return new Tuple<List<string>, List<string>>(shortcuts, steamIds);
         }
+
+
 
         /// <summary>
         /// Determines whether the specified file path is a shortcut by checking the file header.
@@ -377,6 +412,166 @@ namespace VRCX
             fileStream.ReadExactly(headerBytes, 0, 4);
 
             return headerBytes.SequenceEqual(shortcutSignatureBytes);
+        }
+
+        private static bool IsUrlShortcutFile(string filePath)
+        {
+            var headerBytes = new byte[urlShortcutHeader.Length];
+            using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            if (fileStream.Length < headerBytes.Length)
+                return false;
+            fileStream.ReadExactly(headerBytes, 0, headerBytes.Length);
+
+            return headerBytes.SequenceEqual(urlShortcutHeader);
+        }
+
+        // Steam shortcuts
+
+        [SupportedOSPlatform("windows")]
+        public async Task StartSteamGame(string appId)
+        {
+            try
+            {
+                var process = new Process();
+                process.StartInfo = new ProcessStartInfo($"steam://launch/{appId}")
+                {
+                    UseShellExecute = true
+                };
+                process.Start();
+            }
+            catch (Exception ex)
+            {
+                logger.Error(ex, "Error starting steam game with appid {0}", appId);
+            }
+
+            var appDirPath = GetPathWithAppId(appId);
+            if (appDirPath == null)
+                return;
+
+            // wait for Steam to start the process
+            const int retryLimit = 10;
+            for (var i = 0; i < retryLimit; i++)
+            {
+                // find running process from path
+                var processes = Process.GetProcesses();
+                var foundProcess = processes.FirstOrDefault(p =>
+                {
+                    try
+                    {
+                        return !p.HasExited &&
+                               p.MainModule?.FileName != null &&
+                               p.MainModule.FileName.StartsWith(appDirPath, StringComparison.OrdinalIgnoreCase);
+                    }
+                    catch
+                    {
+                        return false;
+                    }
+                });
+                if (foundProcess?.MainModule?.FileName == null)
+                {
+                    await Task.Delay(1000);
+                    continue;
+                }
+
+                var processPath = foundProcess.MainModule.FileName;
+                logger.Info("Found process for appid {0}: {1} (PID: {2})", appId, processPath, foundProcess.Id);
+                lock (startedProcesses)
+                {
+                    startedProcesses.Add(processPath, new HashSet<int>() { foundProcess.Id });
+                }
+
+                return;
+            }
+            logger.Error("Failed to find process for appid {0} after starting. Steam may have failed to launch the game or it may have taken too long to start.", appId);
+        }
+
+        [SupportedOSPlatform("windows")]
+        private static string? GetPathWithAppId(string appId)
+        {
+            string? steamPath = null;
+            try
+            {
+                using var key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Wow6432Node\Valve\Steam");
+                if (key?.GetValue("InstallPath") is string path)
+                    steamPath = path;
+            }
+            catch
+            {
+                // Ignored
+            }
+
+            if (steamPath == null)
+            {
+                try
+                {
+                    using var key = Registry.CurrentUser.OpenSubKey(@"Software\Valve\Steam");
+                    if (key?.GetValue("SteamPath") is string path)
+                        steamPath = path.Replace("/", "\\");
+                }
+                catch
+                {
+                    // Ignored
+                }
+            }
+
+            if (steamPath == null)
+            {
+                logger.Error("Cant find Steam install path");
+                return null;
+            }
+            var libraryFoldersVdfPath = Path.Join(steamPath, @"config\libraryfolders.vdf");
+            if (!File.Exists(libraryFoldersVdfPath))
+            {
+                logger.Error("Cant find Steam libraryfolders.vdf");
+                return null;
+            }
+
+            var libraryFolders = new List<string>();
+            foreach (var line in File.ReadLines(libraryFoldersVdfPath))
+            {
+                if (!line.Contains("\"path\""))
+                    continue;
+
+                var parts = line.Split("\t");
+                if (parts.Length < 4)
+                    continue;
+
+                var basePath = parts[4].Replace("\"", "").Replace(@"\\", @"\");
+                var path = Path.Join(basePath, @"steamapps");
+                if (Directory.Exists(path))
+                    libraryFolders.Add(path);
+            }
+
+            foreach (var libraryPath in libraryFolders)
+            {
+                var appManifestFiles = Directory.GetFiles(libraryPath, "appmanifest_*.acf");
+                foreach (var file in appManifestFiles)
+                {
+                    try
+                    {
+                        var acf = File.ReadAllText(file);
+                        var idMatch = Regex.Match(acf, @"""appid""\s+""(\d+)""");
+                        var dirMatch = Regex.Match(acf, @"""installdir""\s+""([^""]+)""");
+                        if (!idMatch.Success || !dirMatch.Success)
+                            continue;
+
+                        var foundAppId = idMatch.Groups[1].Value;
+                        if (foundAppId != appId)
+                            continue;
+
+                        var fullPath = Path.Join(libraryPath, "common", dirMatch.Groups[1].Value);
+                        if (Directory.Exists(fullPath))
+                            return fullPath;
+                    }
+                    catch
+                    {
+                        // ignore
+                    }
+                }
+            }
+
+            logger.Error("Could not find install dir for appid {0}", appId);
+            return null;
         }
     }
 }

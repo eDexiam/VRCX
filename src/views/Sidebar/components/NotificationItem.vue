@@ -60,8 +60,9 @@
                                 :content="t('view.notification.actions.accept')">
                                 <button
                                     type="button"
-                                    class="inline-flex size-5 items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted"
-                                    @click.stop="notificationStore.acceptFriendRequestNotification(notification)">
+                                    class="inline-flex size-5 items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted cursor-pointer"
+                                    @click.stop="notificationStore.acceptFriendRequestNotification(notification)"
+                                    :ariaLabel="t('view.notification.actions.accept')">
                                     <Check class="size-3" />
                                 </button>
                             </TooltipWrapper>
@@ -72,8 +73,9 @@
                                 :content="t('view.notification.actions.decline_with_message')">
                                 <button
                                     type="button"
-                                    class="inline-flex size-5 items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted"
-                                    @click.stop="$emit('show-invite-response', notification)">
+                                    class="inline-flex size-5 items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted cursor-pointer"
+                                    @click.stop="$emit('show-invite-response', notification)"
+                                    :ariaLabel="t('view.notification.actions.decline_with_message')">
                                     <MessageCircle class="size-3" />
                                 </button>
                             </TooltipWrapper>
@@ -85,8 +87,9 @@
                                     :content="t('view.notification.actions.invite')">
                                     <button
                                         type="button"
-                                        class="inline-flex size-5 items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted"
-                                        @click.stop="notificationStore.acceptRequestInvite(notification)">
+                                        class="inline-flex size-5 items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted cursor-pointer"
+                                        @click.stop="notificationStore.acceptRequestInvite(notification)"
+                                        :ariaLabel="t('view.notification.actions.invite')">
                                         <Check class="size-3" />
                                     </button>
                                 </TooltipWrapper>
@@ -95,8 +98,9 @@
                                     :content="t('view.notification.actions.decline_with_message')">
                                     <button
                                         type="button"
-                                        class="inline-flex size-5 items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted"
-                                        @click.stop="$emit('show-invite-request-response', notification)">
+                                        class="inline-flex size-5 items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted cursor-pointer"
+                                        @click.stop="$emit('show-invite-request-response', notification)"
+                                        :ariaLabel="t('view.notification.actions.decline_with_message')">
                                         <MessageCircle class="size-3" />
                                     </button>
                                 </TooltipWrapper>
@@ -110,7 +114,8 @@
                                     :content="response.text">
                                     <button
                                         type="button"
-                                        class="inline-flex size-5 items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted"
+                                        class="inline-flex size-5 items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted cursor-pointer"
+                                        :ariaLabel="response.text"
                                         @click.stop="handleResponse(response)">
                                         <component :is="getResponseIcon(response)" class="size-3" />
                                     </button>
@@ -123,8 +128,9 @@
                                 :content="t('view.notification.actions.decline')">
                                 <button
                                     type="button"
-                                    class="inline-flex size-5 items-center justify-center rounded text-muted-foreground hover:text-destructive hover:bg-muted"
-                                    @click.stop="notificationStore.hideNotificationPrompt(notification)">
+                                    class="inline-flex size-5 items-center justify-center rounded text-muted-foreground hover:text-destructive hover:bg-muted cursor-pointer"
+                                    @click.stop="notificationStore.hideNotificationPrompt(notification)"
+                                    :ariaLabel="t('view.notification.actions.decline')">
                                     <X class="size-3" />
                                 </button>
                             </TooltipWrapper>
@@ -136,8 +142,9 @@
                             :content="t('view.notification.actions.delete_log')">
                             <button
                                 type="button"
-                                class="inline-flex size-5 items-center justify-center rounded text-muted-foreground hover:text-destructive hover:bg-muted"
-                                @click.stop="notificationStore.deleteNotificationLogPrompt(notification)">
+                                class="inline-flex size-5 items-center justify-center rounded text-muted-foreground hover:text-destructive hover:bg-muted cursor-pointer"
+                                @click.stop="notificationStore.deleteNotificationLogPrompt(notification)"
+                                :ariaLabel="t('view.notification.actions.delete_log')">
                                 <Trash2 class="size-3" />
                             </button>
                         </TooltipWrapper>
@@ -249,14 +256,16 @@
     import { Badge } from '@/components/ui/badge';
     import { Separator } from '@/components/ui/separator';
     import { TooltipWrapper } from '@/components/ui/tooltip';
-    import { notificationRequest } from '@/api';
     import { storeToRefs } from 'pinia';
     import { useI18n } from 'vue-i18n';
 
     import dayjs from 'dayjs';
 
     import { useGameStore, useGroupStore, useLocationStore, useNotificationStore, useUserStore } from '../../../stores';
-    import { checkCanInvite, userImage } from '../../../shared/utils';
+    import { showGroupDialog } from '../../../coordinators/groupCoordinator';
+    import { showUserDialog } from '../../../coordinators/userCoordinator';
+    import { useInviteChecks } from '../../../composables/useInviteChecks';
+    import { useUserDisplay } from '../../../composables/useUserDisplay';
 
     import Location from '../../../components/Location.vue';
 
@@ -273,14 +282,16 @@
     const notificationStore = useNotificationStore();
     const { lastLocation } = storeToRefs(useLocationStore());
     const { isGameRunning } = storeToRefs(useGameStore());
-    const { openNotificationLink, isNotificationExpired, handleNotificationV2Hide } = useNotificationStore();
+    const { openNotificationLink, isNotificationExpired } = useNotificationStore();
+    const { checkCanInvite } = useInviteChecks();
+    const { userImage } = useUserDisplay();
 
     const senderName = computed(() => {
         const n = props.notification;
         // if (n.senderUsername && n.senderUsername?.Value === null) {
         //     return n.title || n.data?.groupName || n.groupName || n.details?.groupName || '';
         // }
-        return n.senderUsername || n.data?.groupName || n.groupName || n.details?.groupName || '';
+        return n.title || n.senderUsername || n.data?.groupName || n.groupName || n.details?.groupName || '';
     });
 
     const avatarUrl = computed(() => {
@@ -392,7 +403,7 @@
 
     const groupDisplayName = computed(() => {
         const n = props.notification;
-        return n.data?.groupName || n.groupName || n.details?.groupName || n.senderUsername || '';
+        return n.title || n.data?.groupName || n.groupName || n.details?.groupName || n.senderUsername || '';
     });
 
     const hoverTitle = computed(() => {
@@ -462,13 +473,13 @@
         if (userId.startsWith('grp_') || n.type?.startsWith('group.') || n.type === 'groupChange') {
             const groupId = userId.startsWith('grp_') ? userId : n.data?.groupId || n.details?.groupId || '';
             if (groupId) {
-                groupStore.showGroupDialog(groupId);
+                showGroupDialog(groupId);
                 return;
             }
         }
 
         if (userId) {
-            userStore.showUserDialog(userId);
+            showUserDialog(userId);
             return;
         }
 
@@ -479,34 +490,11 @@
     }
 
     onBeforeUnmount(() => {
-        // Mark as seen
+        // Mark as seen (queued to avoid 429 rate-limiting)
         if (isNotificationExpired(props.notification) || isSeen.value) {
             return;
         }
-        const params = { notificationId: props.notification.id };
-        if (!props.notification.version || props.notification.version < 2) {
-            notificationRequest.seeNotification({ notificationId: props.notification.id }).then((args) => {
-                console.log('Marked notification-v1 as seen:', args.json);
-                notificationStore.handleNotificationSee(props.notification.id);
-            });
-            return;
-        }
-        notificationRequest
-            .seeNotificationV2(params)
-            .then((args) => {
-                console.log('Marked notification-v2 as seen:', args.json);
-                const newArgs = {
-                    params,
-                    json: {
-                        ...args.json,
-                        seen: true
-                    }
-                };
-                notificationStore.handleNotificationV2Update(newArgs);
-            })
-            .catch((err) => {
-                console.error('Failed to mark notification-v2 as seen:', err);
-                handleNotificationV2Hide(props.notification.id);
-            });
+        const version = props.notification.version || 1;
+        notificationStore.queueMarkAsSeen(props.notification.id, version);
     });
 </script>

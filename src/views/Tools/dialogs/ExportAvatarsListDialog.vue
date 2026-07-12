@@ -6,11 +6,9 @@
             </DialogHeader>
             <InputGroupTextareaField
                 v-model="exportAvatarsListCsv"
-                
                 :rows="15"
                 readonly
-                style="margin-top: 15px"
-                input-class="resize-none"
+                input-class="resize-none mt-4"
                 @click="$event.target.tagName === 'TEXTAREA' && $event.target.select()" />
         </DialogContent>
     </Dialog>
@@ -24,12 +22,13 @@
     import { useI18n } from 'vue-i18n';
 
     import { useAvatarStore, useUserStore } from '../../../stores';
+    import { applyAvatar, removeAvatarFromCache } from '../../../coordinators/avatarCoordinator';
     import { avatarRequest } from '../../../api';
-    import { processBulk } from '../../../service/request';
+    import { processBulk } from '../../../services/request';
 
     const { t } = useI18n();
 
-    const { applyAvatar, cachedAvatars } = useAvatarStore();
+    const { cachedAvatars } = useAvatarStore();
     const { currentUser } = storeToRefs(useUserStore());
 
     const props = defineProps({
@@ -66,7 +65,7 @@
         loading.value = true;
         for (const ref of cachedAvatars.values()) {
             if (ref.authorId === currentUser.value.id) {
-                cachedAvatars.delete(ref.id);
+                removeAvatarFromCache(ref.id);
             }
         }
         const params = {

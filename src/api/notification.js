@@ -1,20 +1,9 @@
-import { useGalleryStore, useNotificationStore } from '../stores';
-import { notificationRequest } from '.';
-import { request } from '../service/request';
-
-/**
- * @returns {any}
- */
-function getGalleryStore() {
-    return useGalleryStore();
-}
-
-function getNotificationStore() {
-    return useNotificationStore();
-}
+import { request } from '../services/request';
+import { useGalleryStore } from '../stores';
 
 const notificationReq = {
-    /** @typedef {{
+    /**
+     * @typedef {{
      *      n: number,
      *      offset: number,
      *      sent: boolean,
@@ -101,7 +90,7 @@ const notificationReq = {
      * rsvp?: boolean,
      *  }} params
      * @param receiverUserId
-     * @return { Promise<{json: any, params}> }
+     * @returns { Promise<{json: any, params}> }
      */
     sendInvite(params, receiverUserId) {
         return request(`invite/${receiverUserId}`, {
@@ -120,7 +109,7 @@ const notificationReq = {
         return request(`invite/${receiverUserId}/photo`, {
             uploadImageLegacy: true,
             postData: JSON.stringify(params),
-            imageData: getGalleryStore().uploadImage
+            imageData: useGalleryStore().uploadImage
         }).then((json) => {
             const args = {
                 json,
@@ -149,7 +138,7 @@ const notificationReq = {
         return request(`requestInvite/${receiverUserId}/photo`, {
             uploadImageLegacy: true,
             postData: JSON.stringify(params),
-            imageData: getGalleryStore().uploadImage
+            imageData: useGalleryStore().uploadImage
         }).then((json) => {
             const args = {
                 json,
@@ -178,7 +167,7 @@ const notificationReq = {
         return request(`invite/${inviteId}/response/photo`, {
             uploadImageLegacy: true,
             postData: JSON.stringify(params),
-            imageData: getGalleryStore().uploadImage,
+            imageData: useGalleryStore().uploadImage,
             inviteId
         }).then((json) => {
             const args = {
@@ -192,7 +181,7 @@ const notificationReq = {
 
     /**
      * @param {{ notificationId: string }} params
-     * @return { Promise<{json: any, params}> }
+     * @returns { Promise<{json: any, params}> }
      */
     acceptFriendRequestNotification(params) {
         return request(
@@ -200,32 +189,18 @@ const notificationReq = {
             {
                 method: 'PUT'
             }
-        )
-            .then((json) => {
-                const args = {
-                    json,
-                    params
-                };
-                getNotificationStore().handleNotificationAccept(args);
-                return args;
-            })
-            .catch((err) => {
-                // if friend request could not be found, delete it
-                if (err && err.message && err.message.includes('404')) {
-                    getNotificationStore().handleNotificationHide(
-                        params.notificationId
-                    );
-                }
-                return {
-                    json: null,
-                    params
-                };
-            });
+        ).then((json) => {
+            const args = {
+                json,
+                params
+            };
+            return args;
+        });
     },
 
     /**
      * @param {{ notificationId: string }} params
-     * @return { Promise<{json: any, params}> }
+     * @returns { Promise<{json: any, params}> }
      */
     hideNotification(params) {
         return request(
@@ -238,16 +213,13 @@ const notificationReq = {
                 json,
                 params
             };
-            getNotificationStore().handleNotificationHide(
-                params.notificationId
-            );
             return args;
         });
     },
 
     /**
      * @param {{ notificationId: string }} params
-     * @return { Promise<{json: any, params}> }
+     * @returns { Promise<{json: any, params}> }
      */
     seeNotification(params) {
         return request(`auth/user/notifications/${params.notificationId}/see`, {
@@ -263,7 +235,7 @@ const notificationReq = {
 
     /**
      * @param {{ notificationId: string }} params
-     * @return { Promise<{json: any, params}> }
+     * @returns { Promise<{json: any, params}> }
      */
     seeNotificationV2(params) {
         return request(`notifications/${params.notificationId}/see`, {
@@ -283,30 +255,19 @@ const notificationReq = {
      * responseType: string,
      * responseData: string
      * }} params
-     * @return { Promise<{json: any, params}> }
+     * @returns { Promise<{json: any, params}> }
      */
     sendNotificationResponse(params) {
         return request(`notifications/${params.notificationId}/respond`, {
             method: 'POST',
             params
-        })
-            .then((json) => {
-                const args = {
-                    json,
-                    params
-                };
-                return args;
-            })
-            .catch(() => {
-                getNotificationStore().handleNotificationV2Hide(
-                    params.notificationId
-                );
-                notificationRequest.hideNotificationV2(params.notificationId);
-                return {
-                    json: null,
-                    params
-                };
-            });
+        }).then((json) => {
+            const args = {
+                json,
+                params
+            };
+            return args;
+        });
     },
 
     hideNotificationV2(notificationId) {
@@ -322,35 +283,6 @@ const notificationReq = {
             return args;
         });
     }
-
-    // sendInviteGalleryPhoto(params, receiverUserId) {
-    //     return request(`invite/${receiverUserId}/photo`, {
-    //         method: 'POST',
-    //         params
-    //     }).then((json) => {
-    //         const args = {
-    //             json,
-    //             params,
-    //             receiverUserId
-    //         };
-    //         API.$emit('NOTIFICATION:INVITE:GALLERYPHOTO:SEND', args);
-    //         return args;
-    //     });
-    // },
-
-    // API.clearNotifications = function () {
-    //     return request('auth/user/notifications/clear', {
-    //         method: 'PUT'
-    //     }).then((json) => {
-    //         var args = {
-    //             json
-    //         };
-    //         // FIXME: NOTIFICATION:CLEAR 핸들링
-    //         this.$emit('NOTIFICATION:CLEAR', args);
-    //         return args;
-    //     });
-    // };
 };
-// #endregion
 
 export default notificationReq;

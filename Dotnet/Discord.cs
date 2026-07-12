@@ -1,7 +1,7 @@
 using System;
-using DiscordRPC;
 using System.Text;
 using System.Threading;
+using DiscordRPC;
 using NLog;
 
 namespace VRCX
@@ -162,7 +162,6 @@ namespace VRCX
                     _presence.Assets = null;
                     _presence.Party = null;
                     _presence.Timestamps = null;
-                    _lock.ExitWriteLock();
                     return;
                 }
 

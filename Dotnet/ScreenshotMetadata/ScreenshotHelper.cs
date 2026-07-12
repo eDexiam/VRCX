@@ -33,7 +33,7 @@ namespace VRCX
             var id = CacheDatabase.IsFileCached(filePath);
             if (id == -1)
                 return false;
-            
+
             var metadataStr = CacheDatabase.GetMetadataById(id);
             var metadataObj = metadataStr == null ? null : JsonConvert.DeserializeObject<ScreenshotMetadata>(metadataStr);
             MetadataCache.TryAdd(filePath, metadataObj);
@@ -95,7 +95,7 @@ namespace VRCX
                     case ScreenshotSearchType.WorldName:
                         if (metadata.World.Name == null)
                             continue;
-                        
+
                         if (metadata.World.Name.Contains(query, StringComparison.OrdinalIgnoreCase))
                             result.Add(metadata);
 
@@ -140,7 +140,7 @@ namespace VRCX
 
                         gotVrchatMetadata = true;
                     }
-                    
+
                     if (metadataString.StartsWith("{") && metadataString.EndsWith("}")) // # Professional Json Validatior© 2.0
                     {
                         var vrcxMetadataResult = JsonConvert.DeserializeObject<ScreenshotMetadata>(metadataString);
@@ -159,7 +159,7 @@ namespace VRCX
 
                             if (includeJSON)
                                 result.JSON = metadataString;
-                        
+
                             gotMetadata = true;
                         }
                     }
@@ -177,12 +177,12 @@ namespace VRCX
                 }
             }
 
-            if (result.Application == null || metadata.Count == 0) 
+            if (result.Application == null || metadata.Count == 0)
                 return ScreenshotMetadata.JustError(path, "Image has no valid metadata.");
 
             return result;
         }
-        
+
         /// <summary>
         /// Reads textual metadata from a PNG image file.
         /// </summary>
@@ -200,10 +200,10 @@ namespace VRCX
             var result = new List<string>();
             var metadata = PNGHelper.ReadTextChunk("Description", pngFile);
             var vrchatMetadata = PNGHelper.ReadTextChunk("XML:com.adobe.xmp", pngFile);
-            
+
             if (!string.IsNullOrEmpty(vrchatMetadata))
                 result.Add(vrchatMetadata);
-            
+
             if (!string.IsNullOrEmpty(metadata))
                 result.Add(metadata);
 
@@ -212,7 +212,7 @@ namespace VRCX
             if (result.Count == 0 && pngFile.GetChunk(PNGChunkTypeFilter.sRGB) != null)
             {
                 var lfsMetadata = PNGHelper.ReadTextChunk("Description", pngFile, true);
-                
+
                 if (!string.IsNullOrEmpty(lfsMetadata))
                     result.Add(lfsMetadata);
             }
@@ -225,16 +225,18 @@ namespace VRCX
             using var pngFile = new PNGFile(path, 128 * 1024);
             if (deleteVRChatMetadata)
                 PNGHelper.DeleteTextChunk("XML:com.adobe.xmp", pngFile);
-            
+
             PNGHelper.DeleteTextChunk("Description", pngFile);
         }
-        
+
         public static bool WriteVRCXMetadata(string text, string path)
         {
-            using var pngFile = new PNGFile(path, true);
+            var pngFile = new PNGFile(path, true);
             var chunk = PNGHelper.GenerateTextChunk("Description", text);
-            
-            return pngFile.WriteChunk(chunk);;
+            var status = pngFile.WriteChunk(chunk);
+            pngFile.Dispose();
+
+            return status;
         }
 
         public static ScreenshotMetadata ParseVRCImage(string xmlString)
@@ -258,10 +260,10 @@ namespace VRCX
             var worldId = root.SelectSingleNode("//vrc:WorldID", nsManager)?.InnerText;
             var worldDisplayName = root.SelectSingleNode("//vrc:WorldDisplayName", nsManager)?.InnerText; // new, 01.08.2025
             var authorId = root.SelectSingleNode("//vrc:AuthorID", nsManager)?.InnerText; // new, 01.08.2025
-            
+
             if (string.IsNullOrEmpty(worldId))
                 worldId = root.SelectSingleNode("//vrc:World", nsManager)?.InnerText; // legacy, it's gone now
-            
+
             if (string.IsNullOrEmpty(authorId))
             {
                 // If authorId is not set, we assume legacy metadata format where authorName is used as authorId.
@@ -297,7 +299,7 @@ namespace VRCX
         public static bool IsPNGFile(string path)
         {
             var pngSignatureBytes = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A };
-            
+
             // Read only the first 8 bytes of the file to check if it's a PNG file instead of reading the entire thing into memory just to see check a couple bytes.
             using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
             if (fs.Length < 33) return false; // I don't remember how I came up with this number, but a PNG file below this size is not going to be valid for our purposes.
@@ -321,7 +323,7 @@ namespace VRCX
             // Entry with image rotation enabled (rq:)
             // lfs|2|author:usr_8c0a2f22-26d4-4dc9-8396-2ab40e3d07fc,knah|world:wrld_fb4edc80-6c48-43f2-9bd1-2fa9f1345621,35341,Luminescent Ledge|pos:8.231676,0.257298,-0.1983307|rq:2|players:usr_65b9eeeb-7c91-4ad2-8ce4-addb1c161cd6,0.74,0.59,1.57,Jakkuba;usr_6a50647f-d971-4281-90c3-3fe8caf2ba80,8.07,9.76,0.16,SopwithPup;usr_8c0a2f22-26d4-4dc9-8396-2ab40e3d07fc,0.26,1.03,-0.28,knah;usr_7f593ad1-3e9e-4449-a623-5c1c0a8d8a78,0.15,0.60,1.46,NekOwneD
 
-            // LFS v1 format: https://github.com/knah/VRCMods/blob/23c3311fdfc4af4b568eedfb2e366710f2a9f925/LagFreeScreenshots/LagFreeScreenshotsMod.cs 
+            // LFS v1 format: https://github.com/knah/VRCMods/blob/23c3311fdfc4af4b568eedfb2e366710f2a9f925/LagFreeScreenshots/LagFreeScreenshotsMod.cs
             // Why support this tho
             // lfs|1|world:wrld_6caf5200-70e1-46c2-b043-e3c4abe69e0f:47213,The Great Pug|players:usr_290c03d6-66cc-4f0e-b782-c07f5cfa8deb,VirtualTeacup;usr_290c03d6-66cc-4f0e-b782-c07f5cfa8deb,VirtualTeacup
 
@@ -389,7 +391,7 @@ namespace VRCX
 
                     // We don't use this, so don't parse it.
                     /*case "rq":
-                        // Image rotation 
+                        // Image rotation
                         metadata.Add("rq", value);
                         break;*/
 

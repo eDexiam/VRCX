@@ -1,3 +1,4 @@
+import { VueQueryPlugin } from '@tanstack/vue-query';
 import { createApp } from 'vue';
 
 import {
@@ -6,8 +7,9 @@ import {
     initPlugins,
     initRouter,
     initSentry
-} from './plugin';
+} from './plugins';
 import { initPiniaPlugins, pinia } from './stores';
+import { queryClient } from './queries';
 
 import App from './App.vue';
 
@@ -18,7 +20,7 @@ await initPiniaPlugins();
 
 const app = createApp(App);
 
-app.use(pinia).use(i18n);
+app.use(pinia).use(i18n).use(VueQueryPlugin, { queryClient });
 initComponents(app);
 initRouter(app);
 await initSentry(app);

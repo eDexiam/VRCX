@@ -1,9 +1,14 @@
-import { ArrowUpDown, UserMinus } from 'lucide-vue-next';
+import { ArrowUpDown, EyeOff, User, UserMinus } from 'lucide-vue-next';
+import {
+    Avatar,
+    AvatarFallback,
+    AvatarImage
+} from '../../components/ui/avatar';
 
 import { Button } from '../../components/ui/button';
 import { Checkbox } from '../../components/ui/checkbox';
 import { TooltipWrapper } from '../../components/ui/tooltip';
-import { i18n } from '../../plugin';
+import { i18n } from '../../plugins';
 import {
     formatDateFilter,
     getFaviconUrl,
@@ -11,30 +16,32 @@ import {
     openExternalLink,
     sortStatus,
     statusClass,
-    timeToText,
-    userImage
+    timeToText
 } from '../../shared/utils';
 
 const { t } = i18n.global;
 
-const sortButton = ({ column, label, descFirst = false }) => (
-    <Button
-        variant="ghost"
-        size="sm"
-        class="-ml-2 h-8 px-2"
-        onClick={() => {
-            const sorted = column.getIsSorted();
-            if (!sorted && descFirst) {
-                column.toggleSorting(true);
-                return;
-            }
-            column.toggleSorting(sorted === 'asc');
-        }}
-    >
-        {label}
-        <ArrowUpDown class="ml-1 h-4 w-4" />
-    </Button>
-);
+const sortButton = ({ column, label, descFirst = false }) => {
+    const resolvedLabel = typeof label === 'function' ? label() : label;
+    return (
+        <Button
+            variant="ghost"
+            size="sm"
+            class="-ml-2 h-8 px-2"
+            onClick={() => {
+                const sorted = column.getIsSorted();
+                if (!sorted && descFirst) {
+                    column.toggleSorting(true);
+                    return;
+                }
+                column.toggleSorting(sorted === 'asc');
+            }}
+        >
+            {resolvedLabel}
+            <ArrowUpDown class="ml-1 h-4 w-4" />
+        </Button>
+    );
+};
 
 const compareNumbers = (a, b) => (a ?? 0) - (b ?? 0);
 
@@ -93,7 +100,8 @@ export const createColumns = ({
     randomUserColours,
     selectedFriends,
     onToggleFriendSelection,
-    onConfirmDeleteFriend
+    onConfirmDeleteFriend,
+    userImage
 }) => {
     const cols = [];
 
@@ -143,10 +151,11 @@ export const createColumns = ({
             header: ({ column }) =>
                 sortButton({
                     column,
-                    label: t('table.friendList.no'),
+                    label: () => t('table.friendList.no'),
                     descFirst: true
                 }),
             size: 100,
+            meta: { label: () => t('table.friendList.no') },
             sortingFn: sortByNumber((row) => row?.$friendNumber ?? 0),
             cell: ({ row }) => <span>{row.original?.$friendNumber || ''}</span>
         },
@@ -156,17 +165,23 @@ export const createColumns = ({
             header: () => t('table.friendList.avatar'),
             size: 90,
             enableSorting: false,
+            meta: { label: () => t('table.friendList.avatar') },
             cell: ({ row }) => {
                 const src = userImage(row.original, true);
-                return src ? (
+                return (
                     <div class="flex items-center">
-                        <img
-                            src={src}
-                            class="friends-list-avatar object-cover w-6! h-6"
-                            loading="lazy"
-                        />
+                        <Avatar class="size-6 rounded-full">
+                            <AvatarImage
+                                src={src}
+                                class="friends-list-avatar object-cover"
+                                loading="lazy"
+                            />
+                            <AvatarFallback>
+                                <User class="size-3 text-muted-foreground" />
+                            </AvatarFallback>
+                        </Avatar>
                     </div>
-                ) : null;
+                );
             }
         },
         {
@@ -175,9 +190,10 @@ export const createColumns = ({
             header: ({ column }) =>
                 sortButton({
                     column,
-                    label: t('table.friendList.displayName')
+                    label: () => t('table.friendList.displayName')
                 }),
             size: 200,
+            meta: { label: () => t('table.friendList.displayName') },
             sortingFn: sortByString((row) => row?.displayName ?? ''),
             cell: ({ row }) => {
                 const style = randomUserColours?.value
@@ -196,9 +212,10 @@ export const createColumns = ({
             header: ({ column }) =>
                 sortButton({
                     column,
-                    label: t('table.friendList.rank')
+                    label: () => t('table.friendList.rank')
                 }),
             size: 140,
+            meta: { label: () => t('table.friendList.rank') },
             sortingFn: sortByNumber((row) => row?.$trustSortNum ?? 0),
             cell: ({ row }) => {
                 if (randomUserColours?.value) {
@@ -222,11 +239,15 @@ export const createColumns = ({
             id: 'status',
             accessorFn: (row) => row?.status,
             header: ({ column }) =>
-                sortButton({ column, label: t('table.friendList.status') }),
+                sortButton({
+                    column,
+                    label: () => t('table.friendList.status')
+                }),
             minSize: 200,
             sortingFn: sortByStatus,
             meta: {
-                stretch: true
+                stretch: true,
+                label: () => t('table.friendList.status')
             },
             cell: ({ row }) => {
                 const status = row.original?.status;
@@ -250,8 +271,12 @@ export const createColumns = ({
             id: 'language',
             accessorFn: (row) => row?.$languages,
             header: ({ column }) =>
-                sortButton({ column, label: t('table.friendList.language') }),
+                sortButton({
+                    column,
+                    label: () => t('table.friendList.language')
+                }),
             size: 130,
+            meta: { label: () => t('table.friendList.language') },
             sortingFn: sortByLanguages,
             cell: ({ row }) => (
                 <div class="flex items-center">
@@ -279,6 +304,7 @@ export const createColumns = ({
             header: () => t('table.friendList.bioLink'),
             size: 130,
             enableSorting: false,
+            meta: { label: () => t('table.friendList.bioLink') },
             cell: ({ row }) => (
                 <div class="flex items-center">
                     {(row.original?.bioLinks ?? [])
@@ -305,12 +331,13 @@ export const createColumns = ({
             header: ({ column }) =>
                 sortButton({
                     column,
-                    label: t('table.friendList.joinCount')
+                    label: () => t('table.friendList.joinCount')
                 }),
             size: 120,
             sortingFn: sortByNumber((row) => row?.$joinCount ?? 0),
             meta: {
-                class: 'text-right'
+                class: 'text-right',
+                label: () => t('table.friendList.joinCount')
             }
         },
         {
@@ -319,12 +346,13 @@ export const createColumns = ({
             header: ({ column }) =>
                 sortButton({
                     column,
-                    label: t('table.friendList.timeTogether')
+                    label: () => t('table.friendList.timeTogether')
                 }),
             size: 140,
             sortingFn: sortByNumber((row) => row?.$timeSpent ?? 0),
             meta: {
-                class: 'text-right'
+                class: 'text-right',
+                label: () => t('table.friendList.timeTogether')
             },
             cell: ({ row }) => {
                 const time = row.original?.$timeSpent;
@@ -337,9 +365,10 @@ export const createColumns = ({
             header: ({ column }) =>
                 sortButton({
                     column,
-                    label: t('table.friendList.lastSeen')
+                    label: () => t('table.friendList.lastSeen')
                 }),
             size: 170,
+            meta: { label: () => t('table.friendList.lastSeen') },
             sortingFn: sortByString((row) => row?.$lastSeen ?? ''),
             cell: ({ row }) => {
                 const text = formatDateFilter(row.original?.$lastSeen, 'long');
@@ -352,16 +381,31 @@ export const createColumns = ({
             header: ({ column }) =>
                 sortButton({
                     column,
-                    label: t('table.friendList.mutualFriends')
+                    label: () => t('table.friendList.mutualFriends')
                 }),
             size: 120,
             sortingFn: sortByNumber((row) => row?.$mutualCount ?? 0),
             meta: {
-                class: 'text-right'
+                class: 'text-right',
+                label: () => t('table.friendList.mutualFriends')
             },
             cell: ({ row }) => {
                 const count = row.original?.$mutualCount;
-                return count ? <span>{count}</span> : null;
+                const optedOut = row.original?.$mutualOptedOut;
+                if (!count && !optedOut) return null;
+                return (
+                    <span class="inline-flex items-center gap-1">
+                        {count || null}
+                        {optedOut ? (
+                            <TooltipWrapper
+                                side="top"
+                                content={t('table.friendList.mutualOptedOut')}
+                            >
+                                <EyeOff class="h-3.5 w-3.5 text-muted-foreground" />
+                            </TooltipWrapper>
+                        ) : null}
+                    </span>
+                );
             }
         },
         {
@@ -370,9 +414,10 @@ export const createColumns = ({
             header: ({ column }) =>
                 sortButton({
                     column,
-                    label: t('table.friendList.lastActivity')
+                    label: () => t('table.friendList.lastActivity')
                 }),
             size: 200,
+            meta: { label: () => t('table.friendList.lastActivity') },
             sortingFn: sortByString((row) => row?.last_activity ?? ''),
             cell: ({ row }) => (
                 <span>
@@ -384,8 +429,12 @@ export const createColumns = ({
             id: 'lastLogin',
             accessorFn: (row) => row?.last_login,
             header: ({ column }) =>
-                sortButton({ column, label: t('table.friendList.lastLogin') }),
+                sortButton({
+                    column,
+                    label: () => t('table.friendList.lastLogin')
+                }),
             size: 200,
+            meta: { label: () => t('table.friendList.lastLogin') },
             sortingFn: sortByString((row) => row?.last_login ?? ''),
             cell: ({ row }) => (
                 <span>
@@ -399,9 +448,10 @@ export const createColumns = ({
             header: ({ column }) =>
                 sortButton({
                     column,
-                    label: t('table.friendList.dateJoined')
+                    label: () => t('table.friendList.dateJoined')
                 }),
             size: 120,
+            meta: { label: () => t('table.friendList.dateJoined') },
             sortingFn: sortByString((row) => row?.date_joined ?? ''),
             cell: ({ row }) => <span>{row.original?.date_joined ?? ''}</span>
         },
@@ -411,7 +461,8 @@ export const createColumns = ({
             size: 100,
             enableSorting: false,
             meta: {
-                class: 'text-center'
+                class: 'text-center',
+                label: t('table.friendList.unfriend')
             },
             cell: ({ row }) => (
                 // TODO(icon): verify unfollow icon replacement

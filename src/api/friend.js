@@ -1,5 +1,22 @@
-import { request } from '../service/request';
+import { queryClient } from '../queries';
+import { request } from '../services/request';
 import { useUserStore } from '../stores/user';
+import { applyUser } from '../coordinators/userCoordinator';
+import { watchState } from '../services/watchState';
+
+/**
+ *
+ */
+function refetchActiveFriendListQueries() {
+    queryClient
+        .invalidateQueries({
+            queryKey: ['friends'],
+            refetchType: 'active'
+        })
+        .catch((err) => {
+            console.error('Failed to refresh friend list queries:', err);
+        });
+}
 
 const friendReq = {
     /**
@@ -21,7 +38,27 @@ const friendReq = {
                     console.error('/friends gave us garbage', user);
                     continue;
                 }
-                userStore.applyUser(user);
+                // hacky way to add state to bulk fetch at startup
+                if (!watchState.isFriendsLoaded) {
+                    for (const item of json) {
+                        if (
+                            userStore.currentUser.activeFriends.includes(
+                                item.id
+                            )
+                        ) {
+                            item.state = 'active';
+                        } else if (
+                            userStore.currentUser.onlineFriends.includes(
+                                item.id
+                            )
+                        ) {
+                            item.state = 'online';
+                        } else {
+                            item.state = 'offline';
+                        }
+                    }
+                }
+                applyUser(user);
             }
             return args;
         });
@@ -39,6 +76,7 @@ const friendReq = {
                 json,
                 params
             };
+            refetchActiveFriendListQueries();
             return args;
         });
     },
@@ -55,12 +93,14 @@ const friendReq = {
                 json,
                 params
             };
+            refetchActiveFriendListQueries();
             return args;
         });
     },
 
     /**
      * @param {{ userId: string }} params
+     * @param customMsg
      * @returns {Promise<{json: any, params: { userId: string }}>}
      */
     deleteFriend(params, customMsg) {
@@ -72,6 +112,7 @@ const friendReq = {
                 json,
                 params
             };
+            refetchActiveFriendListQueries();
             return args;
         });
     },

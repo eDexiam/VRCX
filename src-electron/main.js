@@ -49,6 +49,10 @@ let isOverlayActive = false;
 let appIsQuitting = false;
 const rootDir = app.getAppPath();
 
+let tray = null;
+let trayIcon = null;
+let trayIconNotify = null;
+
 // Get launch arguments
 let appImagePath = process.env.APPIMAGE;
 const args = process.argv.slice(1);
@@ -103,6 +107,8 @@ const OVERLAY_SHARED_WIDTH = Math.max(
 );
 const OVERLAY_FRAME_SIZE = OVERLAY_SHARED_WIDTH * OVERLAY_SHARED_HEIGHT * 4;
 const OVERLAY_SHM_PATH = '/dev/shm/vrcx_overlay';
+const overlayFrameBuffer = Buffer.alloc(OVERLAY_FRAME_SIZE + 1);
+let activeNotification = null;
 
 function createOverlayWindowShm() {
     fs.writeFileSync(OVERLAY_SHM_PATH, Buffer.alloc(OVERLAY_FRAME_SIZE + 1));
@@ -124,7 +130,7 @@ ipcMain.handle('callDotNetMethod', (event, className, methodName, args) => {
     return interopApi.callMethod(className, methodName, args);
 });
 
-/** @type {BrowserWindow} */
+/** @type {Electron.CrossProcessExports.BrowserWindow} */
 let mainWindow = undefined;
 
 const VRCXStorage = interopApi.getDotNetObject('VRCXStorage');
@@ -195,12 +201,23 @@ ipcMain.handle('dialog:openDirectory', async () => {
 });
 
 ipcMain.handle('notification:showNotification', (event, title, body, icon) => {
-    const notification = {
+    if (activeNotification) {
+        activeNotification.close();
+    }
+
+    const notification = new Notification({
         title,
         body,
         icon
-    };
-    new Notification(notification).show();
+    });
+    notification.on('close', () => {
+        if (activeNotification === notification) {
+            notification.removeAllListeners();
+            activeNotification = null;
+        }
+    });
+    activeNotification = notification;
+    notification.show();
 });
 
 ipcMain.handle('app:restart', () => {
@@ -216,6 +233,7 @@ ipcMain.handle('app:restart', () => {
             }
         }
         app.relaunch(options);
+        destroyTray();
         app.exit(0);
     } else {
         app.relaunch();
@@ -292,6 +310,7 @@ function tryRelaunchWithArgs(args) {
 
     child.unref();
 
+    destroyTray();
     app.exit(0);
 }
 
@@ -302,6 +321,7 @@ function createWindow() {
     const y = parseInt(VRCXStorage.Get('VRCX_LocationY')) || 0;
     const width = parseInt(VRCXStorage.Get('VRCX_SizeWidth')) || 1920;
     const height = parseInt(VRCXStorage.Get('VRCX_SizeHeight')) || 1080;
+    const zoomLevel = parseFloat(VRCXStorage.Get('VRCX_ZoomLevel')) || 0;
     mainWindow = new BrowserWindow({
         x,
         y,
@@ -339,21 +359,31 @@ function createWindow() {
     // Open the DevTools.
     // mainWindow.webContents.openDevTools()
 
+    mainWindow.webContents.on('did-finish-load', () => {
+        mainWindow.webContents.setZoomLevel(zoomLevel);
+    });
+
     mainWindow.webContents.on('before-input-event', (event, input) => {
         if (input.control && input.key === '=') {
             mainWindow.webContents.setZoomLevel(
                 mainWindow.webContents.getZoomLevel() + 1
             );
         }
+        if (input.control && input.key === '-') {
+            mainWindow.webContents.setZoomLevel(
+                mainWindow.webContents.getZoomLevel() - 1
+            );
+        }
     });
 
     mainWindow.webContents.on('zoom-changed', (event, zoomDirection) => {
-        const currentZoom = mainWindow.webContents.getZoomLevel();
+        let currentZoom = mainWindow.webContents.getZoomLevel();
         if (zoomDirection === 'in') {
-            mainWindow.webContents.setZoomLevel(currentZoom + 1);
+            mainWindow.webContents.setZoomLevel(++currentZoom);
         } else {
-            mainWindow.webContents.setZoomLevel(currentZoom - 1);
+            mainWindow.webContents.setZoomLevel(--currentZoom);
         }
+        VRCXStorage.Set('VRCX_ZoomLevel', currentZoom.toString());
     });
     mainWindow.webContents.setVisualZoomLevelLimits(1, 5);
 
@@ -450,23 +480,29 @@ function createOverlayWindowOffscreen() {
 }
 
 function writeOverlayFrame(imageBuffer) {
+    let fd;
     try {
-        const fd = fs.openSync(OVERLAY_SHM_PATH, 'r+');
-        const buffer = Buffer.alloc(OVERLAY_FRAME_SIZE + 1);
-        buffer[0] = 0; // not ready
-        imageBuffer.copy(buffer, 1, 0, OVERLAY_FRAME_SIZE);
-        buffer[0] = 1; // ready
-        fs.writeSync(fd, buffer);
-        fs.closeSync(fd);
+        fd = fs.openSync(OVERLAY_SHM_PATH, 'r+');
+        overlayFrameBuffer[0] = 0; // not ready
+        imageBuffer.copy(overlayFrameBuffer, 1, 0, OVERLAY_FRAME_SIZE);
+        overlayFrameBuffer[0] = 1; // ready
+        fs.writeSync(fd, overlayFrameBuffer);
         //console.log('Wrote frame to shared memory');
     } catch (err) {
         console.error('Error writing frame to shared memory:', err);
+    } finally {
+        if (typeof fd === 'number') {
+            fs.closeSync(fd);
+        }
     }
 }
 
-let tray = null;
-let trayIcon = null;
-let trayIconNotify = null;
+function destroyTray() {
+    if (tray) {
+        tray.destroy();
+        tray = null;
+    }
+}
 function createTray() {
     if (process.platform === 'darwin') {
         const image = nativeImage.createFromPath(
@@ -526,7 +562,9 @@ function createTray() {
 }
 
 function setTrayIconNotification(notify) {
-    tray.setImage(notify ? trayIconNotify : trayIcon);
+    if (tray) {
+        tray.setImage(notify ? trayIconNotify : trayIcon);
+    }
 }
 
 async function installVRCX() {
@@ -593,6 +631,7 @@ async function installVRCX() {
                 fs.renameSync(appImagePath, appImageHomePath);
                 appImagePath = appImageHomePath;
                 console.log('AppImage moved to:', appImageHomePath);
+                await createDesktopFile();
             } catch (err) {
                 console.error(`Error moving AppImage ${appImageHomePath}`, err);
                 dialog.showErrorBox(
@@ -606,8 +645,6 @@ async function installVRCX() {
 
     // inform .NET side about AppImage path
     interopApi.getDotNetObject('Update').Init(appImagePath);
-
-    await createDesktopFile();
 }
 
 async function createDesktopFile() {
@@ -891,6 +928,11 @@ function disposeOverlay() {
         return;
     }
     if (overlayWindow && !overlayWindow.isDestroyed()) {
+        const { webContents } = overlayWindow;
+        if (webContents && !webContents.isDestroyed()) {
+            webContents.removeAllListeners('paint');
+            webContents.stopPainting();
+        }
         overlayWindow.close();
     }
     overlayWindow = undefined;
@@ -904,6 +946,7 @@ app.on('before-quit', function () {
     // Mark it as a quitting state to make macOS Dock's "Quit" action take effect.
     appIsQuitting = true;
     disposeOverlay();
+    destroyTray();
 });
 
 app.on('window-all-closed', function () {

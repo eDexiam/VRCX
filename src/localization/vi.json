@@ -43,6 +43,10 @@
                 "devEndpoint": "Dev Endpoint",
                 "endpoint": "Endpoint",
                 "websocket": "WebSocket"
+            },
+            "language_detect": {
+                "title": "Đã phát hiện ngôn ngữ",
+                "description": "Ngôn ngữ hệ thống của bạn có vẻ là {language}. Bạn có muốn chuyển sang không?"
             }
         },
         "feed": {
@@ -90,9 +94,7 @@
             },
             "group": {
                 "header": "Nhóm"
-            },
-            "prev_page": "Trước",
-            "next_page": "Sau"
+            }
         },
         "favorite": {
             "worlds": {
@@ -1399,13 +1401,6 @@
                 "success": "YouTube Preview đã được thay đổi"
             }
         },
-        "change_table_size": {
-            "header": "Kích thước bảng tối đa",
-            "description": "Giới hạn số lượng thông tin trên bảng UI, bảng lớn sẽ sử dụng RAM và hiệu năng nhiều hơn",
-            "table_max_size": "Kích thước bảng tối đa",
-            "cancel": "Hủy",
-            "save": "Lưu"
-        },
         "photon_lobby_timeout": {
             "header": "User Timeout Threshold",
             "description": "Nhập số giây (mặc định: 3)",
@@ -1440,6 +1435,13 @@
             "description": "Enter proxy server address and port",
             "close": "Đóng",
             "restart": "Restart"
+        },
+        "table_entries_settings": {
+            "header": "Kích thước bảng tối đa",
+            "description": "Giới hạn số lượng thông tin trên bảng UI, bảng lớn sẽ sử dụng RAM và hiệu năng nhiều hơn",
+            "table_max_entries": "Kích thước bảng tối đa",
+            "cancel": "Hủy",
+            "save": "Lưu"
         }
     },
     "table": {

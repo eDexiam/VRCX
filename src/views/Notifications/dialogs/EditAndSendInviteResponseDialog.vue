@@ -6,7 +6,7 @@
             <DialogHeader>
                 <DialogTitle>{{ t('dialog.edit_send_invite_response_message.header') }}</DialogTitle>
             </DialogHeader>
-            <div style="font-size: 12px">
+            <div class="text-xs">
                 <span>{{ t('dialog.edit_send_invite_response_message.description') }}</span>
             </div>
             <InputGroupTextareaField
@@ -39,7 +39,7 @@
     import { useI18n } from 'vue-i18n';
 
     import { inviteMessagesRequest, notificationRequest } from '../../../api';
-    import { useGalleryStore } from '../../../stores';
+    import { useGalleryStore, useNotificationStore } from '../../../stores';
 
     const { t } = useI18n();
     const galleryStore = useGalleryStore();
@@ -101,9 +101,13 @@
                     toast.error(t('message.error'));
                 })
                 .then((args) => {
-                    notificationRequest.hideNotification({
-                        notificationId: I.invite.id
-                    });
+                    notificationRequest
+                        .hideNotification({
+                            notificationId: I.invite.id
+                        })
+                        .then(() => {
+                            useNotificationStore().handleNotificationHide(I.invite.id);
+                        });
                     toast.success(t('message.invite.response_sent'));
                     return args;
                 })
@@ -118,9 +122,13 @@
                     toast.error(t('message.error'));
                 })
                 .then((args) => {
-                    notificationRequest.hideNotification({
-                        notificationId: I.invite.id
-                    });
+                    notificationRequest
+                        .hideNotification({
+                            notificationId: I.invite.id
+                        })
+                        .then(() => {
+                            useNotificationStore().handleNotificationHide(I.invite.id);
+                        });
                     toast.success(t('message.invite.response_sent'));
                     return args;
                 })

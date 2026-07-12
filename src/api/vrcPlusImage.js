@@ -1,8 +1,26 @@
-import { request } from '../service/request';
+import { queryClient } from '../queries';
+import { request } from '../services/request';
 import { useUserStore } from '../stores';
 
+/**
+ *
+ */
 function getCurrentUserId() {
     return useUserStore().currentUser.id;
+}
+
+/**
+ *
+ */
+function refetchActiveGalleryQueries() {
+    queryClient
+        .invalidateQueries({
+            queryKey: ['gallery'],
+            refetchType: 'active'
+        })
+        .catch((err) => {
+            console.error('Failed to refresh gallery queries:', err);
+        });
 }
 const vrcPlusImageReq = {
     uploadGalleryImage(imageData) {
@@ -19,6 +37,7 @@ const vrcPlusImageReq = {
                 json,
                 params
             };
+            refetchActiveGalleryQueries();
             return args;
         });
     },
@@ -34,6 +53,7 @@ const vrcPlusImageReq = {
                 json,
                 params
             };
+            refetchActiveGalleryQueries();
             return args;
         });
     },
@@ -59,6 +79,7 @@ const vrcPlusImageReq = {
                 json,
                 printId
             };
+            refetchActiveGalleryQueries();
             return args;
         });
     },
@@ -74,6 +95,7 @@ const vrcPlusImageReq = {
                 json,
                 params
             };
+            refetchActiveGalleryQueries();
             return args;
         });
     },
@@ -101,6 +123,7 @@ const vrcPlusImageReq = {
                 json,
                 params
             };
+            refetchActiveGalleryQueries();
             return args;
         });
     }

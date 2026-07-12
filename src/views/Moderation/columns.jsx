@@ -9,13 +9,13 @@ import { ArrowUpDown, Trash2, X } from 'lucide-vue-next';
 import { storeToRefs } from 'pinia';
 
 import { formatDateFilter } from '../../shared/utils';
-import { i18n } from '../../plugin';
+import { i18n } from '../../plugins';
 import { useUiStore, useUserStore } from '../../stores';
+import { showUserDialog } from '../../coordinators/userCoordinator';
 
 const { t, te } = i18n.global;
 
 export const createColumns = ({ onDelete, onDeletePrompt }) => {
-    const { showUserDialog } = useUserStore();
     const { shiftHeld } = storeToRefs(useUiStore());
     const { currentUser } = storeToRefs(useUserStore());
 
@@ -32,6 +32,7 @@ export const createColumns = ({ onDelete, onDeletePrompt }) => {
         {
             accessorKey: 'created',
             size: 120,
+            meta: { label: () => t('table.moderation.date') },
             header: ({ column }) => (
                 <Button
                     variant="ghost"
@@ -64,6 +65,7 @@ export const createColumns = ({ onDelete, onDeletePrompt }) => {
             accessorKey: 'type',
             size: 140,
             header: () => t('table.moderation.type'),
+            meta: { label: () => t('table.moderation.type') },
             cell: ({ row }) => {
                 const type = row.getValue('type');
                 const typeKey = `view.moderation.filters.${type}`;
@@ -79,7 +81,8 @@ export const createColumns = ({ onDelete, onDeletePrompt }) => {
         {
             accessorKey: 'sourceDisplayName',
             meta: {
-                class: 'overflow-hidden'
+                class: 'overflow-hidden',
+                label: () => t('table.moderation.source')
             },
             size: 120,
             header: () => t('table.moderation.source'),
@@ -100,7 +103,8 @@ export const createColumns = ({ onDelete, onDeletePrompt }) => {
             size: 200,
             minSize: 80,
             meta: {
-                stretch: true
+                stretch: true,
+                label: () => t('table.moderation.target')
             },
             header: () => t('table.moderation.target'),
             cell: ({ row }) => {
@@ -118,7 +122,8 @@ export const createColumns = ({ onDelete, onDeletePrompt }) => {
         {
             id: 'action',
             meta: {
-                class: 'text-right'
+                class: 'text-right',
+                label: () => t('table.moderation.action')
             },
             size: 80,
             minSize: 80,

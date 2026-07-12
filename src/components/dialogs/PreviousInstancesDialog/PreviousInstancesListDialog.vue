@@ -16,7 +16,7 @@
             :on-sort-change="handleSortChange">
             <template #toolbar>
                 <div style="display: flex; align-items: center; justify-content: space-between">
-                    <span style="font-size: 14px" v-text="headerText"></span>
+                    <span class="text-sm" v-text="headerText"></span>
                     <InputGroupField
                         v-model="search"
                         :placeholder="t('dialog.previous_instances.search_placeholder')"
@@ -56,7 +56,7 @@
     } from '../../../shared/utils';
     import { DataTableLayout } from '../../ui/data-table';
     import { createPreviousInstancesColumns } from './previousInstancesColumns.jsx';
-    import { database } from '../../../service/database';
+    import { database } from '../../../services/database';
     import { useVrcxVueTable } from '../../../lib/table/useVrcxVueTable';
 
     const props = defineProps({
@@ -237,9 +237,7 @@
     );
 
     const totalItems = computed(() => {
-        const length = table.getFilteredRowModel().rows.length;
-        const max = vrcxStore.maxTableSize;
-        return length > max ? max : length;
+        return table.getFilteredRowModel().rows.length;
     });
 
     const handlePageSizeChange = (size) => {
@@ -261,6 +259,7 @@
             const D = previousInstancesListDialog.value;
             if (currentId.value !== D.lastId) {
                 table.setPageIndex(0);
+                pageIndex.value = 0;
                 D.lastId = currentId.value;
             }
             if (props.variant === 'user') {

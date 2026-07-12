@@ -6,21 +6,24 @@
             </DialogHeader>
 
             <div v-if="moderateGroupDialog.visible">
-                <div class="x-friend-item" style="cursor: default">
-                    <div class="avatar">
-                        <img :src="userImage(moderateGroupDialog.userObject)" loading="lazy" />
+                <div class="box-border flex items-center p-1.5 text-[13px] cursor-default">
+                    <div class="relative inline-block flex-none size-9 mr-2.5">
+                        <img
+                            class="size-full rounded-full object-cover"
+                            :src="userImage(moderateGroupDialog.userObject)"
+                            loading="lazy" />
                     </div>
-                    <div class="detail">
+                    <div class="flex-1 overflow-hidden">
                         <span
                             v-if="moderateGroupDialog.userObject.id"
-                            class="name"
+                            class="block truncate font-medium leading-[18px]"
                             :style="{ color: moderateGroupDialog.userObject.$userColour }"
                             v-text="moderateGroupDialog.userObject.displayName"></span>
                         <span v-else v-text="moderateGroupDialog.userId"></span>
                     </div>
                 </div>
 
-                <div style="margin-top: 15px; width: 100%">
+                <div class="mt-4" style="width: 100%">
                     <VirtualCombobox
                         :model-value="moderateGroupDialog.groupId"
                         @update:modelValue="setGroupId"
@@ -60,13 +63,15 @@
     import { storeToRefs } from 'pinia';
     import { useI18n } from 'vue-i18n';
 
-    import { groupRequest, userRequest } from '../../api';
-    import { hasGroupModerationPermission, userImage } from '../../shared/utils';
+    import { hasGroupModerationPermission } from '../../shared/utils';
+    import { useUserDisplay } from '../../composables/useUserDisplay';
     import { VirtualCombobox } from '../ui/virtual-combobox';
+    import { queryRequest } from '../../api';
     import { useGroupStore } from '../../stores';
+    import { showGroupMemberModerationDialog } from '../../coordinators/groupCoordinator';
 
+    const { userImage } = useUserDisplay();
     const { currentUserGroups, moderateGroupDialog } = storeToRefs(useGroupStore());
-    const { showGroupMemberModerationDialog } = useGroupStore();
     const { t } = useI18n();
 
     const groupsWithModerationPermission = computed(() => {
@@ -86,6 +91,10 @@
         }
     ]);
 
+    /**
+     *
+     * @param value
+     */
     function setGroupId(value) {
         moderateGroupDialog.value.groupId = String(value ?? '');
     }
@@ -101,11 +110,14 @@
         }
     );
 
+    /**
+     *
+     */
     function initDialog() {
         const D = moderateGroupDialog.value;
         if (D.groupId) {
-            groupRequest
-                .getCachedGroup({
+            queryRequest
+                .fetch('group', {
                     groupId: D.groupId
                 })
                 .then((args) => {
@@ -117,7 +129,7 @@
         }
 
         if (D.userId) {
-            userRequest.getCachedUser({ userId: D.userId }).then((args) => {
+            queryRequest.fetch('user.dialog', { userId: D.userId }).then((args) => {
                 D.userObject = args.ref;
             });
         }

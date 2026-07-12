@@ -1,7 +1,7 @@
 import { ArrowUpDown } from 'lucide-vue-next';
 
 import { Button } from '../../ui/button';
-import { i18n } from '../../../plugin';
+import { i18n } from '../../../plugins';
 import { formatDateFilter } from '../../../shared/utils';
 
 const { t } = i18n.global;
@@ -68,7 +68,10 @@ export const createColumns = ({ onLookupUser }) => [
         id: 'displayName',
         accessorFn: (row) => row?.displayName ?? '',
         header: ({ column }) =>
-            sortButton({ column, label: t('table.previous_instances.display_name') }),
+            sortButton({
+                column,
+                label: t('table.previous_instances.display_name')
+            }),
         meta: {
             stretch: true
         },
@@ -91,14 +94,16 @@ export const createColumns = ({ onLookupUser }) => [
         id: 'time',
         accessorFn: (row) => row?.time ?? 0,
         size: 100,
-        header: ({ column }) => sortButton({ column, label: t('table.previous_instances.time') }),
+        header: ({ column }) =>
+            sortButton({ column, label: t('table.previous_instances.time') }),
         cell: ({ row }) => <span>{row.original?.timer ?? ''}</span>
     },
     {
         id: 'count',
         accessorFn: (row) => row?.count ?? 0,
         size: 100,
-        header: ({ column }) => sortButton({ column, label: t('table.previous_instances.count') }),
+        header: ({ column }) =>
+            sortButton({ column, label: t('table.previous_instances.count') }),
         cell: ({ row }) => <span>{row.original?.count ?? ''}</span>
     }
 ];
