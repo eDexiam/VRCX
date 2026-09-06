@@ -1,10 +1,11 @@
 <template>
     <div class="flex row-auto gap-2" v-bind="$attrs">
-        <div id="standart-actions" class="flex row-auto gap-2">
+        <div v-if="showButtons" class="flex row-auto gap-2">
             <div v-if="showLaunchButton" class="inline-block">
                 <TooltipWrapper side="top" :content="t('dialog.user.info.launch_invite_tooltip')">
                     <Button
                         class="rounded-full w-6 h-6 text-xs text-muted-foreground hover:text-foreground"
+                        :style="buttonStyle"
                         size="icon-sm"
                         variant="outline"
                         :ariaLabel="t('dialog.user.info.launch_invite_tooltip')"
@@ -20,6 +21,7 @@
                     :content="t('dialog.user.info.self_invite_tooltip')">
                     <Button
                         class="rounded-full h-6 w-6 text-xs text-muted-foreground hover:text-foreground"
+                        :style="buttonStyle"
                         size="icon-sm"
                         variant="outline"
                         :ariaLabel="t('dialog.user.info.self_invite_tooltip')"
@@ -30,6 +32,7 @@
                 <TooltipWrapper v-else side="top" :content="t('dialog.user.info.open_in_vrchat_tooltip')">
                     <Button
                         class="rounded-full h-6 w-6 text-xs text-muted-foreground hover:text-foreground"
+                        :style="buttonStyle"
                         size="icon-sm"
                         variant="outline"
                         :ariaLabel="t('dialog.user.info.open_in_vrchat_tooltip')"
@@ -38,6 +41,7 @@
                     </Button>
                     <Button
                         class="rounded-full h-6 w-6 text-xs text-muted-foreground hover:text-foreground"
+                        :style="buttonStyle"
                         size="icon-sm"
                         variant="outline"
                         :ariaLabel="t('dialog.user.info.open_in_vrchat_tooltip')"
@@ -47,9 +51,24 @@
                     </Button>
                 </TooltipWrapper>
             </div>
+            <TooltipWrapper
+                v-if="instanceInfoState.canSendAnnouncement"
+                side="top"
+                :content="t('dialog.user.info.instance_announcement_tooltip')">
+                <Button
+                    class="rounded-full h-6 w-6 text-xs text-muted-foreground hover:text-foreground"
+                    :style="buttonStyle"
+                    size="icon-sm"
+                    variant="outline"
+                    :ariaLabel="t('dialog.user.info.instance_announcement_tooltip')"
+                    @click="instanceAnnouncementDialogVisible = true">
+                    <Megaphone class="h-4 w-4" />
+                </Button>
+            </TooltipWrapper>
             <TooltipWrapper v-if="showRefreshButton" side="top" :content="refreshTooltip">
                 <Button
                     class="rounded-full w-6 h-6 text-xs text-muted-foreground hover:text-foreground"
+                    :style="buttonStyle"
                     size="icon"
                     variant="outline"
                     :ariaLabel="t('common.actions.refresh')"
@@ -60,6 +79,7 @@
             <TooltipWrapper v-if="showHistoryButton" side="top" :content="historyTooltip">
                 <Button
                     class="rounded-full w-6 h-6 text-xs text-muted-foreground hover:text-foreground"
+                    :style="buttonStyle"
                     size="icon-sm"
                     variant="outline"
                     :ariaLabel="t('dialog.social_status.history')"
@@ -69,11 +89,18 @@
             </TooltipWrapper>
         </div>
 
-        <div v-if="showInstanceInfo" class="flex items-center gap-1.5 text-muted-foreground">
+        <div
+            v-if="showInstanceInfo"
+            :class="
+                cn(
+                    'flex items-center gap-1.5 text-muted-foreground rounded-full border border-muted-foreground/10 py-0.5 px-2',
+                    props.class
+                )
+            ">
             <TooltipWrapper v-if="instanceInfoState.isValidInstance" side="top">
                 <template #content>
-                    <div class="flex flex-col flex-wrap items-center gap-x-6 gap-y-2">
-                        <div class="flex gap-1">
+                    <div class="flex flex-col flex-wrap gap-x-6 gap-y-2">
+                        <div class="flex flex-col gap-1">
                             <span>
                                 <span class="text-platform-pc border-platform-pc!">PC: </span>
                                 {{ instance?.platforms?.standalonewindows }}
@@ -143,34 +170,46 @@
                     </span>
                 </TooltipWrapper>
             </span>
-        </div>
 
-        <div v-if="hasInstanceMetadata" class="flex items-center row-auto gap-2">
-            <TooltipWrapper side="top" :content="t('dialog.user.info.instance_queue')">
-                <span v-if="instance?.queueSize" class="flex items-center gap-0.5">
-                    <SquareStack class="h-4 w-4" />
-                    {{ instance.queueSize }}
-                </span>
-            </TooltipWrapper>
-            <TooltipWrapper side="top" :content="t('dialog.user.info.instance_age_gated')">
-                <span v-if="instanceInfoState.isAgeGated" class="flex items-center gap-0.5 text-red-500">
-                    <IdCard class="h-4 w-4" />
-                </span>
-            </TooltipWrapper>
-            <TooltipWrapper side="top" :content="t('dialog.user.info.instance_role_restricted')">
-                <span v-if="instanceInfoState.isRoleRestricted" class="flex items-center gap-0.5 text-red-500">
-                    <UserLock class="h-4 w-4" />
-                </span>
-            </TooltipWrapper>
-            <TooltipWrapper
-                v-if="instance?.minimumAvatarPerformance && instance.minimumAvatarPerformance !== 'None'"
-                side="top"
-                :content="
-                    t('dialog.user.info.instance_minimum_avatar_performance') + ': ' + instance.minimumAvatarPerformance
-                ">
-                <img :src="performanceIcon" class="h-4 w-4" />
-            </TooltipWrapper>
+            <template v-if="hasInstanceMetadata">
+                <TooltipWrapper v-if="instance?.queueSize" side="top" :content="t('dialog.user.info.instance_queue')">
+                    <span class="flex items-center gap-0.5">
+                        <SquareStack class="h-4 w-4" />
+                        {{ instance.queueSize }}
+                    </span>
+                </TooltipWrapper>
+                <TooltipWrapper
+                    v-if="instanceInfoState.isAgeGated"
+                    side="top"
+                    :content="t('dialog.user.info.instance_age_gated')">
+                    <span class="flex items-center gap-0.5 text-red-500">
+                        <IdCard class="h-4 w-4" />
+                    </span>
+                </TooltipWrapper>
+                <TooltipWrapper
+                    v-if="instanceInfoState.isRoleRestricted"
+                    side="top"
+                    :content="t('dialog.user.info.instance_role_restricted')">
+                    <span class="flex items-center gap-0.5 text-red-500">
+                        <UserLock class="h-4 w-4" />
+                    </span>
+                </TooltipWrapper>
+                <TooltipWrapper
+                    v-if="instance?.minimumAvatarPerformance && instance.minimumAvatarPerformance !== 'None'"
+                    side="top"
+                    :content="
+                        t('dialog.user.info.instance_minimum_avatar_performance') +
+                        ': ' +
+                        instance.minimumAvatarPerformance
+                    ">
+                    <img :src="performanceIcon" class="h-4 w-4" />
+                </TooltipWrapper>
+            </template>
         </div>
+        <InstanceAnnouncementDialog
+            v-if="instanceAnnouncementDialogVisible"
+            v-model:open="instanceAnnouncementDialogVisible"
+            :location="resolvedInstanceLocation" />
     </div>
 </template>
 
@@ -181,6 +220,7 @@
         LogIn,
         Mail,
         MapPin,
+        Megaphone,
         PowerIcon,
         RefreshCw,
         UsersRound,
@@ -208,6 +248,7 @@
     import { hasGroupPermission, parseLocation } from '../shared/utils';
     import { useInviteChecks } from '../composables/useInviteChecks';
     import { instanceRequest, miscRequest } from '../api';
+    import InstanceAnnouncementDialog from './dialogs/InstanceAnnouncementDialog.vue';
 
     defineOptions({
         inheritAttrs: false
@@ -289,6 +330,10 @@
             type: Boolean,
             default: true
         },
+        showButtons: {
+            type: Boolean,
+            default: true
+        },
         refreshTooltip: {
             type: String,
             default: ''
@@ -304,7 +349,12 @@
         onHistory: {
             type: Function,
             default: null
-        }
+        },
+        buttonStyle: {
+            type: Object,
+            default: () => ({})
+        },
+        class: { type: null, required: false }
     });
 
     const resolvedLaunchLocation = computed(() => props.launchLocation || props.location);
@@ -319,10 +369,11 @@
     const showHistoryButton = computed(() => props.showHistory && typeof props.onHistory === 'function');
 
     const lastJoin = ref(null);
+    const instanceAnnouncementDialogVisible = ref(false);
     const showLastJoinIndicator = computed(() => props.showLastJoin && lastJoin.value);
     const hasInstanceMetadata = computed(() => {
         return !!(
-            props.instance.value?.queueSize ||
+            props.instance?.queueSize ||
             instanceInfoState.isAgeGated ||
             instanceInfoState.isRoleRestricted ||
             (props.instance.minimumAvatarPerformance && props.instance.minimumAvatarPerformance !== 'None')
@@ -338,6 +389,7 @@
     const instanceInfoState = reactive({
         isValidInstance: false,
         canCloseInstance: false,
+        canSendAnnouncement: false,
         isAgeGated: false,
         isRoleRestricted: false,
         disabledContentSettings: ''
@@ -394,6 +446,7 @@
         Object.assign(instanceInfoState, {
             isValidInstance: false,
             canCloseInstance: false,
+            canSendAnnouncement: false,
             isAgeGated: false,
             isRoleRestricted: false,
             disabledContentSettings: ''
@@ -407,6 +460,9 @@
         } else if (props.instance.ownerId?.startsWith('grp_')) {
             const group = groupStore.cachedGroups.get(props.instance.ownerId);
             instanceInfoState.canCloseInstance = hasGroupPermission(group, 'group-instance-moderate');
+            instanceInfoState.canSendAnnouncement =
+                hasGroupPermission(group, 'group-instance-announcement-create') &&
+                resolvedInstanceLocation.value === locationStore.lastLocation.location;
         }
         instanceInfoState.isAgeGated = props.instance.ageGate === true;
         if (resolvedInstanceLocation.value?.includes('~ageGate')) instanceInfoState.isAgeGated = true;

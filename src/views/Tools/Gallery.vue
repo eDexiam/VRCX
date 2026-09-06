@@ -502,6 +502,16 @@
                                         @click="deletePrint(image.id)">
                                         <Trash2 />
                                     </Button>
+                                    <Button
+                                        size="icon-sm"
+                                        variant="ghost"
+                                        class="rounded-full ml-auto"
+                                        @click="toggleFavoritePrint(image.id)">
+                                        <Star 
+                                            :class="favoritePrintIds.has(image.id)
+                                                ? 'text-yellow-500 fill-yellow-500'
+                                                : 'hover:text-yellow-500'" />
+                                    </Button>
                                 </ItemFooter>
                             </div>
                         </Item>
@@ -511,7 +521,7 @@
 
             <template #inventory>
                 <div>
-                    <div class="flex items-center">
+                    <div class="flex items-center gap-2 flex-wrap">
                         <ButtonGroup>
                             <Button variant="outline" size="sm" @click="getInventory">
                                 <RefreshCw />
@@ -522,16 +532,29 @@
                                 {{ t('dialog.gallery_icons.redeem') }}
                             </Button>
                         </ButtonGroup>
+                        <Select v-model="inventoryTypeFilter">
+                            <SelectTrigger size="sm" class="w-44">
+                                <SelectValue placeholder="All types" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectGroup>
+                                    <SelectItem value="all">All types</SelectItem>
+                                    <SelectItem v-for="type in inventoryTypeOptions" :key="type" :value="type">
+                                        {{ type }}
+                                    </SelectItem>
+                                </SelectGroup>
+                            </SelectContent>
+                        </Select>
                     </div>
                     <ItemGroup
                         class="grid gap-3 mt-3"
                         style="grid-template-columns: repeat(auto-fill, minmax(180px, 1fr))">
                         <Item
-                            v-for="item in inventoryTable"
+                            v-for="item in filteredInventoryTable"
                             :key="item.id"
                             variant="outline"
                             size="sm"
-                            class="p-0 x-hover-card hover:bg-accent hover:shadow-sm"
+                            class="p-0 pb-4 x-hover-card hover:bg-accent hover:shadow-sm"
                             as-child>
                             <div class="overflow-hidden">
                                 <ItemHeader class="cursor-pointer" @click="showFullscreenImageDialog(item.imageUrl)">
@@ -550,21 +573,9 @@
                                     <ItemDescription class="text-[11px] truncate font-mono">
                                         {{ formatDateFilter(item.created_at, 'long') }}
                                     </ItemDescription>
-                                    <ItemDescription class="text-xs">
-                                        <span v-if="item.itemType === 'prop'">{{
-                                            t('dialog.gallery_icons.item')
-                                        }}</span>
-                                        <span v-else-if="item.itemType === 'sticker'">{{
-                                            t('dialog.gallery_icons.sticker')
-                                        }}</span>
-                                        <span v-else-if="item.itemType === 'droneskin'">{{
-                                            t('dialog.gallery_icons.drone_skin')
-                                        }}</span>
-                                        <span v-else-if="item.itemType === 'emoji'">{{
-                                            t('dialog.gallery_icons.emoji')
-                                        }}</span>
-                                        <span v-else v-text="item.itemTypeLabel"></span>
-                                    </ItemDescription>
+                                    <ItemDescription class="text-xs">{{
+                                        item.itemTypeLabel || item.itemType
+                                    }}</ItemDescription>
                                 </ItemContent>
                                 <ItemFooter v-if="item.itemType === 'bundle'" class="p-2">
                                     <Button size="sm" @click="consumeInventoryBundle(item.id)">
@@ -589,7 +600,7 @@
 </template>
 
 <script setup>
-    import { ArrowLeft, Check, Gift, RefreshCw, Trash2, Upload, X } from 'lucide-vue-next';
+    import { ArrowLeft, Check, Gift, RefreshCw, Trash2, Upload, X, Star } from 'lucide-vue-next';
     import {
         NumberField,
         NumberFieldContent,
@@ -602,6 +613,7 @@
     import { ButtonGroup } from '@/components/ui/button-group';
     import { Checkbox } from '@/components/ui/checkbox';
     import { InputGroupTextareaField } from '@/components/ui/input-group';
+    import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
     import { TabsUnderline } from '@/components/ui/tabs';
     import { VirtualCombobox } from '@/components/ui/virtual-combobox';
     import {
@@ -634,6 +646,7 @@
 
     import Emoji from '../../components/Emoji.vue';
     import ImageCropDialog from '../../components/dialogs/ImageCropDialog.vue';
+    import { database } from '../../services/database';
 
     const { t } = useI18n();
     const router = useRouter();
@@ -647,6 +660,7 @@
         printCropBorder,
         stickerTable,
         printTable,
+        favoritePrintIds,
         emojiTable,
         inventoryTable
     } = storeToRefs(useGalleryStore());
@@ -656,6 +670,7 @@
         refreshVRCPlusIconsTable,
         refreshStickerTable,
         refreshPrintTable,
+        refreshPrintFavorites,
         refreshEmojiTable,
         getInventory,
         handleStickerAdd,
@@ -683,6 +698,7 @@
     const emojiAnimType = ref(false);
     const emojiAnimationStyle = ref('Stop');
     const emojiAnimLoopPingPong = ref(false);
+    const inventoryTypeFilter = ref('all');
 
     const emojiStylePickerGroups = computed(() => [
         {
@@ -699,6 +715,26 @@
 
     const pendingUploads = ref(0);
     const isUploading = computed(() => pendingUploads.value > 0);
+
+    const inventoryTypeOptions = computed(() => {
+        const optionsByType = new Set();
+        for (const item of inventoryTable.value) {
+            if (optionsByType.has(item.itemTypeLabel)) {
+                continue;
+            }
+            optionsByType.add(item.itemTypeLabel);
+        }
+        return Array.from(optionsByType.values()).sort((a, b) => a.localeCompare(b));
+    });
+
+    const filteredInventoryTable = computed(() => {
+        const selectedType = inventoryTypeFilter.value;
+        if (selectedType === 'all') {
+            return inventoryTable.value;
+        }
+
+        return inventoryTable.value.filter((item) => item.itemTypeLabel === selectedType);
+    });
 
     const cropDialogOpen = ref(false);
     const cropDialogTitle = ref('');
@@ -1161,9 +1197,25 @@
      * @param printId
      */
     function deletePrint(printId) {
+        if (favoritePrintIds.value.has(printId)) {
+            toast.warning('This print is in your favorites', {
+                description: 'Please remove it from your favorites before deleting it.'
+            });
+            return;
+        }
         vrcPlusImageRequest.deletePrint(printId).then((args) => {
             removeItemById(printTable.value, args.printId);
         });
+    }
+
+    async function toggleFavoritePrint(printId) {
+        if (favoritePrintIds.value.has(printId)) {
+            await database.removePrintFromFavorites(printId);
+            favoritePrintIds.value.delete(printId);
+        } else {
+            await database.addPrintToFavorites(printId);
+            favoritePrintIds.value.add(printId);
+        }
     }
 
     async function handleDropGallery(event) {

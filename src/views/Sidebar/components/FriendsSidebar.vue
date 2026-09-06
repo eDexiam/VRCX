@@ -42,6 +42,9 @@
                                                         <User class="size-5 text-muted-foreground" />
                                                     </AvatarFallback>
                                                 </Avatar>
+                                                <IconFrame
+                                                    :enabled="sidebarCosmetics"
+                                                    :icon-frame="currentUser.iconFrame" />
                                             </div>
                                             <div class="flex-1 overflow-hidden h-9 flex flex-col justify-between">
                                                 <span
@@ -127,6 +130,9 @@
                                                 </ContextMenuItem>
                                             </ContextMenuSubContent>
                                         </ContextMenuSub>
+                                        <ContextMenuItem @click="openEditProfileFromSidebar">
+                                            {{ t('dialog.user.actions.edit_profile') }}
+                                        </ContextMenuItem>
                                     </ContextMenuContent>
                                 </ContextMenu>
                             </template>
@@ -199,6 +205,7 @@
             </div>
         </div>
         <BackToTop :virtualizer="virtualizer" :target="scrollViewportRef" :tooltip="false" />
+        <EditProfileDialog :edit-profile-dialog="editProfileDialog" />
     </div>
 </template>
 
@@ -223,6 +230,7 @@
         ContextMenuTrigger
     } from '../../../components/ui/context-menu';
     import { Avatar, AvatarFallback, AvatarImage } from '../../../components/ui/avatar';
+    import IconFrame from '../../../components/IconFrame.vue';
     import {
         useAdvancedSettingsStore,
         useAppearanceSettingsStore,
@@ -245,6 +253,7 @@
     import BackToTop from '../../../components/BackToTop.vue';
     import FriendItem from './FriendItem.vue';
     import Location from '../../../components/Location.vue';
+    import EditProfileDialog from '../../../components/dialogs/UserDialog/EditProfileDialog.vue';
     import configRepository from '../../../services/config';
     import { useStatusPresets } from '../../../components/dialogs/UserDialog/composables/useStatusPresets';
 
@@ -270,16 +279,18 @@
         isSidebarDivideByFriendGroup,
         sidebarFavoriteGroups,
         sidebarFavoriteGroupOrder,
-        sidebarSortMethods
+        sidebarSortMethods,
+        sidebarCosmetics
     } = storeToRefs(appearanceSettingsStore);
     const { gameLogDisabled } = storeToRefs(useAdvancedSettingsStore());
-    const { showSendBoopDialog } = useUserStore();
+    const userStore = useUserStore();
+    const { showSendBoopDialog, showEditProfileDialog } = userStore;
     const launchStore = useLaunchStore();
     const { favoriteFriendGroups, groupedByGroupKeyFavoriteFriends, localFriendFavorites } =
         storeToRefs(useFavoriteStore());
     const { lastLocation, lastLocationDestination } = storeToRefs(useLocationStore());
     const { isGameRunning } = storeToRefs(useGameStore());
-    const { currentUser } = storeToRefs(useUserStore());
+    const { currentUser, editProfileDialog } = storeToRefs(userStore);
     const { checkCanInvite, checkCanInviteSelf } = useInviteChecks();
     const { userImage, userStatusClass } = useUserDisplay();
     const { presets: statusPresets, getStatusClass: presetStatusClass } = useStatusPresets();
@@ -649,7 +660,7 @@
         isFriendsGroupMe.value = await configRepository.getBool('VRCX_isFriendsGroupMe', true);
         isVIPFriends.value = await configRepository.getBool('VRCX_isFriendsGroupFavorites', true);
         isOnlineFriends.value = await configRepository.getBool('VRCX_isFriendsGroupOnline', true);
-        isActiveFriends.value = await configRepository.getBool('VRCX_isFriendsGroupActive', false);
+        isActiveFriends.value = await configRepository.getBool('VRCX_isFriendsGroupActive', true);
         isOfflineFriends.value = await configRepository.getBool('VRCX_isFriendsGroupOffline', true);
         isSidebarGroupByInstanceCollapsed.value = await configRepository.getBool(
             'VRCX_sidebarGroupByInstanceCollapsed',
@@ -782,6 +793,10 @@
             .then(() => {
                 toast.success('Status updated');
             });
+    }
+
+    function openEditProfileFromSidebar() {
+        showEditProfileDialog();
     }
 
     const canInviteToMyLocation = computed(() => checkCanInvite(lastLocation.value.location));

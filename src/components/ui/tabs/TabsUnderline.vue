@@ -22,11 +22,24 @@
         variant: { type: String, default: 'fit' },
         unmountOnHide: { type: Boolean, default: false },
         fill: { type: Boolean, default: false },
-        sticky: { type: Boolean, default: false }
+        sticky: { type: Boolean, default: false },
+        activeColor: { type: String, default: '' },
+        background: { type: Boolean, default: false }
     });
 
     const emit = defineEmits(['update:modelValue']);
-    const { modelValue, defaultValue, items, ariaLabel, variant, unmountOnHide, fill, sticky } = toRefs(props);
+    const {
+        modelValue,
+        defaultValue,
+        items,
+        ariaLabel,
+        variant,
+        unmountOnHide,
+        fill,
+        sticky,
+        activeColor,
+        background
+    } = toRefs(props);
 
     const itemsList = computed(() => (Array.isArray(items.value) ? items.value : []));
 
@@ -60,6 +73,20 @@
         emit('update:modelValue', v);
     }
 
+    const triggerStyle = computed(() => {
+        if (!activeColor.value) {
+            return undefined;
+        }
+        return { color: activeColor.value };
+    });
+
+    const indicatorStyle = computed(() => {
+        if (!activeColor.value) {
+            return undefined;
+        }
+        return { backgroundColor: activeColor.value };
+    });
+
     const triggerClass = computed(() => {
         return [
             'relative inline-flex cursor-pointer h-10 items-center justify-center px-3 text-sm font-medium',
@@ -76,7 +103,8 @@
         return [
             'relative flex w-full items-center gap-1 border-b border-border',
             variant.value === 'pill' ? 'rounded-full bg-muted p-1' : '',
-            sticky.value ? 'sticky top-0 z-10 bg-background' : ''
+            sticky.value ? 'sticky top-0 z-10 bg-background' : '',
+            background.value ? 'pl-2 rounded-xl bg-(--profile-card) overflow-hidden' : ''
         ].join(' ');
     });
 </script>
@@ -91,7 +119,7 @@
         <TabsList :class="listClass" :aria-label="ariaLabel || undefined">
             <TabsIndicator
                 class="pointer-events-none absolute left-0 bottom-0 h-0.5 w-(--reka-tabs-indicator-size) translate-x-(--reka-tabs-indicator-position) transition-[width,translate] duration-200 ease-out">
-                <div class="h-full w-full rounded-full bg-primary" />
+                <div class="h-full w-full rounded-full bg-primary" :style="indicatorStyle" />
             </TabsIndicator>
 
             <TabsTrigger
@@ -99,7 +127,8 @@
                 :key="it.value"
                 :value="it.value"
                 :disabled="it.disabled"
-                :class="triggerClass">
+                :class="triggerClass"
+                :style="innerValue === it.value ? triggerStyle : undefined">
                 <slot :name="`label-${it.value}`">{{ it.label }}</slot>
             </TabsTrigger>
         </TabsList>
@@ -109,7 +138,7 @@
             :key="it.value"
             :value="it.value"
             :class="[
-                'pt-4 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background',
+                'pt-2 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background',
                 fill ? 'min-h-0 flex-1 overflow-y-auto' : ''
             ]">
             <slot :name="it.value" />

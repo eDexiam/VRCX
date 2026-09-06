@@ -140,6 +140,14 @@ export function request(endpoint, options) {
                 const tag = `[API ${init.method}]`;
                 if (!parsed.data) {
                     logWebRequest(tag, endpoint, `(${parsed.status}) no data`);
+                } else if (init.method === 'PUT' || init.method === 'POST') {
+                    logWebRequest(
+                        tag,
+                        endpoint,
+                        `(${parsed.status})`,
+                        init.params,
+                        parsed.data
+                    );
                 } else {
                     logWebRequest(
                         tag,
@@ -184,6 +192,9 @@ export function request(endpoint, options) {
                 );
             }
             if (parsed.parseError) {
+                if (parsed.data === 'ok') {
+                    return parsed;
+                }
                 console.error('JSON parse error for', endpoint);
                 if (parsed.status === 200) {
                     $throw(
@@ -311,6 +322,9 @@ export function shouldIgnoreError(code, endpoint) {
     if (endpoint?.endsWith('/mutuals') && (code === 403 || code === -1)) {
         return true;
     }
+    if (endpoint?.endsWith('/see') && (code === 429 || code === -1)) {
+        return true;
+    }
     return false;
 }
 
@@ -318,6 +332,7 @@ export function shouldIgnoreError(code, endpoint) {
  * @param {number} code
  * @param {string|object} [error]
  * @param {string} [endpoint]
+ * @returns {never}
  */
 export function $throw(code, error, endpoint) {
     let message = [];

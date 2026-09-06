@@ -61,6 +61,10 @@ export const useAppearanceSettingsStore = defineStore(
         const customFontFamily = ref('');
         const appCjkFontPack = ref(APP_CJK_FONT_PACK_DEFAULT_KEY);
         const displayVRCPlusIconsAsAvatar = ref(false);
+        const displayVRCProfileThemes = ref(false);
+        const displayVRCProfileBackgrounds = ref(false);
+        const profileBackgroundOpacity = ref(0.5);
+        const displayVRCProfileCosmetics = ref(false);
         const hideNicknames = ref(false);
         const showInstanceIdInLocation = ref(false);
         const isAgeGatedInstancesVisible = ref(false);
@@ -86,6 +90,7 @@ export const useAppearanceSettingsStore = defineStore(
         const isSidebarDivideByFriendGroup = ref(false);
         const sidebarFavoriteGroups = ref([]);
         const sidebarFavoriteGroupOrder = ref([]);
+        const sidebarCosmetics = ref(false);
         const hideUserNotes = ref(false);
         const hideUserMemos = ref(false);
         const hideUnfriends = ref(false);
@@ -149,6 +154,10 @@ export const useAppearanceSettingsStore = defineStore(
             const [
                 appLanguageConfig,
                 displayVRCPlusIconsAsAvatarConfig,
+                displayVRCProfileThemesConfig,
+                displayVRCProfileBackgroundsConfig,
+                profileBackgroundOpacityConfig,
+                displayVRCProfileCosmeticsConfig,
                 hideNicknamesConfig,
                 showInstanceIdInLocationConfig,
                 isAgeGatedInstancesVisibleConfig,
@@ -167,6 +176,7 @@ export const useAppearanceSettingsStore = defineStore(
                 isSidebarDivideByFriendGroupConfig,
                 sidebarFavoriteGroupsConfig,
                 sidebarFavoriteGroupOrderConfig,
+                sidebarCosmeticsConfig,
                 hideUserNotesConfig,
                 hideUserMemosConfig,
                 hideUnfriendsConfig,
@@ -186,6 +196,16 @@ export const useAppearanceSettingsStore = defineStore(
             ] = await Promise.all([
                 configRepository.getString('VRCX_appLanguage'),
                 configRepository.getBool('displayVRCPlusIconsAsAvatar', true),
+                configRepository.getBool('VRCX_displayVRCProfileThemes', true),
+                configRepository.getBool(
+                    'VRCX_displayVRCProfileBackgrounds',
+                    false
+                ),
+                configRepository.getFloat('VRCX_profileBackgroundOpacity', 0.5),
+                configRepository.getBool(
+                    'VRCX_displayVRCProfileCosmetics',
+                    false
+                ),
                 configRepository.getBool('VRCX_hideNicknames', false),
                 configRepository.getBool(
                     'VRCX_showInstanceIdInLocation',
@@ -235,6 +255,7 @@ export const useAppearanceSettingsStore = defineStore(
                     'VRCX_sidebarFavoriteGroupOrder',
                     '[]'
                 ),
+                configRepository.getBool('VRCX_sidebarCosmetics', false),
                 configRepository.getBool('VRCX_hideUserNotes', false),
                 configRepository.getBool('VRCX_hideUserMemos', false),
                 configRepository.getBool('VRCX_hideUnfriends', false),
@@ -302,6 +323,11 @@ export const useAppearanceSettingsStore = defineStore(
 
             displayVRCPlusIconsAsAvatar.value =
                 displayVRCPlusIconsAsAvatarConfig;
+            displayVRCProfileThemes.value = displayVRCProfileThemesConfig;
+            displayVRCProfileBackgrounds.value =
+                displayVRCProfileBackgroundsConfig;
+            profileBackgroundOpacity.value = profileBackgroundOpacityConfig;
+            displayVRCProfileCosmetics.value = displayVRCProfileCosmeticsConfig;
             hideNicknames.value = hideNicknamesConfig;
             showInstanceIdInLocation.value = showInstanceIdInLocationConfig;
             isAgeGatedInstancesVisible.value = isAgeGatedInstancesVisibleConfig;
@@ -351,6 +377,7 @@ export const useAppearanceSettingsStore = defineStore(
             sidebarFavoriteGroupOrder.value = JSON.parse(
                 sidebarFavoriteGroupOrderConfig
             );
+            sidebarCosmetics.value = sidebarCosmeticsConfig;
             hideUserNotes.value = hideUserNotesConfig;
             hideUserMemos.value = hideUserMemosConfig;
             hideUnfriends.value = hideUnfriendsConfig;
@@ -607,6 +634,50 @@ export const useAppearanceSettingsStore = defineStore(
                 displayVRCPlusIconsAsAvatar.value
             );
         }
+
+        /**
+         *
+         */
+        function setDisplayVRCProfileThemes() {
+            displayVRCProfileThemes.value = !displayVRCProfileThemes.value;
+            configRepository.setBool(
+                'VRCX_displayVRCProfileThemes',
+                displayVRCProfileThemes.value
+            );
+        }
+
+        /**
+         *
+         */
+        function setDisplayVRCProfileBackgrounds() {
+            displayVRCProfileBackgrounds.value =
+                !displayVRCProfileBackgrounds.value;
+            configRepository.setBool(
+                'VRCX_displayVRCProfileBackgrounds',
+                displayVRCProfileBackgrounds.value
+            );
+        }
+
+        /**
+         *
+         */
+        function setProfileBackgroundOpacity(value) {
+            profileBackgroundOpacity.value = value;
+            configRepository.setFloat('VRCX_profileBackgroundOpacity', value);
+        }
+
+        /**
+         *
+         */
+        function setDisplayVRCProfileCosmetics() {
+            displayVRCProfileCosmetics.value =
+                !displayVRCProfileCosmetics.value;
+            configRepository.setBool(
+                'VRCX_displayVRCProfileCosmetics',
+                displayVRCProfileCosmetics.value
+            );
+        }
+
         /**
          *
          */
@@ -859,6 +930,13 @@ export const useAppearanceSettingsStore = defineStore(
                 'VRCX_sidebarFavoriteGroupOrder',
                 JSON.stringify(value)
             );
+        }
+        /**
+         *
+         */
+        function setSidebarCosmetics() {
+            sidebarCosmetics.value = !sidebarCosmetics.value;
+            configRepository.setBool('VRCX_sidebarCosmetics', sidebarCosmetics.value);
         }
         /**
          *
@@ -1166,6 +1244,10 @@ export const useAppearanceSettingsStore = defineStore(
             appFontFamily,
             appCjkFontPack,
             displayVRCPlusIconsAsAvatar,
+            displayVRCProfileThemes,
+            displayVRCProfileBackgrounds,
+            profileBackgroundOpacity,
+            displayVRCProfileCosmetics,
             hideNicknames,
             showInstanceIdInLocation,
             isAgeGatedInstancesVisible,
@@ -1187,6 +1269,7 @@ export const useAppearanceSettingsStore = defineStore(
             isSidebarDivideByFriendGroup,
             sidebarFavoriteGroups,
             sidebarFavoriteGroupOrder,
+            sidebarCosmetics,
             hideUserNotes,
             hideUserMemos,
             hideUnfriends,
@@ -1208,6 +1291,10 @@ export const useAppearanceSettingsStore = defineStore(
 
             setAppLanguage,
             setDisplayVRCPlusIconsAsAvatar,
+            setDisplayVRCProfileThemes,
+            setDisplayVRCProfileBackgrounds,
+            setProfileBackgroundOpacity,
+            setDisplayVRCProfileCosmetics,
             setHideNicknames,
             setShowInstanceIdInLocation,
             setIsAgeGatedInstancesVisible,
@@ -1229,6 +1316,7 @@ export const useAppearanceSettingsStore = defineStore(
             setIsSidebarDivideByFriendGroup,
             setSidebarFavoriteGroups,
             setSidebarFavoriteGroupOrder,
+            setSidebarCosmetics,
             setHideUserNotes,
             setHideUserMemos,
             setHideUnfriends,

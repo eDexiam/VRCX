@@ -28,7 +28,19 @@
             "d": "d",
             "h": "h",
             "m": "m",
-            "s": "s"
+            "s": "s",
+            "year": "year",
+            "month": "month",
+            "day": "day",
+            "hour": "hour",
+            "min": "min",
+            "sec": "sec",
+            "years": "years",
+            "months": "months",
+            "days": "days",
+            "hours": "hours",
+            "mins": "mins",
+            "secs": "secs"
         },
         "days": {
             "sunday": "Sunday",
@@ -423,6 +435,10 @@
             "filter_placeholder": "Filter",
             "search_placeholder": "Search",
             "refresh_tooltip": "Refresh",
+            "clear_type_placeholder": "Clear all moderations",
+            "clear_all": "Clear All",
+            "clear_confirm_title": "Clear Moderations",
+            "clear_confirm_description": "WARNING: This will remove all \"{type}\" moderations from your account and cannot be undone. Continue?",
             "filters": {
                 "block": "Block",
                 "unblock": "Unblock",
@@ -480,7 +496,8 @@
                     "contentrestriction": "Moderation Content Restriction"
                 },
                 "instance": {
-                    "closed": "Instance Closed"
+                    "closed": "Instance Closed",
+                    "announcement": "Instance Announcement"
                 },
                 "badge": {
                     "earned": "Badge Earned"
@@ -494,6 +511,9 @@
                         "gift": "Gift Received"
                     },
                     "alert": "Economy Alert"
+                },
+                "twitchdrop": {
+                    "fulfilled": "Twitch Drop Fulfilled"
                 }
             }
         },
@@ -733,6 +753,9 @@
                 },
                 "favorites": {
                     "header": "Favorites"
+                },
+                "friend_requests": {
+                    "header": "Friend Reqeusts"
                 }
             },
             "vr": {
@@ -853,6 +876,10 @@
                 },
                 "contributors": {
                     "header": "Contributors"
+                },
+                "friend_requests": {
+                    "header": "Auto-decline Spam Friend Requests",
+                    "header_tooltip": "Auto-decline requests from users you haven't met (never been in the same instance)."
                 }
             },
             "appearance": {
@@ -889,8 +916,9 @@
                     "theme_mode_pink": "Pink",
                     "theme_mode_material3": "Material 3",
                     "zoom": "Zoom",
-                    "vrcplus_profile_icons": "VRChat+ Profile Icons",
-                    "vrcplus_profile_icons_description": "Use VRChat+ exclusive profile icons when available.",
+                    "profile_icons": "Profile Icons",
+                    "profile_icons_description": "Use profile icons when available.",
+                    "vrc_profile_themes": "VRChat Profile Themes",
                     "show_instance_id": "Show Instance ID",
                     "show_status_bar": "Show Status Bar",
                     "age_gated_instances": "Show Age-Gated Instances",
@@ -915,7 +943,14 @@
                     "table_density_comfortable": "Comfortable",
                     "table_density_compact": "Compact",
                     "table_entries_settings": "Table Entries Settings",
-                    "table_entries_settings_description": "Control how many items are loaded for lists and searches."
+                    "table_entries_settings_description": "Control how many items are loaded for lists and searches.",
+                    "vrc_profile_backgrounds": "VRChat Profile Backgrounds",
+                    "vrc_profile_backgrounds_description": "Show profile backgrounds in user dialog, e.g. color gradient or VRC+ background.",
+                    "vrc_profile_backgrounds_opacity": "Profile Background Opacity",
+                    "vrc_profile_backgrounds_opacity_description": "Higher values will impact text readability.",
+                    "vrc_profile_cosmetics": "Profile Cosmetics",
+                    "cosmetics_description": "Shows icon frame and profile effects",
+                    "show_cosmetics": "Show Cosmetics"
                 },
                 "display": {
                     "header": "Display"
@@ -1360,10 +1395,13 @@
                 "unfriend_success_msg": "Unfriended",
                 "logout": "Logout",
                 "edit_note_memo": "Edit Note and Memo",
-                "reset_home": "Reset Home"
+                "reset_home": "Reset Home",
+                "edit_profile": "Edit Profile"
             },
             "info": {
                 "header": "Info",
+                "vrcx_info": "VRCX Info",
+                "vrcx_info_tooltip": "VRCX info may be inaccurate",
                 "launch_invite_tooltip": "Launch/Invite",
                 "self_invite_tooltip": "Invite Yourself",
                 "open_in_vrchat_tooltip": "Open in VRChat",
@@ -1398,8 +1436,8 @@
                 "unfriended": "Unfriended",
                 "avatar_cloning": "Avatar Cloning",
                 "booping": "Booping",
-                "avatar_cloning_allow": "Allowed",
-                "avatar_cloning_deny": "Deny",
+                "avatar_cloning_allow": "Enabled",
+                "avatar_cloning_deny": "Disabled",
                 "home_location": "Home World",
                 "id": "User ID",
                 "id_tooltip": "Copy to clipboard",
@@ -1417,7 +1455,10 @@
                 "open_previous_instance": "Open Previous Instances",
                 "show_mutual_friends": "Show Mutual Friends",
                 "show_discord_connections": "Show Discord Connections",
-                "instance_minimum_avatar_performance": "Minimum Avatar Performance"
+                "instance_minimum_avatar_performance": "Minimum Avatar Performance",
+                "current_instance": "Current Instance",
+                "economy_creator": "Economy Creator",
+                "instance_announcement_tooltip": "Send Instance Announcement"
             },
             "groups": {
                 "header": "Groups",
@@ -1425,6 +1466,8 @@
                 "sort_by": "Sort by:",
                 "edit_mode": "Edit Mode",
                 "exit_edit_mode": "Exit Edit Mode",
+                "create_requires_vrc_plus": "Creating a group requires VRC+",
+                "create_limit_reached": "You have reached the owned group limit",
                 "hold_shift": "Hold shift to leave without confirmation",
                 "own_groups": "Own Groups",
                 "mutual_groups": "Mutual Groups",
@@ -1594,13 +1637,14 @@
                 "copy_name": "Copy Name",
                 "youtube_preview": "Youtube Preview",
                 "author_tags": "Author Tags",
+                "more_info": "More Info",
                 "players": "Players",
                 "favorites": "Favorites",
                 "visits": "Visits",
                 "capacity": "Capacity",
                 "heat": "Heat",
                 "popularity": "Popularity",
-                "created_at": "Created At",
+                "created": "Created",
                 "last_updated": "Last Updated",
                 "publication_date": "Publication Date",
                 "labs_publication_date": "Labs Publication Date",
@@ -1609,7 +1653,8 @@
                 "platform": "Platform",
                 "last_visited": "Last Visited",
                 "visit_count": "Visit Count",
-                "time_spent": "Time Spent"
+                "time_spent": "Time Spent",
+                "description": "Description"
             },
             "json": {
                 "header": "JSON"
@@ -1693,6 +1738,124 @@
                 "header": "JSON"
             }
         },
+        "group_edit": {
+            "create_header": "Create Group",
+            "edit_header": "Edit Group",
+            "name": "Name",
+            "short_code": "Short Code",
+            "description": "Description",
+            "join_state": "Join State",
+            "privacy": "Privacy",
+            "role_template": "Role Template",
+            "loading_role_templates": "Loading role templates...",
+            "language": "Languages",
+            "no_language": "No languages",
+            "rules": "Rules",
+            "links": "Links",
+            "add_link": "Add Link",
+            "allow_join_prompt": "Automatic Group Invites",
+            "allow_join_prompt_description": "Automatically send group invites to non-members who’ve spent over 5 minutes in this group’s instances or made a friend there. Only available to Open groups.",
+            "banner": "Banner",
+            "icon": "Icon",
+            "select_image": "Select Image",
+            "clear_image": "Clear Image",
+            "saving": "Saving...",
+            "save": "Save Changes",
+            "create": "Create Group",
+            "create_success": "Group created",
+            "edit_success": "Group updated"
+        },
+        "group_event_edit": {
+            "create_header": "Create Group Event",
+            "edit_header": "Edit Group Event",
+            "title": "Title",
+            "description": "Description",
+            "starts_at": "Starts At",
+            "ends_at": "Ends At",
+            "invalid_date_range": "The event must end after it starts.",
+            "access_type": "Access",
+            "access_group": "Group",
+            "access_public": "Public",
+            "category": "Category",
+            "categories": {
+                "arts": "Arts",
+                "avatars": "Avatars",
+                "dance": "Dance",
+                "education": "Education",
+                "exploration": "Exploration",
+                "film_media": "Film & Media",
+                "gaming": "Gaming",
+                "hangout": "Hangout",
+                "music": "Music",
+                "other": "Other",
+                "performance": "Performance",
+                "roleplaying": "Roleplaying",
+                "wellness": "Wellness"
+            },
+            "tags": "Tags",
+            "tags_help": "Separate up to five tags with commas. Each tag can be up to 100 characters.",
+            "languages": "Languages",
+            "platforms": "Platforms",
+            "platform_values": {
+                "android": "Android",
+                "ios": "iOS",
+                "standalonewindows": "Windows"
+            },
+            "none_selected": "None selected",
+            "roles": "Roles",
+            "all_members": "All members",
+            "image": "Image",
+            "select_image": "Select Image",
+            "clear_image": "Clear Image",
+            "host_early_join": "Host Early Join (minutes)",
+            "guest_early_join": "Guest Early Join (minutes)",
+            "close_after_end": "Close After End (minutes)",
+            "send_notification": "Send creation notification",
+            "repeat": "Repeat",
+            "repeat_every": "Repeat every",
+            "repeat_values": {
+                "none": "Never",
+                "weekly": "Week",
+                "monthly": "Month",
+                "yearly": "Year"
+            },
+            "weekly_pattern": "Weekly repeat pattern",
+            "weekly_pattern_values": {
+                "every_week": "Every week",
+                "weekdays": "Every weekday",
+                "weekend": "Every weekend",
+                "custom": "Custom days"
+            },
+            "custom_days": "Select days",
+            "weekday_values": {
+                "MO": "Monday",
+                "TU": "Tuesday",
+                "WE": "Wednesday",
+                "TH": "Thursday",
+                "FR": "Friday",
+                "SA": "Saturday",
+                "SU": "Sunday"
+            },
+            "ends": "Ends",
+            "ends_values": {
+                "never": "Never",
+                "after_occurrences": "After occurrences",
+                "after_date": "On date"
+            },
+            "occurrence_count": "Number of occurrences",
+            "end_date": "End date",
+            "saving": "Saving...",
+            "save": "Save Changes",
+            "edit_parent": "Edit Parent Event",
+            "create": "Create Event",
+            "create_success": "Group event created",
+            "edit_success": "Group event updated",
+            "delete_success": "Group event deleted",
+            "save_error": "Failed to save group event",
+            "delete_error": "Failed to delete group event",
+            "load_error": "Failed to load group event",
+            "delete_confirm": "Are you sure you want to delete this group event?"
+        },
         "group": {
             "tags": {
                 "verified": "Verified",
@@ -1704,6 +1867,7 @@
                 "closed": "Closed",
                 "joined": "Joined",
                 "banned": "Banned",
+                "everyone": "Everyone",
                 "visible": "Visible",
                 "friends": "Friends",
                 "hidden": "Hidden",
@@ -1729,7 +1893,10 @@
                 "visibility_friends": "Visibility Friends",
                 "visibility_hidden": "Visibility Hidden",
                 "create_post": "Create Post",
+                "create_event": "Create Event",
                 "moderation_tools": "Moderation Tools",
+                "transfer": "Transfer Group",
+                "delete": "Delete Group",
                 "leave": "Leave Group",
                 "block": "Block Group",
                 "unblock": "Unblock Group",
@@ -1742,7 +1909,8 @@
                 "announcement": "Announcement",
                 "rules": "Rules",
                 "members": "Members",
-                "created_at": "Created At",
+                "online_members": "Online Members",
+                "created": "Created",
                 "links": "Links",
                 "url": "Group URL",
                 "url_tooltip": "Copy URL to clipboard",
@@ -1757,7 +1925,10 @@
                 "role_permissions": "Permissions:",
                 "last_visited": "Last Visited",
                 "past_events": "Past Events",
-                "upcoming_events": "Upcoming Events"
+                "upcoming_events": "Upcoming Events",
+                "member_info": "Member Info",
+                "visibility": "Visibility",
+                "short_code": "Short Code"
             },
             "posts": {
                 "header": "Posts",
@@ -1790,6 +1961,26 @@
                 "representing": "Representing",
                 "manager_notes": "Manager Notes:",
                 "search": "Search"
+            },
+            "transfer": {
+                "header": "Transfer Group",
+                "description": "Search for a member to transfer ownership of {groupName} to.",
+                "search_placeholder": "Search group members",
+                "search_minimum": "Enter at least {count} characters to search.",
+                "no_results": "No matching members found.",
+                "cancel": "Cancel",
+                "submit": "Transfer Group",
+                "requirements_title": "Unable to Transfer Group",
+                "requirements_description": "{displayName} does not meet all requirements to own this group. Requirements not met: {requirements}.",
+                "requirements": {
+                    "group_not_monetized": "the group must not be monetized",
+                    "has_vrc_plus": "the member must have VRC+",
+                    "has_verified_email": "the member must have a verified email address",
+                    "can_own_more_groups": "the member must not exceed the maximum number of groups they can own",
+                    "is_group_member": "the user must be a member of the group"
+                },
+                "confirm_title": "Transfer Group Ownership",
+                "confirm_description": "Send a request to transfer ownership of {groupName} to {displayName}?"
             },
             "gallery": {
                 "header": "Photos"
@@ -1829,6 +2020,30 @@
             "header": "Pronouns",
             "pronouns_placeholder": "Please input your pronouns",
             "update": "Update"
+        },
+        "edit_profile": {
+            "banner": "Banner",
+            "banner_color": "Banner Color",
+            "banner_type_color": "Color",
+            "banner_type_avatar_banner": "Avatar Image",
+            "banner_type_custom_image": "Custom Image",
+            "button": "Button",
+            "icon": "Icon",
+            "subtext": "Subtext",
+            "profile_theme": "Profile Theme",
+            "theme_name_placeholder": "Theme name",
+            "create_theme": "Create Theme",
+            "delete_theme": "Delete Theme",
+            "profile_background": "Profile Background",
+            "profile_background_type_none": "None",
+            "profile_background_type_image": "Image",
+            "profile_background_type_gradient": "Gradient",
+            "gradient_top": "Gradient Top",
+            "gradient_bottom": "Gradient Bottom",
+            "nameplate_effect": "Nameplate Effect",
+            "profile_effect": "Profile Effect",
+            "icon_frame": "Icon Frame",
+            "select_effect": "Select an effect"
         },
         "new_instance": {
             "header": "New Instance",
@@ -2432,6 +2647,15 @@
         "avatar_database_provider": {
             "header": "Avatar Database Provider",
             "add_provider": "Add Provider"
+        },
+        "instance_announcement": {
+            "header": "Send Instance Announcement",
+            "message": "Message",
+            "image": "Image (optional)",
+            "clear_image": "Clear Image",
+            "select_image": "Select Image",
+            "sending": "Sending...",
+            "send": "Send Announcement"
         }
     },
     "confirm": {
@@ -2451,6 +2675,9 @@
         "decline_type": "Continue? Decline {type}",
         "delete_type": "Continue? {type}",
         "command_question": "Are you sure you want to {command}?",
+        "command_question_toggle": "Are you sure you want to {action} {command}?",
+        "enable_action": "enable",
+        "disable_action": "disable",
         "clear_group": "Continue? Clear Group",
         "delete_group": "Continue? Delete Group {name}",
         "delete_post": "Are you sure you want to delete this post?",
@@ -2695,7 +2922,8 @@
             "closed": "Instance closed",
             "removed_form_queue": "Removed instance {worldName} from queue",
             "not_allowed": "You're not allowed to access this instance",
-            "create_failed": "Failed to create instance"
+            "create_failed": "Failed to create instance",
+            "announcement_sent": "Instance announcement sent"
         },
         "avatar": {
             "selected": "Avatar changed",
@@ -2739,7 +2967,8 @@
             "join_request_sent": "Group join request sent",
             "visibility_updated": "Group visibility updated",
             "subscription_updated": "Group subscription updated",
-            "event_announcement_updated": "Group event announcements updated"
+            "event_announcement_updated": "Group event announcements updated",
+            "transfer_requested": "Group transfer request sent"
         },
         "invite": {
             "self_sent": "Self invite sent",
@@ -2838,6 +3067,8 @@
         "trust_level": "Trust level is now {trustLevel}",
         "display_name": "changed their name to {displayName}",
         "group_announcement_title": "Group Announcement",
+        "group_event_created_title": "Group Event Created",
+        "group_event_starting_title": "Group Event Starting",
         "group_informative_title": "Group Informative",
         "group_invite_title": "Group Invite",
         "group_join_request_title": "Group Join Request",

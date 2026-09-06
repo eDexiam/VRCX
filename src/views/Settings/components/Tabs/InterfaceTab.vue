@@ -97,15 +97,90 @@
             </SettingsItem>
 
             <SettingsItem
-                :label="t('view.settings.appearance.appearance.vrcplus_profile_icons')"
-                :description="t('view.settings.appearance.appearance.vrcplus_profile_icons_description')">
+                :label="t('view.settings.appearance.appearance.profile_icons')"
+                :description="t('view.settings.appearance.appearance.profile_icons_description')">
                 <Switch
                     :model-value="displayVRCPlusIconsAsAvatar"
-                    :ariaLabel="t('view.settings.appearance.appearance.vrcplus_profile_icons')"
+                    :ariaLabel="t('view.settings.appearance.appearance.profile_icons')"
                     @update:modelValue="
                         setDisplayVRCPlusIconsAsAvatar();
                         saveOpenVROption();
                     " />
+            </SettingsItem>
+        </SettingsGroup>
+
+        <SettingsGroup :title="t('view.settings.appearance.user_dialog.header')">
+            <SettingsItem :label="t('view.settings.appearance.appearance.vrc_profile_themes')">
+                <Switch
+                    :model-value="displayVRCProfileThemes"
+                    :ariaLabel="t('view.settings.appearance.appearance.vrc_profile_themes')"
+                    @update:modelValue="
+                        setDisplayVRCProfileThemes();
+                        saveOpenVROption();
+                    " />
+            </SettingsItem>
+
+            <SettingsItem
+                :label="t('view.settings.appearance.appearance.vrc_profile_backgrounds')"
+                :description="t('view.settings.appearance.appearance.vrc_profile_backgrounds_description')">
+                <Switch
+                    :model-value="displayVRCProfileBackgrounds"
+                    :ariaLabel="t('view.settings.appearance.appearance.vrc_profile_backgrounds')"
+                    @update:modelValue="
+                        setDisplayVRCProfileBackgrounds();
+                        saveOpenVROption();
+                    " />
+            </SettingsItem>
+
+            <template v-if="displayVRCProfileBackgrounds">
+                <SettingsItem
+                    :label="t('view.settings.appearance.appearance.vrc_profile_backgrounds_opacity')"
+                    :description="t('view.settings.appearance.appearance.vrc_profile_backgrounds_opacity_description')">
+                    <NumberField
+                        v-model="profileBackgroundOpacity"
+                        :step="0.1"
+                        :min="0"
+                        :max="1"
+                        :format-options="{ maximumFractionDigits: 2 }"
+                        class="w-32"
+                        @update:modelValue="setProfileBackgroundOpacity">
+                        <NumberFieldContent>
+                            <NumberFieldDecrement />
+                            <NumberFieldInput />
+                            <NumberFieldIncrement />
+                        </NumberFieldContent>
+                    </NumberField>
+                </SettingsItem>
+            </template>
+
+            <SettingsItem
+                :label="t('view.settings.appearance.appearance.vrc_profile_cosmetics')"
+                :description="t('view.settings.appearance.appearance.cosmetics_description')">
+                <Switch
+                    :model-value="displayVRCProfileCosmetics"
+                    :ariaLabel="t('view.settings.appearance.appearance.vrc_profile_cosmetics')"
+                    @update:modelValue="
+                        setDisplayVRCProfileCosmetics();
+                        saveOpenVROption();
+                    " />
+            </SettingsItem>
+
+            <SettingsItem
+                :label="t('view.settings.appearance.user_dialog.vrchat_notes')"
+                :description="t('view.settings.appearance.user_dialog.vrchat_notes_description')">
+                <Switch
+                    :model-value="!hideUserNotes"
+                    :ariaLabel="t('view.settings.appearance.user_dialog.vrchat_notes')"
+                    @update:modelValue="setHideUserNotes" />
+            </SettingsItem>
+
+            <SettingsItem
+                :label="t('view.settings.appearance.user_dialog.vrcx_memos')"
+                :description="t('view.settings.appearance.user_dialog.vrcx_memos_description')">
+                <Switch
+                    :model-value="!hideUserMemos"
+                    :ariaLabel="t('view.settings.appearance.user_dialog.vrcx_memos')"
+                    @update:modelValue="setHideUserMemos" />
             </SettingsItem>
         </SettingsGroup>
 
@@ -330,26 +405,6 @@
             </SettingsItem>
         </SettingsGroup>
 
-        <SettingsGroup :title="t('view.settings.appearance.user_dialog.header')">
-            <SettingsItem
-                :label="t('view.settings.appearance.user_dialog.vrchat_notes')"
-                :description="t('view.settings.appearance.user_dialog.vrchat_notes_description')">
-                <Switch
-                    :model-value="!hideUserNotes"
-                    :ariaLabel="t('view.settings.appearance.user_dialog.vrchat_notes')"
-                    @update:modelValue="setHideUserNotes" />
-            </SettingsItem>
-
-            <SettingsItem
-                :label="t('view.settings.appearance.user_dialog.vrcx_memos')"
-                :description="t('view.settings.appearance.user_dialog.vrcx_memos_description')">
-                <Switch
-                    :model-value="!hideUserMemos"
-                    :ariaLabel="t('view.settings.appearance.user_dialog.vrcx_memos')"
-                    @update:modelValue="setHideUserMemos" />
-            </SettingsItem>
-        </SettingsGroup>
-
         <SettingsGroup :title="t('view.settings.appearance.friend_log.header')">
             <SettingsItem :label="t('view.settings.appearance.friend_log.hide_unfriends')">
                 <Switch
@@ -372,7 +427,7 @@
                 <div class="flex flex-col gap-2 py-2">
                     <div v-for="colorEntry in trustColorEntries" :key="colorEntry.key" class="flex items-center gap-3">
                         <span :class="colorEntry.tagClass">{{ t(colorEntry.labelKey) }}</span>
-                        <PresetColorPicker
+                        <ColorPickerButton
                             :model-value="trustColor[colorEntry.key]"
                             :presets="colorEntry.presets"
                             @change="updateTrustColor(colorEntry.key, $event)" />
@@ -431,7 +486,7 @@
     import { toast } from 'vue-sonner';
     import { useI18n } from 'vue-i18n';
 
-    import PresetColorPicker from '@/components/PresetColorPicker.vue';
+    import ColorPickerButton from '@/components/ColorPickerButton.vue';
     import TableLimitsDialog from '@/components/dialogs/TableLimitsDialog.vue';
     import { saveSortFavoritesOption } from '@/coordinators/favoriteCoordinator';
 
@@ -446,6 +501,10 @@
     const {
         appLanguage,
         displayVRCPlusIconsAsAvatar,
+        displayVRCProfileThemes,
+        displayVRCProfileBackgrounds,
+        profileBackgroundOpacity,
+        displayVRCProfileCosmetics,
         appFontFamily,
         customFontFamily,
         appCjkFontPack,
@@ -473,6 +532,10 @@
 
     const {
         setDisplayVRCPlusIconsAsAvatar,
+        setDisplayVRCProfileThemes,
+        setDisplayVRCProfileBackgrounds,
+        setProfileBackgroundOpacity,
+        setDisplayVRCProfileCosmetics,
         setHideNicknames,
         setShowInstanceIdInLocation,
         setIsAgeGatedInstancesVisible,

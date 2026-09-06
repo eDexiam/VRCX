@@ -315,6 +315,7 @@ export function showGroupDialog(groupId, options = {}) {
     D.instances = [];
     D.memberRoles = [];
     D.lastVisit = '';
+    D.joinCount = 0;
     D.memberSearch = '';
     D.memberSearchResults = [];
     D.galleries = {};
@@ -354,6 +355,11 @@ export function showGroupDialog(groupId, options = {}) {
                 database.getLastGroupVisit(D.id).then((r) => {
                     if (D.id === ref.id) {
                         D.lastVisit = r.created_at;
+                    }
+                });
+                database.getGroupJoinCount(D.id).then((r) => {
+                    if (D.id === ref.id) {
+                        D.joinCount = r.joinCount;
                     }
                 });
                 instanceStore.applyGroupDialogInstances();
@@ -412,6 +418,34 @@ export function showGroupMemberModerationDialog(groupId, userId = '') {
         }
     });
     D.visible = true;
+}
+
+/**
+ * @param groupId
+ */
+export function getGroupDialogCalendar(groupId) {
+    const groupStore = useGroupStore();
+    const D = groupStore.groupDialog;
+    queryRequest.fetch('groupCalendar', { groupId }).then((args) => {
+        if (D.id === args.params.groupId) {
+            D.calendar = args.json.results;
+            for (const event of D.calendar) {
+                Object.assign(event, groupStore.applyGroupEvent(event));
+                // fetch again for isFollowing
+                queryRequest
+                    .fetch('groupCalendarEvent', {
+                        groupId,
+                        eventId: event.id
+                    })
+                    .then((args) => {
+                        Object.assign(
+                            event,
+                            groupStore.applyGroupEvent(args.json)
+                        );
+                    });
+            }
+        }
+    });
 }
 
 /**
@@ -483,33 +517,7 @@ export function getGroupDialogGroup(groupId, existingRef) {
                             });
                         }
                     });
-                queryRequest
-                    .fetch('groupCalendar', { groupId })
-                    .then((args) => {
-                        if (groupStore.groupDialog.id === args.params.groupId) {
-                            D.calendar = args.json.results;
-                            for (const event of D.calendar) {
-                                Object.assign(
-                                    event,
-                                    groupStore.applyGroupEvent(event)
-                                );
-                                // fetch again for isFollowing
-                                queryRequest
-                                    .fetch('groupCalendarEvent', {
-                                        groupId,
-                                        eventId: event.id
-                                    })
-                                    .then((args) => {
-                                        Object.assign(
-                                            event,
-                                            groupStore.applyGroupEvent(
-                                                args.json
-                                            )
-                                        );
-                                    });
-                            }
-                        }
-                    });
+                getGroupDialogCalendar(groupId);
             }
             nextTick(() => (D.isGetGroupDialogGroupLoading = false));
             return result.args || result;
@@ -768,33 +776,66 @@ export async function updateInGameGroupOrder() {
 }
 
 /**
+ * @param {object} group
+ * @param {string} userId
+ * @returns {boolean}
+ */
+export function isSoleGroupOwner(group, userId) {
+    return (
+        group?.ownerId === userId &&
+        typeof group.memberCount === 'number' &&
+        group.memberCount <= 1
+    );
+}
+
+/**
  *
  * @param groupId
  */
 export function leaveGroup(groupId) {
     const groupStore = useGroupStore();
     const userStore = useUserStore();
-    groupRequest
-        .leaveGroup({
+    const group =
+        groupStore.cachedGroups.get(groupId) ?? groupStore.currentUserGroups.get(groupId);
+    const deleteOwnedGroup = isSoleGroupOwner(
+        group,
+        userStore.currentUser.id
+    );
+    const request = deleteOwnedGroup
+        ? groupRequest.deleteGroup({
+              groupId,
+              hardDelete: false
+          })
+        : groupRequest.leaveGroup({
             groupId
-        })
-        .then((args) => {
-            const groupId = args.params.groupId;
-            if (
-                groupStore.groupDialog.visible &&
-                groupStore.groupDialog.id === groupId
-            ) {
+        });
+    return request.then((args) => {
+        const groupId = args.params.groupId;
+        if (
+            groupStore.groupDialog.visible &&
+            groupStore.groupDialog.id === groupId
+        ) {
+            if (deleteOwnedGroup) {
+                groupStore.groupDialog.visible = false;
+            } else {
                 groupStore.groupDialog.inGroup = false;
                 getGroupDialogGroup(groupId);
             }
-            if (
-                userStore.userDialog.visible &&
-                userStore.userDialog.id === userStore.currentUser.id &&
-                userStore.userDialog.representedGroup.id === groupId
-            ) {
-                getCurrentUserRepresentedGroup();
-            }
-        });
+        }
+        if (deleteOwnedGroup) {
+            groupStore.currentUserGroups.delete(groupId);
+            groupStore.cachedGroups.delete(groupId);
+            removeGroupSearchIndex(groupId);
+            saveCurrentUserGroups();
+        }
+        if (
+            userStore.userDialog.visible &&
+            userStore.userDialog.id === userStore.currentUser.id &&
+            userStore.userDialog.representedGroup.id === groupId
+        ) {
+            getCurrentUserRepresentedGroup();
+        }
+    });
 }
 
 /**
@@ -804,9 +845,20 @@ export function leaveGroup(groupId) {
 export function leaveGroupPrompt(groupId) {
     const t = i18n.global.t;
     const modalStore = useModalStore();
+    const groupStore = useGroupStore();
+    const userStore = useUserStore();
+    const group =
+        groupStore.currentUserGroups.get(groupId) ??
+        groupStore.cachedGroups.get(groupId);
+    const deleteOwnedGroup = isSoleGroupOwner(
+        group,
+        userStore.currentUser.id
+    );
     modalStore
         .confirm({
-            description: t('confirm.leave_group'),
+            description: deleteOwnedGroup
+                ? t('confirm.delete_group', { name: group.name })
+                : t('confirm.leave_group'),
             title: t('confirm.title'),
             destructive: true
         })

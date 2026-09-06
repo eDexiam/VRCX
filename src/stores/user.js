@@ -1,5 +1,6 @@
 import { computed, reactive, ref, shallowReactive, watch } from 'vue';
 import { defineStore } from 'pinia';
+import { useI18n } from 'vue-i18n';
 
 import {
     compareByCreatedAt,
@@ -12,7 +13,7 @@ import {
     replaceBioSymbols
 } from '../shared/utils';
 import { getAllUserMemos } from '../coordinators/memoCoordinator';
-import { instanceRequest, userRequest } from '../api';
+import { instanceRequest, userRequest, cosmeticsRequest } from '../api';
 import { AppDebug } from '../services/appConfig';
 import { database } from '../services/database';
 import { runUpdateCurrentUserLocationFlow } from '../coordinators/locationCoordinator';
@@ -20,6 +21,7 @@ import { useAppearanceSettingsStore } from './settings/appearance';
 import { useFriendStore } from './friend';
 import { useInstanceStore } from './instance';
 import { useLocationStore } from './location';
+import { useModalStore } from './modal';
 import { syncFriendSearchIndex } from '../coordinators/searchIndexCoordinator';
 import { useUiStore } from './ui';
 import { watchState } from '../services/watchState';
@@ -31,118 +33,148 @@ export const useUserStore = defineStore('User', () => {
     const friendStore = useFriendStore();
     const locationStore = useLocationStore();
     const instanceStore = useInstanceStore();
+    const modalStore = useModalStore();
     const uiStore = useUiStore();
+    const { t } = useI18n();
 
-    const currentUser = ref({
-        acceptedPrivacyVersion: 0,
-        acceptedTOSVersion: 0,
-        accountDeletionDate: null,
-        accountDeletionLog: null,
-        activeFriends: [],
-        ageVerificationStatus: '',
-        ageVerified: false,
-        allowAvatarCopying: false,
-        badges: [],
-        bio: '',
-        bioLinks: [],
-        currentAvatar: '',
-        currentAvatarImageUrl: '',
-        currentAvatarTags: [],
-        currentAvatarThumbnailImageUrl: '',
-        date_joined: '',
-        developerType: '',
-        discordDetails: {
-            global_name: '',
-            id: ''
-        },
-        discordId: '',
-        displayName: '',
-        emailVerified: false,
-        fallbackAvatar: '',
-        friendGroupNames: [],
-        friendKey: '',
-        friends: [],
-        googleId: '',
-        hasBirthday: false,
-        hasDiscordFriendsOptOut: false,
-        hasEmail: false,
-        hasLoggedInFromClient: false,
-        hasPendingEmail: false,
-        hasSharedConnectionsOptOut: false,
-        hideContentFilterSettings: false,
-        homeLocation: '',
-        id: '',
-        isAdult: true,
-        isBoopingEnabled: false,
-        isFriend: false,
-        last_activity: '',
-        last_login: '',
-        last_mobile: null,
-        last_platform: '',
-        obfuscatedEmail: '',
-        obfuscatedPendingEmail: '',
-        oculusId: '',
-        offlineFriends: [],
-        onlineFriends: [],
-        pastDisplayNames: [],
-        picoId: '',
-        presence: {
-            avatarThumbnail: '',
-            currentAvatarTags: '',
-            debugflag: '',
+    const currentUser = ref(
+        /** @type {import('../types/api/user').VrcxCurrentUser} */ ({
+            acceptedPrivacyVersion: 0,
+            acceptedTOSVersion: 0,
+            accountDeletionDate: null,
+            accountDeletionLog: null,
+            activeFriends: [],
+            ageVerificationStatus: '',
+            ageVerified: false,
+            allowAvatarCopying: false,
+            appleDetails: {},
+            appleId: '',
+            badges: [],
+            bannerColor: '',
+            bannerType: 'color',
+            bannerUrl: '',
+            bio: '',
+            bioLinks: [],
+            completedTutorials: [],
+            currentAvatar: '',
+            currentAvatarImageUrl: '',
+            currentAvatarTags: [],
+            currentAvatarThumbnailImageUrl: '',
+            date_joined: '',
+            developerType: '',
+            discordDetails: {
+                global_name: '',
+                id: ''
+            },
+            discordId: '',
             displayName: '',
-            groups: [],
+            emailVerified: false,
+            fallbackAvatar: '',
+            friendGroupNames: [],
+            friendKey: '',
+            friends: [],
+            googleDetails: {},
+            googleId: '',
+            hasAcceptedDiscordSocialSDKPerms: false,
+            hasBirthday: false,
+            hasDiscordFriendsOptOut: false,
+            hasEmail: false,
+            hasLoggedInFromClient: false,
+            hasPendingEmail: false,
+            hasSharedConnectionsOptOut: false,
+            hideContentFilterSettings: false,
+            homeLocation: '',
             id: '',
-            instance: '',
-            instanceType: '',
-            platform: '',
+            isAdult: true,
+            isBoopingEnabled: false,
+            isEconomyCreator: false,
+            isFriend: false,
+            isTemporary: false,
+            iconFrame: '',
+            iconUrl: '',
+            last_activity: '',
+            last_login: '',
+            last_mobile: null,
+            last_platform: '',
+            nameplateEffect: '',
+            obfuscatedEmail: '',
+            obfuscatedPendingEmail: '',
+            oculusId: '',
+            offlineFriends: [],
+            onlineFriends: [],
+            pastDisplayNames: [],
+            picoId: '',
+            platform_history: [],
+            presence: {
+                avatarThumbnail: '',
+                currentAvatarTags: '',
+                debugflag: '',
+                displayName: '',
+                groups: [],
+                id: '',
+                instance: '',
+                instanceType: '',
+                platform: '',
+                profilePicOverride: '',
+                status: '',
+                travelingToInstance: '',
+                travelingToWorld: '',
+                userIcon: '',
+                world: ''
+            },
+            profileEffect: '',
             profilePicOverride: '',
+            profilePicOverrideThumbnail: '',
+            pronouns: '',
+            pronounsHistory: [],
+            queuedInstance: '',
+            receiveMobileInvitations: false,
+            state: '',
             status: '',
-            travelingToInstance: '',
-            travelingToWorld: '',
+            statusDescription: '',
+            statusFirstTime: false,
+            statusHistory: [],
+            steamDetails: {},
+            steamId: '',
+            tags: [],
+            temporaryExpiryDate: null,
+            twitchDetails: {
+                display_name: '',
+                id: '',
+                login: '',
+                profile_image_url: ''
+            },
+            twitchId: '',
+            twoFactorAuthEnabled: false,
+            twoFactorAuthEnabledDate: null,
+            unsubscribe: false,
+            updated_at: '',
             userIcon: '',
-            world: ''
-        },
-        profilePicOverride: '',
-        profilePicOverrideThumbnail: '',
-        pronouns: '',
-        queuedInstance: '',
-        state: '',
-        status: '',
-        statusDescription: '',
-        statusFirstTime: false,
-        statusHistory: [],
-        steamDetails: {},
-        steamId: '',
-        tags: [],
-        twoFactorAuthEnabled: false,
-        twoFactorAuthEnabledDate: null,
-        unsubscribe: false,
-        updated_at: '',
-        userIcon: '',
-        userLanguage: '',
-        userLanguageCode: '',
-        username: '',
-        viveId: '',
-        // VRCX
-        $online_for: Date.now(),
-        $offline_for: null,
-        $location_at: Date.now(),
-        $travelingToTime: Date.now(),
-        $previousAvatarSwapTime: null,
-        $homeLocation: {},
-        $isVRCPlus: false,
-        $isModerator: false,
-        $isTroll: false,
-        $isProbableTroll: false,
-        $trustLevel: 'Visitor',
-        $trustClass: 'x-tag-untrusted',
-        $userColour: '',
-        $trustSortNum: 1,
-        $languages: [],
-        $locationTag: '',
-        $travelingToLocation: ''
-    });
+            userLanguage: '',
+            userLanguageCode: '',
+            username: '',
+            usesGeneratedPassword: false,
+            viveId: '',
+            // VRCX
+            $online_for: Date.now(),
+            $offline_for: null,
+            $location_at: Date.now(),
+            $travelingToTime: Date.now(),
+            $previousAvatarSwapTime: null,
+            $homeLocation: {},
+            $isVRCPlus: false,
+            $isModerator: false,
+            $isTroll: false,
+            $isProbableTroll: false,
+            $trustLevel: 'Visitor',
+            $trustClass: 'x-tag-untrusted',
+            $userColour: '',
+            $trustSortNum: 1,
+            $languages: [],
+            $locationTag: '',
+            $travelingToLocation: ''
+        })
+    );
 
     const userDialog = ref({
         visible: false,
@@ -151,6 +183,12 @@ export const useUserStore = defineStore('User', () => {
         lastActiveTab: 'Info',
         id: '',
         ref: {},
+        publicProfileRef: {},
+        theme: {
+            iconColor: '',
+            buttonColor: '',
+            subtextColor: ''
+        },
         friend: {},
         isFriend: false,
         note: '',
@@ -247,14 +285,37 @@ export const useUserStore = defineStore('User', () => {
         isMutualFriendsLoading: false
     });
 
-    const currentTravelers = reactive(new Map());
-    const subsetOfLanguages = ref([]);
-    const languageDialog = ref({
+    const editProfileDialog = ref({
         visible: false,
         loading: false,
-        languageChoice: false,
-        languages: []
+        selfProfileRef: {},
+        status: '',
+        statusDescription: '',
+        pronouns: '',
+        bio: '',
+        bioLinks: [],
+        socialStatusHistoryTable: [],
+        bannerColor: '',
+        bannerUrl: '',
+        bannerType: '',
+        userIcon: '',
+        themes: [],
+        themeId: '',
+        themeName: '',
+        themeButtonColor: '',
+        themeIconColor: '',
+        themeSubtextColor: '',
+        backgroundType: 'default',
+        backgroundTextureId: '',
+        backgroundGradientBottom: '',
+        backgroundGradientTop: '',
+        nameplateEffect: '',
+        profileEffect: '',
+        iconFrame: '',
     });
+
+    const currentTravelers = reactive(new Map());
+    const subsetOfLanguages = ref([]);
     const sendBoopDialog = ref({
         visible: false,
         userId: ''
@@ -271,6 +332,10 @@ export const useUserStore = defineStore('User', () => {
 
     const cachedUsers = shallowReactive(new Map());
     const cachedUserIdsByDisplayName = shallowReactive(new Map());
+
+    const cachedProfileEffects = shallowReactive(new Map());
+    const cachedIconFrames = shallowReactive(new Map());
+    const cachedNameplateEffects = shallowReactive(new Map());
 
     function addCachedUserDisplayNameEntry(displayName, userId) {
         if (!displayName || !userId) {
@@ -749,18 +814,75 @@ export const useUserStore = defineStore('User', () => {
         subsetOfLanguages.value = value;
     }
 
-    /**
-     * @param {Array} value
-     */
-    function setLanguageDialogLanguages(value) {
-        languageDialog.value.languages = value;
+    function showEditProfileDialog() {
+        const D = editProfileDialog.value;
+        const statusHistory = currentUser.value?.statusHistory || [];
+        const statusHistoryArray = [];
+        for (let i = 0; i < statusHistory.length; ++i) {
+            statusHistoryArray.push({
+                no: i + 1,
+                status: statusHistory[i]
+            });
+        }
+        D.socialStatusHistoryTable = statusHistoryArray;
+
+        D.status = currentUser.value.status;
+        D.statusDescription = currentUser.value.statusDescription;
+        D.pronouns = currentUser.value.pronouns;
+        D.bio = currentUser.value.bio;
+        D.bioLinks = currentUser.value.bioLinks.slice();
+        D.bannerColor = currentUser.value.bannerColor;
+        D.bannerUrl = currentUser.value.bannerUrl;
+        D.bannerType = currentUser.value.bannerType;
+        D.userIcon = currentUser.value.userIcon;
+
+        D.themeId = '';
+        D.themes = [];
+        D.themeName = '';
+        D.themeButtonColor = '';
+        D.themeIconColor = '';
+        D.themeSubtextColor = '';
+
+        userRequest.getSelfProfile().then((args) => {
+            const ref = args.json;
+            D.selfProfileRef = ref;
+
+            // D.status = ref.status;
+            // D.statusDescription = ref.statusDescription;
+            D.pronouns = ref.pronouns;
+            D.bio = ref.bio;
+            D.bioLinks = ref.bioLinks.slice();
+            D.bannerColor = ref.bannerColor;
+            D.bannerUrl = ref.bannerUrl;
+            D.bannerType = ref.bannerType || 'color';
+            D.userIcon = ref.userIcon;
+
+            D.themes = ref.themes;
+            D.themeId = ref.themeId;
+            const selectedTheme = ref.themes.find(
+                (theme) => theme.id === ref.themeId
+            );
+            D.themeName = selectedTheme?.name ?? '';
+            D.themeButtonColor = ref.themeButtonColor;
+            D.themeIconColor = ref.themeIconColor;
+            D.themeSubtextColor = ref.themeSubtextColor;
+            D.backgroundType = ref.backgroundType || 'default';
+            D.backgroundTextureId = ref.backgroundTextureId;
+            D.backgroundGradientBottom = ref.backgroundGradientBottom;
+            D.backgroundGradientTop = ref.backgroundGradientTop;
+            D.nameplateEffect = ref.nameplateEffect;
+            D.profileEffect = ref.profileEffect;
+            D.iconFrame = ref.iconFrame;
+        });
+
+        D.visible = true;
     }
 
     /**
      */
     function markCurrentUserGameStarted() {
         currentUser.value.$online_for = Date.now();
-        currentUser.value.$offline_for = '';
+        currentUser.value.$offline_for = null;
         currentUser.value.$previousAvatarSwapTime = Date.now();
     }
 
@@ -773,8 +895,65 @@ export const useUserStore = defineStore('User', () => {
     }
 
     /**
+     * @param {string} command
      */
-    function toggleSharedConnectionsOptOut() {
+    async function confirmCurrentUserToggle(command, isEnableAction) {
+        const action = isEnableAction
+            ? t('confirm.enable_action')
+            : t('confirm.disable_action');
+        const { ok } = await modalStore.confirm({
+            title: t('confirm.title'),
+            description: t('confirm.command_question_toggle', {
+                action,
+                command
+            })
+        });
+        return ok;
+    }
+
+    /**
+     */
+    async function toggleAvatarCopying() {
+        if (
+            !(await confirmCurrentUserToggle(
+                t('dialog.user.info.avatar_cloning'),
+                !currentUser.value.allowAvatarCopying
+            ))
+        ) {
+            return;
+        }
+        userRequest.saveCurrentUser({
+            allowAvatarCopying: !currentUser.value.allowAvatarCopying
+        });
+    }
+
+    /**
+     */
+    async function toggleAllowBooping() {
+        if (
+            !(await confirmCurrentUserToggle(
+                t('dialog.user.info.booping'),
+                !currentUser.value.isBoopingEnabled
+            ))
+        ) {
+            return;
+        }
+        userRequest.saveCurrentUser({
+            isBoopingEnabled: !currentUser.value.isBoopingEnabled
+        });
+    }
+
+    /**
+     */
+    async function toggleSharedConnectionsOptOut() {
+        if (
+            !(await confirmCurrentUserToggle(
+                t('dialog.user.info.show_mutual_friends'),
+                currentUser.value.hasSharedConnectionsOptOut
+            ))
+        ) {
+            return;
+        }
         userRequest.saveCurrentUser({
             hasSharedConnectionsOptOut:
                 !currentUser.value.hasSharedConnectionsOptOut
@@ -783,7 +962,15 @@ export const useUserStore = defineStore('User', () => {
 
     /**
      */
-    function toggleDiscordFriendsOptOut() {
+    async function toggleDiscordFriendsOptOut() {
+        if (
+            !(await confirmCurrentUserToggle(
+                t('dialog.user.info.show_discord_connections'),
+                currentUser.value.hasDiscordFriendsOptOut
+            ))
+        ) {
+            return;
+        }
         userRequest.saveCurrentUser({
             hasDiscordFriendsOptOut: !currentUser.value.hasDiscordFriendsOptOut
         });
@@ -803,20 +990,51 @@ export const useUserStore = defineStore('User', () => {
         });
     }
 
+    watch(
+        () => watchState.isLoggedIn,
+        (isLoggedIn) => {
+            if (isLoggedIn) {
+                getCosmetics();
+            }
+        },
+        { flush: 'sync' }
+    );
+
+    function getCosmetics() {
+        cosmeticsRequest.getProfileEffects().then(({ json }) => {
+            json.forEach((effect) => {
+                cachedProfileEffects.set(effect.id, effect);
+            });
+        });
+        cosmeticsRequest.getIconFrames().then(({ json }) => {
+            json.forEach((frame) => {
+                cachedIconFrames.set(frame.id, frame);
+            });
+        });
+        cosmeticsRequest.gatNameplateEffects().then(({ json }) => {
+            json.forEach((effect) => {
+                cachedNameplateEffects.set(effect.id, effect);
+            });
+        });
+    }
+
     return {
         state,
 
         currentUser,
         currentTravelers,
         userDialog,
+        editProfileDialog,
         subsetOfLanguages,
-        languageDialog,
         sendBoopDialog,
         showUserDialogHistory,
         customUserTags,
         cachedUsers,
         cachedUserIdsByDisplayName,
         isLocalUserVrcPlusSupporter,
+        cachedProfileEffects,
+        cachedIconFrames,
+        cachedNameplateEffects,
         applyUserLanguage,
         applyPresenceLocation,
         applyUserDialogLocation,
@@ -828,6 +1046,7 @@ export const useUserStore = defineStore('User', () => {
         sortUserDialogAvatars,
         initUserNotes,
         showSendBoopDialog,
+        showEditProfileDialog,
         setUserDialogMemo,
         setUserDialogVisible,
         setUserDialogIsFavorite,
@@ -836,13 +1055,15 @@ export const useUserStore = defineStore('User', () => {
         setCurrentUserTravelingToTime,
         setCurrentUser,
         setSubsetOfLanguages,
-        setLanguageDialogLanguages,
         markCurrentUserGameStarted,
         markCurrentUserGameStopped,
         checkNote,
         toggleSharedConnectionsOptOut,
         toggleDiscordFriendsOptOut,
+        toggleAllowBooping,
+        toggleAvatarCopying,
         changePassword,
-        changeContentFilterSettings
+        changeContentFilterSettings,
+        getCosmetics
     };
 });

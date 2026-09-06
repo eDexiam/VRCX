@@ -1,4 +1,4 @@
-const dotnet = require('node-api-dotnet/net9.0');
+const dotnet = require('node-api-dotnet/net10.0');
 
 class InteropApi {
     constructor() {
@@ -9,6 +9,7 @@ class InteropApi {
     getDotNetObject(className) {
         if (!this.createdObjects[className]) {
             console.log(`Creating new instance of ${className}`);
+            // @ts-ignore
             this.createdObjects[className] = new dotnet.VRCX[className]();
         }
         return this.createdObjects[className];

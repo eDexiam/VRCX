@@ -1,77 +1,78 @@
 <template>
-    <div class="w-223 flex-1 min-h-0 flex flex-col">
+    <div class="user-dialog-scrollbars flex-1 min-h-0 min-w-0 flex flex-row">
         <DialogHeader class="sr-only">
             <DialogTitle>{{
                 userDialog.ref?.displayName || userDialog.id || t('dialog.user.info.header')
             }}</DialogTitle>
             <DialogDescription>{{ getUserStateText(userDialog.ref || {}) }}</DialogDescription>
         </DialogHeader>
-        <UserSummaryHeader
-            class="flex-shrink-0"
-            :get-user-state-text="getUserStateText"
-            :copy-user-display-name="copyUserDisplayName"
-            :toggle-badge-visibility="toggleBadgeVisibility"
-            :toggle-badge-showcased="toggleBadgeShowcased"
-            :user-dialog-command="userDialogCommand" />
 
-        <TabsUnderline
-            v-model="userDialog.activeTab"
-            :items="userDialogTabs"
-            :unmount-on-hide="false"
-            fill
-            @update:modelValue="userDialogTabClick">
-            <template #Info>
-                <UserDialogInfoTab ref="infoTabRef" @show-bio-dialog="showBioDialog" />
-            </template>
+        <div class="flex-none w-77 overflow-y-auto">
+            <UserSummaryHeader
+                :get-user-state-text="getUserStateText"
+                :copy-user-display-name="copyUserDisplayName"
+                :toggle-badge-visibility="toggleBadgeVisibility"
+                :toggle-badge-showcased="toggleBadgeShowcased"
+                :user-dialog-command="userDialogCommand" />
+        </div>
 
-            <template v-if="userDialog.id !== currentUser.id && !currentUser.hasSharedConnectionsOptOut" #mutual>
-                <UserDialogMutualFriendsTab ref="mutualFriendsTabRef" />
-            </template>
+        <div class="flex-1 min-w-0 flex flex-col min-h-0 pl-2">
+            <TabsUnderline
+                v-model="userDialog.activeTab"
+                :items="userDialogTabs"
+                :activeColor="userDialogTabColor"
+                :unmount-on-hide="false"
+                fill
+                :background="true"
+                @update:modelValue="userDialogTabClick">
+                <template #Info>
+                    <UserDialogInfoTab ref="infoTabRef" />
+                </template>
 
-            <template #Groups>
-                <UserDialogGroupsTab ref="groupsTabRef" />
-            </template>
+                <template v-if="userDialog.id !== currentUser.id && !currentUser.hasSharedConnectionsOptOut" #mutual>
+                    <UserDialogMutualFriendsTab ref="mutualFriendsTabRef" />
+                </template>
 
-            <template #Worlds>
-                <UserDialogWorldsTab ref="worldsTabRef" />
-            </template>
+                <template #Groups>
+                    <UserDialogGroupsTab ref="groupsTabRef" />
+                </template>
 
-            <template #favorite-worlds>
-                <UserDialogFavoriteWorldsTab ref="favoriteWorldsTabRef" />
-            </template>
+                <template #Worlds>
+                    <UserDialogWorldsTab ref="worldsTabRef" />
+                </template>
 
-            <template #Avatars>
-                <UserDialogAvatarsTab ref="avatarsTabRef" />
-            </template>
+                <template #favorite-worlds>
+                    <UserDialogFavoriteWorldsTab ref="favoriteWorldsTabRef" />
+                </template>
 
-            <template #Activity>
-                <UserDialogActivityTab ref="activityTabRef" />
-            </template>
+                <template #Avatars>
+                    <UserDialogAvatarsTab ref="avatarsTabRef" />
+                </template>
 
-            <template #JSON>
-                <DialogJsonTab
-                    :tree-data="treeData"
-                    :tree-data-key="treeData?.id"
-                    :dialog-id="userDialog.id"
-                    :dialog-ref="userDialog.ref"
-                    @refresh="refreshUserDialogTreeData()" />
-            </template>
-        </TabsUnderline>
-        <SendInviteDialog
-            v-model:sendInviteDialogVisible="sendInviteDialogVisible"
-            v-model:sendInviteDialog="sendInviteDialog"
-            @closeInviteDialog="closeInviteDialog" />
-        <SendInviteRequestDialog
-            v-model:sendInviteRequestDialogVisible="sendInviteRequestDialogVisible"
-            v-model:sendInviteDialog="sendInviteDialog"
-            @closeInviteDialog="closeInviteDialog" />
-        <SocialStatusDialog
-            :social-status-dialog="socialStatusDialog"
-            :social-status-history-table="socialStatusHistoryTable" />
-        <LanguageDialog />
-        <BioDialog :bio-dialog="bioDialog" />
-        <PronounsDialog :pronouns-dialog="pronounsDialog" />
-        <ModerateGroupDialog />
+                <template #Activity>
+                    <UserDialogActivityTab ref="activityTabRef" />
+                </template>
+
+                <template #JSON>
+                    <DialogJsonTab
+                        class="rounded-xl bg-(--profile-card) p-2"
+                        :tree-data="treeData"
+                        :tree-data-key="treeData?.user?.id"
+                        :dialog-id="userDialog.id"
+                        :dialog-ref="userDialog.ref"
+                        @refresh="refreshUserDialogTreeData()" />
+                </template>
+            </TabsUnderline>
+            <SendInviteDialog
+                v-model:sendInviteDialogVisible="sendInviteDialogVisible"
+                v-model:sendInviteDialog="sendInviteDialog"
+                @closeInviteDialog="closeInviteDialog" />
+            <SendInviteRequestDialog
+                v-model:sendInviteRequestDialogVisible="sendInviteRequestDialogVisible"
+                v-model:sendInviteDialog="sendInviteDialog"
+                @closeInviteDialog="closeInviteDialog" />
+            <ModerateGroupDialog />
+        </div>
     </div>
 </template>
 
@@ -115,12 +116,8 @@
     import UserDialogWorldsTab from './UserDialogWorldsTab.vue';
     import UserSummaryHeader from './UserSummaryHeader.vue';
 
-    import BioDialog from './BioDialog.vue';
-    import LanguageDialog from './LanguageDialog.vue';
     import ModerateGroupDialog from '../ModerateGroupDialog.vue';
-    import PronounsDialog from './PronounsDialog.vue';
     import SendInviteRequestDialog from './SendInviteRequestDialog.vue';
-    import SocialStatusDialog from './SocialStatusDialog.vue';
 
     const props = defineProps({
         previousIds: {
@@ -162,8 +159,21 @@
     const modalStore = useModalStore();
     const instanceStore = useInstanceStore();
 
-    const { userDialog, languageDialog, currentUser } = storeToRefs(useUserStore());
-    const { cachedUsers, showSendBoopDialog } = useUserStore();
+    const { userDialog, currentUser } = storeToRefs(useUserStore());
+    const userDialogTabColor = computed(() => {
+        const color = userDialog.value.theme?.buttonColor;
+        if (!color) {
+            return 'var(--primary)';
+        }
+        return color;
+    });
+    const scrollbarThumbColor = computed(() => {
+        const color = userDialog.value.theme?.buttonColor;
+        return color === 'var(--primary)'
+            ? 'color-mix(in oklab, var(--foreground) 30%, transparent)'
+            : `color-mix(in oklab, ${color} 50%, transparent)`;
+    });
+    const { cachedUsers, showSendBoopDialog, showEditProfileDialog } = useUserStore();
     const { showFavoriteDialog } = useFavoriteStore();
     const { showModerateGroupDialog } = useGroupStore();
     const { inviteGroupDialog } = storeToRefs(useGroupStore());
@@ -204,7 +214,8 @@
         refreshInviteMessageTableData,
         clearInviteImageUpload,
         instanceStore,
-        useNotificationStore
+        useNotificationStore,
+        showEditProfileDialog
     });
 
     watch(
@@ -225,30 +236,6 @@
         }
     );
 
-    const socialStatusDialog = ref({
-        visible: false,
-        loading: false,
-        status: '',
-        statusDescription: ''
-    });
-    const socialStatusHistoryTable = ref({
-        data: [],
-
-        layout: 'table'
-    });
-
-    const bioDialog = ref({
-        visible: false,
-        loading: false,
-        bio: '',
-        bioLinks: []
-    });
-
-    const pronounsDialog = ref({
-        visible: false,
-        loading: false,
-        pronouns: ''
-    });
     const treeData = ref({});
 
     /**
@@ -296,13 +283,17 @@
     function refreshUserDialogTreeData() {
         const D = userDialog.value;
         if (D.id === currentUser.value.id) {
-            treeData.value = formatJsonVars({
-                ...currentUser.value,
-                ...D.ref
-            });
+            treeData.value = {
+                currentUser: formatJsonVars(currentUser.value),
+                user: formatJsonVars(D.ref),
+                profile: formatJsonVars(D.publicProfileRef)
+            };
             return;
         }
-        treeData.value = formatJsonVars(D.ref);
+        treeData.value = {
+            user: formatJsonVars(D.ref),
+            profile: formatJsonVars(D.publicProfileRef)
+        };
     }
 
     /**
@@ -379,53 +370,11 @@
         handleUserDialogTab(tabName);
     }
 
-    /**
-     *
-     */
-    function showPronounsDialog() {
-        const D = pronounsDialog.value;
-        D.pronouns = currentUser.value.pronouns;
-        D.visible = true;
-    }
-
-    /**
-     *
-     */
-    function showLanguageDialog() {
-        const D = languageDialog.value;
-        D.visible = true;
-    }
-
     // Register simple dialog openers as callbacks for the command composable
     registerCallbacks({
-        showSocialStatusDialog,
-        showLanguageDialog,
-        showBioDialog,
-        showPronounsDialog,
-        showEditNoteAndMemoDialog: () => {
-            infoTabRef.value?.showEditNoteAndMemoDialog();
-        }
+        showEditProfileDialog,
+        showEditNoteAndMemoDialog: () => infoTabRef.value?.showEditNoteAndMemoDialog()
     });
-
-    /**
-     *
-     */
-    function showSocialStatusDialog() {
-        const D = socialStatusDialog.value;
-        const { statusHistory } = currentUser.value;
-        const statusHistoryArray = [];
-        for (let i = 0; i < statusHistory.length; ++i) {
-            const addStatus = {
-                no: i + 1,
-                status: statusHistory[i]
-            };
-            statusHistoryArray.push(addStatus);
-        }
-        socialStatusHistoryTable.value.data = statusHistoryArray;
-        D.status = currentUser.value.status;
-        D.statusDescription = currentUser.value.statusDescription;
-        D.visible = true;
-    }
 
     /**
      *
@@ -471,16 +420,6 @@
 
     /**
      *
-     */
-    function showBioDialog() {
-        const D = bioDialog.value;
-        D.bio = currentUser.value.bio;
-        D.bioLinks = currentUser.value.bioLinks.slice();
-        D.visible = true;
-    }
-
-    /**
-     *
      * @param displayName
      */
     function copyUserDisplayName(displayName) {
@@ -494,3 +433,14 @@
         clearInviteImageUpload();
     }
 </script>
+
+<style scoped>
+    .user-dialog-scrollbars {
+        --user-dialog-scrollbar-thumb: v-bind(scrollbarThumbColor);
+        --user-dialog-scrollbar-track: transparent;
+    }
+
+    .user-dialog-scrollbars :deep(*) {
+        scrollbar-color: var(--user-dialog-scrollbar-thumb) var(--user-dialog-scrollbar-track);
+    }
+</style>
