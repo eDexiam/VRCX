@@ -25,75 +25,74 @@ jobs:
           export DATE="$(cat Version)"
           echo "version=${FILENAME}" >> $GITHUB_OUTPUT
           echo "date=${DATE}" >> $GITHUB_OUTPUT
+  build_dotnet_windows:
+      runs-on: windows-latest
+      defaults:
+          run:
+              shell: bash
+      needs: [set_version, build_node]
+      steps:
+          - uses: actions/checkout@v6
+          - name: Setup .NET 10
+            uses: actions/setup-dotnet@v5
+            with:
+                dotnet-version: '10.0.x'
+          - name: Set version
+            run: |
+                echo "${{ needs.set_version.outputs.version }}" > Version
+                echo "!define PRODUCT_VERSION_FROM_FILE \"${{ needs.set_version.outputs.date }}.0\"" > Installer/version_define.nsh
+                cat Version
+          - uses: actions/cache@v5
+            with:
+                path: ~/.nuget/packages
+                key: ${{ runner.os }}-nuget-${{ hashFiles('**/Dotnet/VRCX-Cef.csproj') }}
+                restore-keys: |
+                    ${{ runner.os }}-nuget-
+          - name: Build Cef .NET Application
+            run: dotnet build Dotnet/VRCX-Cef.csproj -p:Configuration=Release -p:WarningLevel=0 -p:Platform=x64 -p:PlatformTarget=x64 -p:RestorePackagesConfig=true -t:"Restore;Clean;Build" -m -a x64 --self-contained
+          - name: Download html artifacts
+            uses: actions/download-artifact@v8
+            with:
+                name: html
+                path: build/html
+          - name: Install NSIS
+            run: choco install nsis -y
+          - name: Create NSIS installer
+            uses: joncloud/makensis-action@v5.0
+            with:
+                script-file: Installer/installer.nsi
+                additional-plugin-paths: Installer/Plugins
+          - name: Rename setup
+            run: |
+                file_name="VRCX_${{ needs.set_version.outputs.version }}_Setup.exe"
+                echo "Setup FileName: ${file_name}"
+                mv Installer/VRCX_Setup.exe $file_name
+          - name: Sign Cef setup
+            uses: azure/trusted-signing-action@v1
+            if: steps.check_sign.outputs.sign == 'true'
+            with:
+                azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+                azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+                azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+                endpoint: https://eus.codesigning.azure.net/
+                trusted-signing-account-name: ${{ secrets.AZURE_ACCOUNT_NAME }}
+                certificate-profile-name: ${{ secrets.AZURE_PROFILE_NAME }}
+                file-digest: SHA256
+                timestamp-rfc3161: http://timestamp.acs.microsoft.com
+                timestamp-digest: SHA256
+                files: |
+                    ${{ github.workspace }}\VRCX_${{ needs.set_version.outputs.version }}_Setup.exe
 
-    build_dotnet_windows:
-        runs-on: windows-latest
-        defaults:
-            run:
-                shell: bash
-        needs: [set_version, build_node]
-        steps:
-            - uses: actions/checkout@v6
-            - name: Setup .NET 10
-              uses: actions/setup-dotnet@v5
-              with:
-                  dotnet-version: '10.0.x'
-            - name: Set version
-              run: |
-                  echo "${{ needs.set_version.outputs.version }}" > Version
-                  echo "!define PRODUCT_VERSION_FROM_FILE \"${{ needs.set_version.outputs.date }}.0\"" > Installer/version_define.nsh
-                  cat Version
-            - uses: actions/cache@v5
-              with:
-                  path: ~/.nuget/packages
-                  key: ${{ runner.os }}-nuget-${{ hashFiles('**/Dotnet/VRCX-Cef.csproj') }}
-                  restore-keys: |
-                      ${{ runner.os }}-nuget-
-            - name: Build Cef .NET Application
-              run: dotnet build Dotnet/VRCX-Cef.csproj -p:Configuration=Release -p:WarningLevel=0 -p:Platform=x64 -p:PlatformTarget=x64 -p:RestorePackagesConfig=true -t:"Restore;Clean;Build" -m -a x64 --self-contained
-            - name: Download html artifacts
-              uses: actions/download-artifact@v8
-              with:
-                  name: html
-                  path: build/html
-            - name: Install NSIS
-              run: choco install nsis -y
-            - name: Create NSIS installer
-              uses: joncloud/makensis-action@v5.0
-              with:
-                  script-file: Installer/installer.nsi
-                  additional-plugin-paths: Installer/Plugins
-            - name: Rename setup
-              run: |
-                  file_name="VRCX_${{ needs.set_version.outputs.version }}_Setup.exe"
-                  echo "Setup FileName: ${file_name}"
-                  mv Installer/VRCX_Setup.exe $file_name
-            - name: Sign Cef setup
-              uses: azure/trusted-signing-action@v1
-              if: steps.check_sign.outputs.sign == 'true'
-              with:
-                  azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-                  azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
-                  azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
-                  endpoint: https://eus.codesigning.azure.net/
-                  trusted-signing-account-name: ${{ secrets.AZURE_ACCOUNT_NAME }}
-                  certificate-profile-name: ${{ secrets.AZURE_PROFILE_NAME }}
-                  file-digest: SHA256
-                  timestamp-rfc3161: http://timestamp.acs.microsoft.com
-                  timestamp-digest: SHA256
-                  files: |
-                      ${{ github.workspace }}\VRCX_${{ needs.set_version.outputs.version }}_Setup.exe
-
-            - name: Upload Cef dotnet artifacts
-              uses: actions/upload-artifact@v7
-              with:
-                name: Cef-Release
-                path: build/Cef
-            - name: Upload setup artifact
-              uses: actions/upload-artifact@v7
-              with:
-                name: Cef-Setup
-                path: VRCX_${{ needs.set_version.outputs.version }}_Setup.exe
+          - name: Upload Cef dotnet artifacts
+            uses: actions/upload-artifact@v7
+            with:
+              name: Cef-Release
+              path: build/Cef
+          - name: Upload setup artifact
+            uses: actions/upload-artifact@v7
+            with:
+              name: Cef-Setup
+              path: VRCX_${{ needs.set_version.outputs.version }}_Setup.exe
 
   build_dotnet_linux:
     runs-on: ubuntu-latest
