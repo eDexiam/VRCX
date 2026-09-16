@@ -84,16 +84,16 @@ jobs:
                   files: |
                       ${{ github.workspace }}\VRCX_${{ needs.set_version.outputs.version }}_Setup.exe
 
-      - name: Upload Cef dotnet artifacts
-        uses: actions/upload-artifact@v7
-        with:
-          name: Cef-Release
-          path: build/Cef
-      - name: Upload setup artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: Cef-Setup
-          path: VRCX_${{ needs.set_version.outputs.version }}_Setup.exe
+            - name: Upload Cef dotnet artifacts
+              uses: actions/upload-artifact@v7
+              with:
+                name: Cef-Release
+                path: build/Cef
+            - name: Upload setup artifact
+              uses: actions/upload-artifact@v7
+              with:
+                name: Cef-Setup
+                path: VRCX_${{ needs.set_version.outputs.version }}_Setup.exe
 
   build_dotnet_linux:
     runs-on: ubuntu-latest
