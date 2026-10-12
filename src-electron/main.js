@@ -9,10 +9,12 @@ const {
     Menu,
     dialog,
     Notification: ElectronNotification,
-    nativeImage
+    nativeImage,
+    nativeTheme
 } = require('electron');
 const { spawnSync } = require('child_process');
 const fs = require('fs');
+const os = require('os');
 
 //app.disableHardwareAcceleration();
 
@@ -21,16 +23,16 @@ function dotnetSetup() {
     if (fs.existsSync(bundledDotNetPath)) {
         // Include bundled .NET runtime
         process.env.DOTNET_ROOT = bundledDotNetPath;
-        process.env.PATH = `${bundledDotNetPath}:${process.env.PATH}`;
+        process.env.PATH = `${bundledDotNetPath}${path.delimiter}${process.env.PATH}`;
     } else if (process.platform === 'darwin') {
         const dotnetPath = path.join('/usr/local/share/dotnet');
         const dotnetPathArm = path.join('/usr/local/share/dotnet/x64');
         if (fs.existsSync(dotnetPathArm)) {
             process.env.DOTNET_ROOT = dotnetPathArm;
-            process.env.PATH = `${dotnetPathArm}:${process.env.PATH}`;
+            process.env.PATH = `${dotnetPathArm}${path.delimiter}${process.env.PATH}`;
         } else if (fs.existsSync(dotnetPath)) {
             process.env.DOTNET_ROOT = dotnetPath;
-            process.env.PATH = `${dotnetPath}:${process.env.PATH}`;
+            process.env.PATH = `${dotnetPath}${path.delimiter}${process.env.PATH}`;
         }
     }
 
@@ -83,11 +85,27 @@ if (!fs.existsSync(userDataPath)) {
 }
 app.setPath('userData', userDataPath);
 
-const armPath = path.join(rootDir, 'build/Electron/VRCX-Electron-arm64.cjs');
-if (process.arch === 'arm64' && fs.existsSync(armPath)) {
-    require(armPath);
-} else {
+/**
+ * Generates a RuntimeIdentifier used by dotnet tooling to identify different builds.
+ *
+ * @returns A RuntimeIdentifier string of the form 'os-arch' eg 'linux-x64'
+ */
+function getRid() {
+    const osMap = { win32: 'win', darwin: 'osx', linux: 'linux', freebsd: 'linux', openbsd: 'linux' };
+    const archMap = { x64: 'x64', arm64: 'arm64' };
+
+    const osName = osMap[os.platform()];
+    const arch = archMap[os.arch()];
+
+    return `${osName}-${arch}`;
+}
+
+if (app.isPackaged) {
     require(path.join(rootDir, 'build/Electron/VRCX-Electron.cjs'));
+} else {
+    // if debugging, we need to get from the platform dir ourselves
+    const rid = getRid();
+    require(path.join(rootDir, `build/Electron/${rid}/VRCX-Electron.cjs`));
 }
 
 const InteropApi = require('./InteropApi');
@@ -261,6 +279,22 @@ ipcMain.handle('app:setTrayIconNotification', (_event, notify) => {
     setTrayIconNotification(notify);
 });
 
+function sendSystemTheme() {
+    if (mainWindow && !mainWindow.isDestroyed() && nativeTheme.themeSource === 'system') {
+        mainWindow.webContents.send('systemThemeChanged', nativeTheme.shouldUseDarkColors);
+    }
+}
+
+ipcMain.handle('app:setThemeSource', (_event, source) => {
+    if (!['system', 'light', 'dark'].includes(source)) {
+        return;
+    }
+    nativeTheme.themeSource = source;
+    sendSystemTheme();
+});
+
+nativeTheme.on('updated', sendSystemTheme);
+
 function createWindow() {
     console.log('Creating main window');
 
@@ -375,6 +409,10 @@ function createWindow() {
 
     mainWindow.on('focus', () => {
         mainWindow.webContents.send('onBrowserFocus');
+    });
+
+    mainWindow.on('blur', () => {
+        mainWindow.webContents.send('onBrowserBlur');
     });
 }
 
@@ -709,7 +747,8 @@ function isDotNetInstalled() {
     let dotnetPath;
 
     if (process.env.DOTNET_ROOT) {
-        dotnetPath = path.join(process.env.DOTNET_ROOT, 'dotnet');
+        const dotnetExe = process.platform === 'win32' ? 'dotnet.exe' : 'dotnet';
+        dotnetPath = path.join(process.env.DOTNET_ROOT, dotnetExe);
         if (!fs.existsSync(dotnetPath)) {
             // fallback to command
             dotnetPath = 'dotnet';

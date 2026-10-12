@@ -26,20 +26,29 @@ $root = Resolve-Path .
 
 $Date = Get-Date -format yyyyMMdd
 $ZipName = "VRCX_" + $Date + ".zip"
-$SetupName = "VRCX_" + $Date + "_Setup.exe"
+$SetupName = "VRCX_" + $Date + "_Setup_x64.exe"
 
 Write-Host "Building .Net..." -ForegroundColor Green
 
 if ($IsWindows) {
-    dotnet build Dotnet\VRCX-Cef.csproj -p:Configuration=Release -p:WarningLevel=0 -p:Platform=x64 -t:"Restore;Clean;Build" -maxcpucount --self-contained
+    dotnet build Dotnet\VRCX-Cef.csproj -p:Configuration=Release -p:WarningLevel=0 -p:Platform=x64 -t:"Clean;Build" -maxcpucount --runtime win-x64 --self-contained
 }
 
-if ($IsLinux -or $IsMacOS) {
+if ($IsLinux) {
     if ($BuildArm64) {
-        dotnet build 'Dotnet/VRCX-Electron-arm64.csproj' -p:Configuration=Release -p:WarningLevel=0 -p:Platform=arm64 -p:PlatformTarget=arm64 -t:"Restore;Clean;Build" -maxcpucount --arch arm64
+        dotnet build 'Dotnet/VRCX-Electron.csproj' -p:Configuration=Release -p:WarningLevel=0 -p:Platform=arm64 -t:"Clean;Build" -maxcpucount --runtime linux-arm64
     }
     else {
-        dotnet build 'Dotnet/VRCX-Electron.csproj' -p:Configuration=Release -p:WarningLevel=0 -p:Platform=x64 -p:PlatformTarget=x64 -t:"Restore;Clean;Build" -maxcpucount --arch x64
+        dotnet build 'Dotnet/VRCX-Electron.csproj' -p:Configuration=Release -p:WarningLevel=0 -p:Platform=x64 -t:"Clean;Build" -maxcpucount --runtime linux-x64
+    }
+}
+
+if ($IsMacOS) {
+    if ($BuildArm64) {
+        dotnet build 'Dotnet/VRCX-Electron.csproj' -p:Configuration=Release -p:WarningLevel=0 -p:Platform=arm64 -t:"Clean;Build" -maxcpucount --runtime osx-arm64
+    }
+    else {
+        dotnet build 'Dotnet/VRCX-Electron.csproj' -p:Configuration=Release -p:WarningLevel=0 -p:Platform=x64 -t:"Clean;Build" -maxcpucount --runtime osx-x64
     }
 }
 
@@ -53,11 +62,13 @@ else {
     npm ci --loglevel=error
 }
 
+# this is for some long forgotten reason, possibly something returning non-zero despite a passing build
 $ErrorActionPreference = "Continue"
 
 if ($IsWindows) {
     npm run prod
 }
+
 if ($IsLinux -or $IsMacOS) {
     if ($BuildArm64) {
         npm run prod
@@ -88,7 +99,7 @@ if ($IsWindows) {
     $nsisPath = "C:\Program Files (x86)\NSIS\makensis.exe"
     &$nsisPath installer.nsi
     Start-Sleep -Seconds 1
-    Move-Item VRCX_Setup.exe ..\$SetupName -Force
+    Move-Item VRCX_Setup_x64.exe ..\$SetupName -Force
     cd ..
 
     Write-Host "Creating SHA256-hash..." -ForegroundColor Green

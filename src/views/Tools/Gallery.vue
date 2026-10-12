@@ -7,37 +7,43 @@
             </Button>
             <span class="header">{{ t('dialog.gallery_icons.header') }}</span>
         </div>
-        <TabsUnderline default-value="gallery" :items="galleryTabs" :unmount-on-hide="false">
+        <TabsUnderline v-model="activeTab" :items="galleryTabs" :unmount-on-hide="false">
             <template #label-gallery>
                 <span>
                     {{ t('dialog.gallery_icons.gallery') }}
-                    <span class="text-xs ml-[5px]"> {{ galleryTable.length }}/64 </span>
+                    <span class="text-xs ml-[5px]">
+                        {{ galleryTable.length }}/{{ cachedPermissions.maxUserGallery }}
+                    </span>
                 </span>
             </template>
             <template #label-icons>
                 <span>
                     {{ t('dialog.gallery_icons.icons') }}
-                    <span class="text-xs ml-[5px]"> {{ VRCPlusIconsTable.length }}/64 </span>
+                    <span class="text-xs ml-[5px]">
+                        {{ VRCPlusIconsTable.length }}/{{ cachedPermissions.maxUserIcons }}
+                    </span>
                 </span>
             </template>
             <template #label-emojis>
                 <span>
                     {{ t('dialog.gallery_icons.emojis') }}
-                    <span class="text-xs ml-[5px]"> {{ emojiTable.length }}/{{ cachedConfigTyped.maxUserEmoji }} </span>
+                    <span class="text-xs ml-[5px]"> {{ emojiTable.length }}/{{ cachedPermissions.maxUserEmoji }} </span>
                 </span>
             </template>
             <template #label-stickers>
                 <span>
                     {{ t('dialog.gallery_icons.stickers') }}
                     <span class="text-xs ml-[5px]">
-                        {{ stickerTable.length }}/{{ cachedConfigTyped.maxUserStickers }}
+                        {{ stickerTable.length }}/{{ cachedPermissions.maxUserStickers }}
                     </span>
                 </span>
             </template>
             <template #label-prints>
                 <span>
                     {{ t('dialog.gallery_icons.prints') }}
-                    <span class="text-xs ml-[5px]"> {{ printTable.length }}/64 </span>
+                    <span class="text-xs ml-[5px]">
+                        {{ printTable.length }}/{{ cachedPermissions.maxUserPrints }}
+                    </span>
                 </span>
             </template>
             <template #label-inventory>
@@ -69,14 +75,6 @@
                             <Upload />
                             {{ t('dialog.gallery_icons.upload') }}
                         </Button>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            :disabled="!currentUser.profilePicOverride"
-                            @click="setProfilePicOverride('')">
-                            <X />
-                            {{ t('dialog.gallery_icons.clear') }}
-                        </Button>
                     </ButtonGroup>
                     <ItemGroup
                         class="grid gap-3 mt-3"
@@ -87,7 +85,6 @@
                             variant="outline"
                             size="sm"
                             class="p-0 x-hover-card hover:bg-accent hover:shadow-sm"
-                            :class="compareCurrentProfilePic(image.id) ? 'x-highlight-ring' : ''"
                             as-child>
                             <div
                                 v-if="
@@ -113,13 +110,6 @@
                                         class="rounded-full text-destructive"
                                         @click="deleteGalleryImage(image.id)">
                                         <Trash2 />
-                                    </Button>
-                                    <Button
-                                        size="icon-sm"
-                                        class="rounded-full"
-                                        :variant="compareCurrentProfilePic(image.id) ? 'default' : 'ghost'"
-                                        @click="setProfilePicOverride(image.id)">
-                                        <Check />
                                     </Button>
                                 </ItemFooter>
                             </div>
@@ -152,8 +142,8 @@
                         <Button
                             variant="outline"
                             size="sm"
-                            :disabled="!currentUser.userIcon"
-                            @click="setVRCPlusIcon('')">
+                            :disabled="currentUser.userIcon === currentUser.currentAvatarImageUrl"
+                            @click="setUserIcon('')">
                             <X />
                             {{ t('dialog.gallery_icons.clear') }}
                         </Button>
@@ -198,7 +188,7 @@
                                         size="icon-sm"
                                         class="rounded-full"
                                         :variant="compareCurrentVRCPlusIcon(image.id) ? 'default' : 'ghost'"
-                                        @click="setVRCPlusIcon(image.id)">
+                                        @click="setUserIcon(image.id)">
                                         <Check />
                                     </Button>
                                 </ItemFooter>
@@ -536,11 +526,11 @@
                         </ButtonGroup>
                         <Select v-model="inventoryTypeFilter">
                             <SelectTrigger size="sm" class="w-44">
-                                <SelectValue placeholder="All types" />
+                                <SelectValue :placeholder="t('dialog.gallery_icons.all_types')" />
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectGroup>
-                                    <SelectItem value="all">All types</SelectItem>
+                                    <SelectItem value="all">{{ t('dialog.gallery_icons.all_types') }}</SelectItem>
                                     <SelectItem v-for="type in inventoryTypeOptions" :key="type" :value="type">
                                         {{ type }}
                                     </SelectItem>
@@ -610,7 +600,7 @@
         NumberFieldIncrement,
         NumberFieldInput
     } from '@/components/ui/number-field';
-    import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+    import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
     import { Button } from '@/components/ui/button';
     import { ButtonGroup } from '@/components/ui/button-group';
     import { Checkbox } from '@/components/ui/checkbox';
@@ -630,7 +620,7 @@
     import { storeToRefs } from 'pinia';
     import { toast } from 'vue-sonner';
     import { useI18n } from 'vue-i18n';
-    import { useRouter } from 'vue-router';
+    import { useRoute, useRouter } from 'vue-router';
 
     import {
         extractFileId,
@@ -652,6 +642,17 @@
 
     const { t } = useI18n();
     const router = useRouter();
+    const route = useRoute();
+    const activeTab = ref(String(route.query.tab || 'gallery'));
+
+    watch(
+        () => route.query.tab,
+        (tab) => {
+            if (tab) {
+                activeTab.value = String(tab);
+            }
+        }
+    );
     const modalStore = useModalStore();
 
     const {
@@ -682,10 +683,7 @@
     const { currentUserInventory } = storeToRefs(useAdvancedSettingsStore());
     const { showFullscreenImageDialog } = useGalleryStore();
     const { currentUser, isLocalUserVrcPlusSupporter } = storeToRefs(useUserStore());
-    const { cachedConfig } = storeToRefs(useAuthStore());
-    const cachedConfigTyped = computed(
-        () => /** @type {{ maxUserEmoji?: number; maxUserStickers?: number }} */ (cachedConfig.value ?? {})
-    );
+    const { cachedPermissions } = storeToRefs(useAuthStore());
     const galleryTabs = computed(() => [
         { value: 'gallery', label: t('dialog.gallery_icons.gallery') },
         { value: 'icons', label: t('dialog.gallery_icons.icons') },
@@ -841,17 +839,11 @@
     /**
      * @param {Event} e
      * @param {{
-
      *     inputSelector: string;
-
      *     aspectRatio: number;
-
      *     beforeCrop?: (file: File) => void;
-
      *     upload: (payload: { file: File; blob: Blob; base64Body: string }) => Promise<void>;
-
      *     errorMessage?: string;
-
      * }} options
      */
     function openImageUploadFlow(
@@ -916,38 +908,6 @@
     /**
      * @param fileId
      */
-    function setProfilePicOverride(fileId) {
-        if (!isLocalUserVrcPlusSupporter.value) {
-            toast.error(t('message.vrcplus.required'));
-            return;
-        }
-        let profilePicOverride = '';
-        if (fileId) {
-            profilePicOverride = `${AppDebug.endpointDomain}/file/${fileId}/1`;
-        }
-        if (profilePicOverride === currentUser.value.profilePicOverride) {
-            return;
-        }
-        userRequest
-            .saveCurrentUser({
-                profilePicOverride
-            })
-            .then((args) => {
-                toast.success(t('message.gallery.profile_pic_changed'));
-                return args;
-            });
-    }
-
-    /**
-     * @param fileId
-     */
-    function compareCurrentProfilePic(fileId) {
-        return isCurrentFile(currentUser.value.profilePicOverride, fileId);
-    }
-
-    /**
-     * @param fileId
-     */
     function deleteGalleryImage(fileId) {
         deleteFileAndRemove(fileId, galleryTable.value);
     }
@@ -979,7 +939,7 @@
     /**
      * @param fileId
      */
-    function setVRCPlusIcon(fileId) {
+    function setUserIcon(fileId) {
         if (!isLocalUserVrcPlusSupporter.value) {
             toast.error(t('message.vrcplus.required'));
             return;
@@ -988,16 +948,15 @@
         if (fileId) {
             userIcon = `${AppDebug.endpointDomain}/file/${fileId}/1`;
         }
-        if (userIcon === currentUser.value.userIcon) {
+        if (userIcon === currentUser.value.iconUrl) {
             return;
         }
         userRequest
-            .saveCurrentUser({
+            .saveProfile({
                 userIcon
             })
-            .then((args) => {
+            .then(() => {
                 toast.success(t('message.gallery.profile_icon_changed'));
-                return args;
             });
     }
 
@@ -1005,7 +964,7 @@
      * @param userIcon
      */
     function compareCurrentVRCPlusIcon(userIcon) {
-        return isCurrentFile(currentUser.value.userIcon, userIcon);
+        return isCurrentFile(currentUser.value.iconUrl, userIcon);
     }
 
     /**
@@ -1042,9 +1001,12 @@
     }
 
     async function uploadEmoji(base64Body) {
+        /** @type {Omit<NonNullable<import('vrchat').UploadImage['body']>, 'file'>} */
         const params = {
             tag: emojiAnimType.value ? 'emojianimated' : 'emoji',
-            animationStyle: emojiAnimationStyle.value.toLowerCase(),
+            animationStyle: /** @type {import('vrchat').ImageAnimationStyle} */ (
+                emojiAnimationStyle.value.toLowerCase()
+            ),
             maskTag: 'square'
         };
         if (emojiAnimType.value) {
@@ -1089,6 +1051,7 @@
     }
 
     async function uploadSticker(base64Body) {
+        /** @type {Omit<NonNullable<import('vrchat').UploadImage['body']>, 'file'>} */
         const params = {
             tag: 'sticker',
             maskTag: 'square'

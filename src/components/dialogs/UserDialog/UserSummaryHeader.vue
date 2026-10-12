@@ -106,7 +106,7 @@
                         </TooltipWrapper>
                         <span v-if="userDialog.ref.pronouns" class="basis-full h-0"></span>
                         <TooltipWrapper v-if="userDialog.ref.pronouns" side="top" :content="t('dialog.user.pronouns')">
-                            <span class="x-grey font-mono text-xs" v-text="userDialog.ref.pronouns"></span>
+                            <span class="x-grey font-mono text-xs" v-text="replaceBioSymbols(userDialog.ref.pronouns)"></span>
                         </TooltipWrapper>
                     </div>
                     <template v-if="userDialog.ref.id === currentUser.id">
@@ -147,6 +147,23 @@
                         class="name h-5 px-1.5 text-[11px] leading-none"
                         :class="userDialog.ref.$trustClass">
                         <Shield class="h-2.5 w-2.5" /> {{ userDialog.ref.$trustLevel }}
+                    </Badge>
+                </TooltipWrapper>
+                <TooltipWrapper
+                    v-if="userDialog.id === currentUser.id && currentUser.accountStanding"
+                    side="top"
+                    :content="t('dialog.user.tags.account_standing')">
+                    <Badge
+                        variant="outline"
+                        class="h-5 px-1.5 text-[11px] leading-none capitalize"
+                        :class="
+                            currentUser.accountStanding === 'good'
+                                ? 'text-green-500 border-green-500!'
+                                : 'text-red-500 border-red-500!'
+                        ">
+                        <ShieldCheck v-if="currentUser.accountStanding === 'good'" class="h-2.5 w-2.5" />
+                        <ShieldAlert v-else class="h-2.5 w-2.5" />
+                        {{ currentUser.accountStanding }}
                     </Badge>
                 </TooltipWrapper>
                 <TooltipWrapper
@@ -369,6 +386,16 @@
                             : t('dialog.user.info.avatar_cloning_deny')
                     }}</span>
                 </div>
+                <div
+                    class="flex justify-between items-center text-xs cursor-pointer hover:text-foreground"
+                    @click="toggleReducedProfileAnimations">
+                    <span class="text-muted-foreground">{{ t('dialog.user.info.reduced_profile_animations') }}</span>
+                    <span class="text-muted-foreground">{{
+                        currentUserClientConfig.accessReduceDecorAnim
+                            ? t('dialog.user.info.avatar_cloning_allow')
+                            : t('dialog.user.info.avatar_cloning_deny')
+                    }}</span>
+                </div>
             </div>
         </div>
     </div>
@@ -379,27 +406,23 @@
             :style="{ color: userDialog.theme.subtextColor }">
             {{ t('dialog.user.info.avatar_info') }}
             <span class="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-                <TooltipWrapper v-if="!hasAvatarSet" side="top" :content="t('dialog.user.info.icon_hides_avatar')">
+                <TooltipWrapper v-if="!hasAvatarSet" side="right" :content="t('dialog.user.info.icon_hides_avatar')">
                     <Info class="inline-block h-3 w-3 align-middle" :style="{ color: userDialog.theme.iconColor }" />
                 </TooltipWrapper>
             </span>
         </div>
         <div class="text-xs flex justify-between gap-2">
-            <template v-if="hasAvatarSet">
+            <template v-if="avatarImageUrl">
                 <AvatarInfo
-                    :key="userDialog.id"
-                    :imageurl="userDialog.ref.currentAvatarImageUrl || userDialog.publicProfileRef?.iconUrl"
+                    :key="avatarImageUrl"
+                    :imageurl="avatarImageUrl"
                     :userid="userDialog.id"
                     :avatartags="userDialog.ref.currentAvatarTags"
                     style="display: inline-block" />
                 <img
                     class="h-12 w-16 rounded-lg object-cover cursor-pointer flex-none"
-                    :src="userDialog.ref.currentAvatarImageUrl || userDialog.publicProfileRef?.iconUrl"
-                    @click="
-                        showFullscreenImageDialog(
-                            userDialog.ref.currentAvatarImageUrl || userDialog.publicProfileRef?.iconUrl
-                        )
-                    "
+                    :src="avatarImageUrl"
+                    @click="showFullscreenImageDialog(avatarImageUrl)"
                     loading="lazy" />
             </template>
             <template v-else>
@@ -466,6 +489,8 @@
         Info,
         Monitor,
         Shield,
+        ShieldAlert,
+        ShieldCheck,
         Smartphone,
         Hand,
         UserPlus,
@@ -475,12 +500,19 @@
         MessageCircle,
         User
     } from 'lucide-vue-next';
-    import { ref, watch } from 'vue';
+    import { computed, ref, watch } from 'vue';
     import { storeToRefs } from 'pinia';
     import { useI18n } from 'vue-i18n';
 
     import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-    import { copyToClipboard, formatDateFilter, languageClass, openDiscordProfile } from '../../../shared/utils';
+    import {
+        convertFileUrlToImageUrl,
+        copyToClipboard,
+        formatDateFilter,
+        languageClass,
+        openDiscordProfile,
+        replaceBioSymbols
+    } from '../../../shared/utils';
     import { useUserDisplay } from '../../../composables/useUserDisplay';
     import { Popover, PopoverContent, PopoverTrigger } from '../../ui/popover';
     import { useGalleryStore, useUserStore } from '../../../stores';
@@ -519,9 +551,14 @@
 
     const { t } = useI18n();
 
-    const { userDialog, currentUser } = storeToRefs(useUserStore());
-    const { toggleSharedConnectionsOptOut, toggleDiscordFriendsOptOut, toggleAvatarCopying, toggleAllowBooping } =
-        useUserStore();
+    const { userDialog, currentUser, currentUserClientConfig } = storeToRefs(useUserStore());
+    const {
+        toggleSharedConnectionsOptOut,
+        toggleDiscordFriendsOptOut,
+        toggleAvatarCopying,
+        toggleAllowBooping,
+        toggleReducedProfileAnimations
+    } = useUserStore();
 
     const { showFullscreenImageDialog } = useGalleryStore();
     const { userStatusClass } = useUserDisplay();
@@ -530,26 +567,21 @@
     const profileImageError = ref(false);
     const userIconError = ref(false);
     const hasAvatarSet = ref(false);
+    const avatarImageUrl = computed(() => {
+        if (userDialog.value.id === currentUser.value.id) {
+            return currentUser.value.currentAvatarImageUrl;
+        }
+
+        return hasAvatarSet.value ? userDialog.value.publicProfileRef?.iconUrl : '';
+    });
 
     watch(
-        [
-            () => userDialog.value.id,
-            () => userDialog.value.ref.currentAvatarImageUrl,
-            () => userDialog.value.publicProfileRef?.iconUrl
-        ],
-        async ([userId, currentAvatarImageUrl, iconUrl]) => {
-            if (currentAvatarImageUrl) {
-                hasAvatarSet.value = true;
-                return;
-            }
-
+        () => userDialog.value.publicProfileRef?.iconUrl,
+        async (iconUrl) => {
             hasAvatarSet.value = false;
+            // check if image is from an avatar
             const avatarInfo = await getAvatarName(iconUrl);
-            if (
-                userId === userDialog.value.id &&
-                iconUrl === userDialog.value.publicProfileRef?.iconUrl &&
-                !userDialog.value.ref.currentAvatarImageUrl
-            ) {
+            if (iconUrl === userDialog.value.publicProfileRef?.iconUrl) {
                 hasAvatarSet.value = Boolean(avatarInfo.ownerId);
             }
         },

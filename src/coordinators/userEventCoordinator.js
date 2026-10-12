@@ -130,8 +130,10 @@ export async function runHandleUserUpdateFlow(ref, props, { now = Date.now, nowI
             };
             notificationStore.queueFeedNoty(feed);
             sharedFeedStore.addEntry(feed);
-            feedStore.addFeedEntry(feed);
-            database.addGPSToDatabase(feed);
+            const persistedFeed = await database.addGPSToDatabase(feed);
+            if (persistedFeed) {
+                feedStore.addFeedEntry(persistedFeed);
+            }
             // clear previousLocation after GPS
             ref.$previousLocation = '';
             ref.$travelingToTime = now();
@@ -142,7 +144,50 @@ export async function runHandleUserUpdateFlow(ref, props, { now = Date.now, nowI
         ref.$previousLocation = props.location[1];
         ref.$travelingToTime = now();
     }
-    if (props.iconUrl && props.iconUrl[0]) {
+    if (ref.bannerType === 'avatarBanner' && props.bannerUrl && props.bannerUrl[0]) {
+        const currentBannerUrl = props.bannerUrl[0];
+        const previousBannerUrl = props.bannerUrl[1];
+        let avatarInfo = {
+            ownerId: '',
+            avatarName: ''
+        };
+        try {
+            avatarInfo = await getAvatarName(currentBannerUrl);
+        } catch (err) {
+            console.log(err);
+        }
+        if (avatarInfo.ownerId) {
+            let previousAvatarInfo = {
+                ownerId: '',
+                avatarName: ''
+            };
+            try {
+                previousAvatarInfo = await getAvatarName(previousBannerUrl);
+            } catch (err) {
+                console.log(err);
+            }
+            feed = {
+                created_at: nowIso(),
+                type: 'Avatar',
+                userId: ref.id,
+                displayName: ref.displayName,
+                ownerId: avatarInfo.ownerId,
+                previousOwnerId: previousAvatarInfo.ownerId,
+                avatarName: avatarInfo.avatarName,
+                previousAvatarName: previousAvatarInfo.avatarName,
+                currentAvatarImageUrl: avatarInfo.ownerId ? currentBannerUrl : '',
+                currentAvatarThumbnailImageUrl: avatarInfo.ownerId ? currentBannerUrl : '',
+                previousCurrentAvatarImageUrl: previousAvatarInfo.ownerId ? previousBannerUrl : '',
+                previousCurrentAvatarThumbnailImageUrl: previousAvatarInfo.ownerId ? previousBannerUrl : ''
+            };
+            notificationStore.queueFeedNoty(feed);
+            sharedFeedStore.addEntry(feed);
+            const persistedFeed = await database.addAvatarToDatabase(feed);
+            if (persistedFeed) {
+                feedStore.addFeedEntry(persistedFeed);
+            }
+        }
+    } else if (props.iconUrl && props.iconUrl[0]) {
         const currentIconUrl = props.iconUrl[0];
         const previousIconUrl = props.iconUrl[1];
         let avatarInfo = {
@@ -180,8 +225,10 @@ export async function runHandleUserUpdateFlow(ref, props, { now = Date.now, nowI
             };
             notificationStore.queueFeedNoty(feed);
             sharedFeedStore.addEntry(feed);
-            feedStore.addFeedEntry(feed);
-            database.addAvatarToDatabase(feed);
+            const persistedFeed = await database.addAvatarToDatabase(feed);
+            if (persistedFeed) {
+                feedStore.addFeedEntry(persistedFeed);
+            }
         }
     }
     // if status is offline, ignore status and statusDescription
@@ -227,30 +274,10 @@ export async function runHandleUserUpdateFlow(ref, props, { now = Date.now, nowI
         };
         notificationStore.queueFeedNoty(feed);
         sharedFeedStore.addEntry(feed);
-        feedStore.addFeedEntry(feed);
-        database.addStatusToDatabase(feed);
-    }
-    if (props.bio && props.bio[0] && props.bio[1]) {
-        let bio = '';
-        let previousBio = '';
-        if (props.bio[0]) {
-            bio = props.bio[0];
+        const persistedFeed = await database.addStatusToDatabase(feed);
+        if (persistedFeed) {
+            feedStore.addFeedEntry(persistedFeed);
         }
-        if (props.bio[1]) {
-            previousBio = props.bio[1];
-        }
-        feed = {
-            created_at: nowIso(),
-            type: 'Bio',
-            userId: ref.id,
-            displayName: ref.displayName,
-            bio,
-            previousBio
-        };
-        notificationStore.queueFeedNoty(feed);
-        sharedFeedStore.addEntry(feed);
-        feedStore.addFeedEntry(feed);
-        database.addBioToDatabase(feed);
     }
     if (props.note && props.note[0] !== null && props.note[0] !== props.note[1]) {
         checkNote(ref.id, props.note[0]);

@@ -164,7 +164,7 @@
                     <pre
                         class="text-xs font-[inherit]"
                         style="white-space: pre-wrap; max-height: 210px; overflow-y: auto"
-                        >{{ bioCache.translated || userDialog.publicProfileRef?.bio || '—' }}</pre>
+                        >{{ bioCache.translated || replaceBioSymbols(userDialog.publicProfileRef?.bio) || '—' }}</pre>
                     <div
                         v-if="userDialog.publicProfileRef?.bioLinks && userDialog.publicProfileRef?.bioLinks.length"
                         class="flex flex-wrap items-center gap-1.5 mt-2">
@@ -235,7 +235,7 @@
                             {{ t('dialog.user.info.vrcx_info') }}
                             <span
                                 class="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-                                <TooltipWrapper side="top" :content="t('dialog.user.info.vrcx_info_tooltip')">
+                                <TooltipWrapper side="right" :content="t('dialog.user.info.vrcx_info_tooltip')">
                                     <Info class="h-3 w-3 shrink-0" :style="{ color: userDialog.theme.iconColor }" />
                                 </TooltipWrapper>
                             </span>
@@ -243,7 +243,7 @@
                     </div>
                     <div class="flex flex-col gap-1.5">
                         <TooltipWrapper
-                            side="top"
+                            side="right"
                             :content="formatDateFilter(userOnlineForTimestamp(userDialog), 'long')"
                             :disabled="!userOnlineForTimestamp(userDialog)">
                             <template #content>
@@ -265,7 +265,7 @@
 
                         <template v-if="currentUser.id !== userDialog.id">
                             <TooltipWrapper
-                                side="top"
+                                side="right"
                                 :disabled="!userDialog.lastSeen"
                                 :content="formatDateFilter(userDialog.lastSeen, 'long')">
                                 <div class="flex justify-between items-start gap-2 text-xs">
@@ -277,7 +277,7 @@
                                     }}</span>
                                 </div>
                             </TooltipWrapper>
-                            <TooltipWrapper side="top" :disabled="userDialog.dateFriendedInfo.length === 0">
+                            <TooltipWrapper side="right" :disabled="userDialog.dateFriendedInfo.length === 0">
                                 <template #content>
                                     <template v-if="userDialog.dateFriendedInfo.length === 1">
                                         {{ formatDateFilter(userDialog.dateFriended, 'long') }}
@@ -303,7 +303,7 @@
                                 </div>
                             </TooltipWrapper>
                             <TooltipWrapper
-                                side="top"
+                                side="right"
                                 :content="timeToText(userDialog.timeSpent, true)"
                                 :disabled="!userDialog.timeSpent">
                                 <div class="flex justify-between items-start gap-2 text-xs">
@@ -315,7 +315,7 @@
                                     }}</span>
                                 </div>
                             </TooltipWrapper>
-                            <TooltipWrapper side="top" :content="t('dialog.user.info.open_previous_instance')">
+                            <TooltipWrapper side="right" :content="t('dialog.user.info.open_previous_instance')">
                                 <div
                                     class="flex justify-between items-start gap-2 text-xs cursor-pointer hover:text-foreground"
                                     @click="showPreviousInstancesListDialog(userDialog.ref)">
@@ -329,7 +329,7 @@
                             </TooltipWrapper>
                         </template>
                         <template v-else>
-                            <TooltipWrapper side="top" :content="t('dialog.user.info.open_previous_instance')">
+                            <TooltipWrapper side="right" :content="t('dialog.user.info.open_previous_instance')">
                                 <div
                                     class="flex justify-between items-start gap-2 text-xs cursor-pointer hover:text-foreground"
                                     @click="showPreviousInstancesListDialog(userDialog.ref)">
@@ -352,7 +352,7 @@
                         {{ t('dialog.user.info.header') }}
                     </div>
                     <div class="flex flex-col gap-1.5">
-                        <TooltipWrapper side="top">
+                        <TooltipWrapper side="right">
                             <template #content>
                                 <span
                                     >{{ t('dialog.user.info.last_login') }}
@@ -375,7 +375,7 @@
                         </TooltipWrapper>
 
                         <TooltipWrapper
-                            side="top"
+                            side="right"
                             :content="formatDateFilter(userDialog.ref.date_joined, 'date')"
                             :disabled="!userDialog.ref.date_joined">
                             <div class="flex justify-between items-start gap-2 text-xs">
@@ -389,7 +389,7 @@
                         </TooltipWrapper>
 
                         <template v-if="currentUser.id === userDialog.id">
-                            <TooltipWrapper side="top">
+                            <TooltipWrapper side="right">
                                 <template #content>
                                     <span>{{ t('view.profile.profile.refresh') }}</span>
                                 </template>
@@ -400,7 +400,7 @@
                                         t('view.profile.profile.vrchat_credits')
                                     }}</span>
                                     <span class="text-right text-muted-foreground">{{
-                                        vrchatCredit ?? t('view.profile.profile.refresh')
+                                        currentUserCredits ?? t('view.profile.profile.refresh')
                                     }}</span>
                                 </div>
                             </TooltipWrapper>
@@ -413,6 +413,18 @@
                                     ? t('dialog.user.info.avatar_cloning_allow')
                                     : t('dialog.user.info.avatar_cloning_deny')
                             }}</span>
+                        </div>
+
+                        <div class="flex justify-between items-center gap-2 text-xs">
+                            <span class="text-muted-foreground">{{ t('dialog.user.info.id') }}</span>
+                            <Button
+                                class="-mr-1.5 h-5 gap-1 px-1.5 text-xs font-normal text-muted-foreground has-[>svg]:px-1.5"
+                                size="sm"
+                                variant="ghost"
+                                @click="copyToClipboard(userDialog.id, t('message.user.id_copied'))">
+                                <Copy class="size-3" />
+                                {{ t('dialog.user.info.copy_id') }}
+                            </Button>
                         </div>
                     </div>
                 </div>
@@ -445,7 +457,7 @@
 </template>
 
 <script setup>
-    import { Info, Languages, Pencil, Trash2, User } from 'lucide-vue-next';
+    import { Copy, Info, Languages, Pencil, Trash2, User } from 'lucide-vue-next';
     import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
     import IconFrame from '@/components/IconFrame.vue';
     import { ref, watch } from 'vue';
@@ -456,11 +468,13 @@
     import { useI18n } from 'vue-i18n';
 
     import {
+        copyToClipboard,
         formatDateFilter,
         getFaviconUrl,
         isFriendOnline,
         isRealInstance,
         openExternalLink,
+        replaceBioSymbols,
         timeToText,
         userOnlineForTimestamp,
         timeAgo
@@ -492,7 +506,7 @@
     const { hideUserNotes, hideUserMemos } = storeToRefs(useAppearanceSettingsStore());
     const { bioLanguage, translationApi, translationApiType } = storeToRefs(useAdvancedSettingsStore());
     const { translateText } = useAdvancedSettingsStore();
-    const { userDialog, currentUser } = storeToRefs(useUserStore());
+    const { userDialog, currentUser, currentUserCredits } = storeToRefs(useUserStore());
     const { showEditProfileDialog } = useUserStore();
     const { fullscreenImageDialog } = storeToRefs(useGalleryStore());
 
@@ -505,7 +519,6 @@
     });
 
     const isEditNoteAndMemoDialogVisible = ref(false);
-    const vrchatCredit = ref(null);
     const translateLoading = ref(false);
 
     watch(
@@ -523,7 +536,7 @@
     );
 
     function onTabActivated() {
-        if (currentUser.value.id === userDialog.value.id && vrchatCredit.value === null) {
+        if (currentUser.value.id === userDialog.value.id && currentUserCredits.value === null) {
             getVRChatCredits();
         }
     }
@@ -536,7 +549,7 @@
         if (translateLoading.value) {
             return;
         }
-        const bio = userDialog.value.ref.bio;
+        const bio = replaceBioSymbols(userDialog.value.ref.bio);
         if (!bio) {
             return;
         }
@@ -599,7 +612,7 @@
     }
 
     function getVRChatCredits() {
-        queryRequest.fetch('vrchatCredits').then((args) => (vrchatCredit.value = args.json?.balance));
+        queryRequest.fetch('vrchatCredits').then((args) => (currentUserCredits.value = args.json?.balance));
     }
 
     /**
